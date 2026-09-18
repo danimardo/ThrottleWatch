@@ -180,7 +180,7 @@ Dos resultados son comparables («antes/después») si coinciden `cpu_id`, `dura
 |---|---|---|
 | `id` | text PK | Evento |
 | `session_id` | FK | Sesión |
-| `kind` | enum | `thermal`, `power`, `current`, `platform`, `mixed`, `turbo_end`, `unknown` |
+| `kind` | enum | `thermal`, `power`, `current`, `platform`, `mixed`, `turbo_end`, `oem_mode_change`, `unknown` |
 | `platform_kind` | enum nullable | `chassis_thermal`, `external_prochot` (solo con `kind = platform`) |
 | `certainty` | enum | `observed` (razones directas, nivel A), `inferred` (mesetas, niveles B/C) |
 | `limit_severity` | enum nullable | `boost`, `below_base` |
@@ -190,7 +190,7 @@ Dos resultados son comparables («antes/después») si coinciden `cpu_id`, `dura
 | `evidence_json` | json | Códigos y métricas, no prosa localizada |
 | `ruleset_version` | text | Reglas |
 
-**Mapeo a `AnalysisChart.events[].kind`**: `thermal` → `thermal`; `power` y `current` → `electrical`; `platform` → `platform`; `mixed` → `mixed`; `turbo_end` → marcador informativo (`info`), nunca banda de limitación; `unknown` → no se dibuja como banda, solo aparece en la lista de eventos del panel de evidencias.
+**Mapeo a `AnalysisChart.events[].kind`**: `thermal` → `thermal`; `power` y `current` → `electrical`; `platform` → `platform`; `mixed` → `mixed`; `turbo_end` y `oem_mode_change` → marcadores informativos (`info`), nunca banda de limitación; `unknown` → no se dibuja como banda, solo aparece en la lista de eventos del panel de evidencias.
 
 ### `diagnostic_report`
 

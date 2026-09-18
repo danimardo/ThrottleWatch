@@ -156,8 +156,8 @@ Revisado el 2026-09-18 (véase `gap-analysis.md` § 12). Los valores concretos e
 4. **Rasgos de la ventana estable** (60 s, deslizante cada 10 s): ocupación de cada razón, meseta térmica, meseta de potencia, tendencia del límite o del nivel de meseta de potencia a lo largo de la sesión, razón frecuencia activa / base.
 5. **Clasificación** por la tabla ordenada de `spec.md` (primera regla que se cumple), con subtipo de equipo y gravedad `boost`/`below_base`.
 6. **Confianza**: puntuación de solidez con techo por nivel.
-7. **Potencial** (solo nivel A y clases térmicas, mixta o chasis): método «techo de potencia» `g = (PL1_ref / P)^(1/3) − 1` (PL1_ref = PL1 efectivo actual; en chasis, el máximo de la sesión), acotado con `g ≤ f_turbo / f_activa − 1`, expresado como `[0,5·g, 1,0·g]` y redondeado a tramos.
-8. **Eventos**: fusión de ventanas consecutivas de la misma clase en `limit_event` con evidencias como códigos.
+7. **Potencial** (cifra solo en nivel A y clases térmicas, mixta o chasis; en niveles B/C solo el tramo cualitativo sin cifra con `below_base`): método «techo de potencia» `g = (PL1_ref / P)^(1/3) − 1` (PL1_ref = PL1 efectivo actual; en chasis, el máximo de la sesión), acotado con `g ≤ f_turbo / f_activa − 1`, expresado como `[0,5·g, 1,0·g]` y redondeado a tramos.
+8. **Eventos**: fusión de ventanas consecutivas de la misma clase en `limit_event` con evidencias como códigos; marcadores informativos `turbo_end` y `oem_mode_change`.
 9. **Informe de sesión**: clase principal por tiempo acumulado según `spec.md` § «Clasificación de una sesión», con duración por clase e intervalo analizado.
 
 ### Por qué así
@@ -201,7 +201,7 @@ El generador de carga debe estar aislado del hilo de sensores, permitir cancelac
 
 ## Almacenamiento y retención
 
-- SQLite en el directorio de datos de aplicación, WAL y `busy_timeout`.
+- SQLite en el directorio de datos de aplicación, WAL, `foreign_keys = ON` en cada conexión y `busy_timeout`.
 - Escritura de muestras en lotes pequeños transaccionales.
 - Datos brutos según retención del usuario; por defecto siete días.
 - Informes y resultados guiados se conservan hasta borrado explícito.
@@ -316,6 +316,7 @@ Runner `windows-2025`. Orden (constitución XVI): instalación con archivos de b
 
 - Matriz mínima: Intel híbrido moderno, Intel anterior, AMD Ryzen moderno, AMD anterior y equipo con cobertura degradada.
 - Equipos disponibles (2026-09-18): AMD Ryzen 5 2600X (Zen+, sobremesa, Windows 11 25H2; cubre «AMD anterior» y es el equipo de desarrollo), Intel híbrido de 12.ª generación o posterior, Intel de 11.ª generación o anterior, un portátil (batería, plan energético y gestión térmica del fabricante) y AMD Zen 3/4/5. La cobertura degradada se obtiene sin el acceso avanzado y en la VM de CI. Falta asignar quién ejecuta cada verificación manual.
+- **Equipo de referencia para presupuestos** (NFR-001 a NFR-003, NFR-010, NFR-016, SC-006): el Intel híbrido de 12.ª generación o posterior de la matriz, con Windows 11 25H2 y WebView2 Evergreen actualizado. El Ryzen 5 2600X sirve de cota inferior informativa, no de referencia. El modelo exacto se registra en el ADR de release.
 - **Hueco para SC-009:** SC-009 exige al menos dos generaciones anteriores de cada fabricante, y hoy solo hay una de Intel (≤ 11.ª) y una de AMD (Zen+). Antes de T109 hay que conseguir otra generación anterior de cada fabricante (por ejemplo, Intel 8.ª–10.ª y AMD Zen 2) o registrar en el ADR de release la verificación parcial de SC-009.
 - Comparar mensajes con señales expuestas por herramientas de referencia, sin exigir igualdad exacta de muestreo.
 
@@ -339,6 +340,7 @@ apps/
 │   │   ├── src/
 │   │   │   ├── commands/
 │   │   │   ├── diagnostics/
+│   │   │   ├── telemetry/      # agregación de snapshot, frescura y búfer reciente
 │   │   │   ├── ipc/
 │   │   │   ├── storage/
 │   │   │   ├── export/
@@ -374,7 +376,7 @@ tests/
 ### Integración del sistema de diseño
 
 - `design/tokens/tokens.css` alimenta los estilos de la aplicación; no se mantiene una copia divergente de los tokens.
-- **Decisión (2026-09-18):** `design/` se **copia** a `apps/desktop/src/design-system/` mediante un script de sincronización (`pnpm design:sync`) y un test de CI comprueba la igualdad byte a byte de `components/`, `icons/`, `illustrations/`, `lib/` y `tokens/`. `design/` sigue siendo la única fuente editable; la app nunca modifica su copia. `design/examples/` y `design/harness/` no se copian ni se importan. Motivo: el harness fija Svelte 5.57 y Tauri fijará su propia versión; un paquete workspace contradice la decisión de `design/README.md` de no publicar paquete.
+- **Decisión (2026-09-18):** `design/` se **copia** a `apps/desktop/src/design-system/` mediante un script de sincronización (`pnpm design:sync`) y un test de CI comprueba la igualdad byte a byte de `brand/`, `components/`, `icons/`, `illustrations/`, `lib/` y `tokens/`. `design/` sigue siendo la única fuente editable; la app nunca modifica su copia. `design/examples/` y `design/harness/` no se copian ni se importan. Motivo: el harness fija Svelte 5.57 y Tauri fijará su propia versión; un paquete workspace contradice la decisión de `design/README.md` de no publicar paquete.
 - `design/examples/` define la composición de referencia, mientras que las features conectan datos y comandos mediante adaptadores Svelte/Tauri.
 - `design/harness/` es la prueba aislada del sistema: sus comandos de comprobación y compilación forman parte de CI.
 - Cada pantalla se valida en español e inglés, claro y oscuro y tres niveles de ancho: compacto, medio y expandido. Cualquier excepción queda registrada en este plan o en un ADR.
@@ -397,11 +399,11 @@ Resultados posibles: **(a)** nivel A sin UAC recurrente → se continúa con el 
 - Verificar que `% Processor Performance` y `Processor Frequency` son fiables por procesador lógico en Intel híbrido y AMD (comparando con APERF/MPERF leídos por el sidecar cuando haya acceso), incluidos equipos con EcoQoS y modos de eficiencia.
 - Grabar el corpus etiquetado inicial (véase `research.md` § 15) en al menos un Intel híbrido, un Intel anterior, un portátil con gestión térmica del fabricante y un AMD Zen 4.
 - Validar en el hardware objetivo el presupuesto del `AnalysisChart` SVG con 4 pistas, 3.000 puntos por pista y eventos superpuestos; conservar el benchmark reproducible.
-- Medir en WebView2 el coste del material de vidrio (`backdrop-filter` en tarjetas y chrome, fondo ambiental animado) en reposo y con el gráfico actualizándose; fijar el umbral de degradación automática a `reduced` (propuesta: < 50 fps sostenidos durante 3 s o > 1 % de CPU en reposo atribuible a composición) y leer `UISettings.AdvancedEffectsEnabled` para el modo `system`.
-- Decidir estrategia segura de carga guiada.
+- Medir en WebView2 el coste del material de vidrio (`backdrop-filter` en tarjetas y chrome, fondo ambiental animado) en reposo y con el gráfico actualizándose; fijar el umbral de degradación automática a `reduced` (propuesta: < 50 fps sostenidos durante 3 s o > 1 % de CPU en reposo atribuible a composición) y leer `UISettings.AdvancedEffectsEnabled` para el modo `system` (T019c; umbrales provisionales `glass.*` en `spec.md`).
+- Decidir estrategia segura de carga guiada (T053 en L03; ADR T054 al cerrar L12).
 - Validar la conducción de WebView2 por CDP desde Playwright con la compilación `e2e` de Tauri en el runner `windows-2025` (T-PLAY-002); alternativa: WebDriver con `tauri-driver`, que exigiría enmienda del stack.
 - Medir los tiempos base de cada suite y fijar el presupuesto del pipeline de PR (objetivo inicial: ≤ 15 min de mediana).
-- Validar permisos mínimos de barra propia, inicio con Windows, notificaciones y actualizador.
+- Validar permisos mínimos de barra propia, inicio con Windows, notificaciones y actualizador (T019d).
 - Definir pipeline de GitHub Releases, clave pública Ed25519 y custodia del secreto de firma.
 
 ### Fase 1 — Vertical slice pasivo

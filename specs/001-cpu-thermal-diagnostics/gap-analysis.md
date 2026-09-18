@@ -296,3 +296,27 @@ Se corrigieron los 4 hallazgos críticos y los 8 altos. Los medios y bajos queda
 Además, T047a (sesiones pasivas) pasa a la fase 2 porque el corte vertical la necesita.
 
 **Segunda pasada de `/speckit-analyze` (2026-09-18).** Sin críticos. Corregidos: FR-078 alineado con la regla 3 (la mixta exige nivel A); US2-2 sin la condición obsoleta sobre la meseta de potencia; US2-7 con bajada progresiva; gravedad «reglas 3–8, salvo 7b»; T044, T068 y T101 reescritas para conectar o añadir en `design/`. Pendientes antes de la fase 3/4: U6 (alertas en B/C), U8 (7b como evento informativo), I14 (SC-016 con mixta degradada) y el resto de medios.
+
+**Tercera pasada de `/speckit-analyze` (2026-09-18).** Sin críticos; cobertura de FR/NFR/SC al 100 %. Aplicado:
+
+| # | Hallazgo | Decisión | Dónde |
+|---|---|---|---|
+| U1 | Umbrales de degradación del vidrio solo como «propuesta» en el plan (constitución VII) | Bloque «Vidrio» en parámetros iniciales (`glass.*`, provisionales hasta T019c) | `spec.md`, FR-043b, T131, T019c |
+| U2 | T036 no incluía en `ruleset-v1` estado térmico, alertas, prueba guiada, potencial ni sesión | T036 cubre toda la sección; T047, T056, T069, T071, T104 y T131 leen de `ruleset-v1` sin literales | `tasks.md` |
+| U3 | Parámetros sin identificador estable (constitución VII) | Tabla de identificadores `grupo.nombre` en «Parámetros iniciales» | `spec.md` |
+| A3 | NFR-004 sin cifras de retroceso | Bloque «Colector (supervisión)» (`collector.*`) que referencia `ipc-protocol.md` | `spec.md` |
+| U6 | `thermal_probable` sin alerta; alertas en B/C indefinidas | Las alertas de limitación exigen `below_base` y `certainty = observed`; en B/C solo ventana e icono | `spec.md` (Alertas), T069 |
+| U8 / I14 | SC-016 no decía cómo puntuar la mixta degradada | Tabla de equivalencias A → B en SC-016 | `spec.md`, T045 |
+| U7 | 7b solo como causa alternativa | Evento informativo `oem_mode_change` (marcador, como `turbo_end`) | `spec.md` regla 7b, `data-model.md`, T042, T063, `plan.md` etapa 8 |
+| I1 | FR-046 «sin estado en bandeja sin muestreo» frente a pausa de FR-059 | FR-046 se refiere a la configuración; la pausa es transitoria, icono `desconocido`, sin alertas | `spec.md` FR-046, FR-059 |
+| I2 | T049/T051 (L13) antes del spike y ADR de carga guiada | T053 a L03, T054 al cierre de L12; T049 y T051 condicionadas | `tasks.md`, `plan.md` fase 0 |
+| U4 | `telemetry/` no estaba en la estructura del plan | Añadido; T004 crea todos los módulos | `plan.md`, T004 |
+| U5 | Spikes de vidrio y permisos sin tarea | T019c y T019d en L03 | `tasks.md`, `plan.md` fase 0 |
+| I3 | `brand/` copiado por T024 pero fuera del test de igualdad | Añadido al plan | `plan.md` |
+| C2 | Claves foráneas activas (constitución X) sin tarea | `foreign_keys = ON` por conexión y test de integridad | `plan.md`, T022 |
+| A1 | Equipo de referencia indefinido | Intel híbrido de 12.ª generación o posterior; Ryzen 5 2600X como cota inferior | `plan.md` § Hardware real |
+| I6 | T047 «solo nivel A» omitía el tramo cualitativo B/C | T047 y etapa 7 del plan reescritas | `tasks.md`, `plan.md` |
+| C3, U9, G2 | `lang`, medición de NFR-010, FR-018 sin aserción | T084, T-E2E-01 y T059 ampliadas | `tasks.md` |
+| A2, D1, I4, I7, I8 | Erratas: «método A», caso límite duplicado, enums de FR-060 en español, estado de la spec, familia `T-ACC` | Corregidas | `spec.md`, `tasks.md` |
+
+Pendiente de decisión humana: ninguno. El hueco de hardware para SC-009 sigue registrado en `plan.md` § Hardware real y en T109.

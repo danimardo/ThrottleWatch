@@ -2,7 +2,7 @@
 
 **Rama**: `001-cpu-thermal-diagnostics`  
 **Creada**: 2026-09-17  
-**Estado**: Lista para planificación  
+**Estado**: Planificada y con tareas (L00 pendiente)  
 **Entrada**: Utilidad Windows visualmente atractiva que mida CPU Intel/AMD, detecte limitación térmica y explique cuánto rendimiento potencial se pierde sin confundir calor con otras limitaciones.
 
 ## Objetivo
@@ -228,7 +228,7 @@ Como usuario quiero saber si existe una versión nueva y decidir por separado si
 
 - CPU o placa no reconocida; sensores con nombres inesperados o duplicados.
 - Máquina virtual o entorno sin acceso a sensores: la cobertura lo indica explícitamente como estado propio.
-- Segunda instancia de la aplicación: se enfoca la existente y la nueva termina.
+- Segunda instancia de la aplicación (se enfoca la existente y la nueva termina) o una actualización durante el muestreo.
 - Temperatura disponible solo como paquete, solo por núcleo, `Tctl` con offset o margen respecto a TjMax.
 - TjMax desconocido o dinámico; sensores que devuelven valores imposibles, congelados o intermitentes.
 - Cambio de corriente alterna a batería, plan energético o modo OEM durante una sesión.
@@ -236,7 +236,6 @@ Como usuario quiero saber si existe una versión nueva y decidir por separado si
 - Topología híbrida, SMT, núcleos aparcados o cambios de afinidad.
 - Carga parcial, variable o concentrada en pocos núcleos.
 - Sidecar detenido, protocolo incompatible, permisos insuficientes o controlador ausente.
-- Dos instancias de la aplicación o una actualización durante el muestreo.
 - Historial grande, disco lleno, base de datos dañada o exportación cancelada.
 - Onboarding interrumpido, omitido o invalidado por una actualización importante.
 - Locale de Windows ausente, no reconocido o cambiado mientras la aplicación está abierta.
@@ -292,10 +291,10 @@ Como usuario quiero saber si existe una versión nueva y decidir por separado si
 - **FR-041**: CSV y JSON DEBEN usar claves y enums técnicos estables en inglés; todo informe destinado a personas DEBE usar el idioma efectivo elegido.
 - **FR-042**: La apariencia DEBE ofrecer `Sistema`, `Claro` y `Oscuro`, usando `Sistema` por defecto y reaccionando a cambios de tema de Windows mientras la aplicación está abierta.
 - **FR-043**: El movimiento reducido DEBE seguir Windows por defecto y poder anularse desde Ajustes (`Sistema` / `Reducido` / `Completo`).
-- **FR-043b**: El efecto de vidrio de la interfaz DEBE ofrecer `Sistema`, `Completo`, `Reducido` y `Sin`; `Sistema` DEBE seguir el ajuste «Efectos de transparencia» de Windows. La aplicación DEBE degradar el nivel automáticamente cuando la tasa de fotogramas no alcance el presupuesto y DEBE mantener el contraste AA del texto en todos los niveles.
+- **FR-043b**: El efecto de vidrio de la interfaz DEBE ofrecer `Sistema`, `Completo`, `Reducido` y `Sin`; `Sistema` DEBE seguir el ajuste «Efectos de transparencia» de Windows. La aplicación DEBE degradar el nivel automáticamente según los umbrales `glass.*` de los parámetros iniciales y DEBE mantener el contraste AA del texto en todos los niveles.
 - **FR-044**: La ventana principal DEBE usar una barra de título propia con icono, nombre, región de arrastre, minimizar, maximizar/restaurar, cerrar y doble clic para maximizar/restaurar, disponible también en onboarding y errores iniciales.
 - **FR-045**: La aplicación DEBE conservar posición, tamaño, estado maximizado y último tamaño restaurado; nunca DEBE restaurar la ventana completamente fuera del área visible ni recordar un estado minimizado.
-- **FR-046**: En el primer cierre sin decisión guardada, el sistema DEBE preguntar si sale o continúa en la bandeja, guardar obligatoriamente la elección e indicar que puede cambiarse en Ajustes. Elegir bandeja DEBE activar `tray.monitoring_enabled`; no existe un estado «en bandeja sin muestreo». Cerrar el diálogo sin elegir DEBE dejar la decisión sin guardar y la ventana abierta.
+- **FR-046**: En el primer cierre sin decisión guardada, el sistema DEBE preguntar si sale o continúa en la bandeja, guardar obligatoriamente la elección e indicar que puede cambiarse en Ajustes. Elegir bandeja DEBE activar `tray.monitoring_enabled`; no existe una **configuración** «en bandeja sin muestreo» (`lifecycle.close_action = tray` implica `tray.monitoring_enabled = true`); la pausa manual desde el menú de bandeja (FR-059) es un estado transitorio que no se persiste y se anula al mostrar la ventana o reiniciar. Cerrar el diálogo sin elegir DEBE dejar la decisión sin guardar y la ventana abierta.
 - **FR-047**: `Iniciar con Windows` DEBE estar desactivado por defecto y, al activarse, permitir mostrar la ventana o iniciar oculto; iniciar oculto solo DEBE permitirse si la monitorización en bandeja está habilitada.
 - **FR-048**: Los avisos DEBEN estar desactivados por defecto; el onboarding solo DEBE informar de que pueden habilitarse en Ajustes.
 - **FR-049**: La configuración de muestreo DEBE presentar los perfiles `Bajo consumo`, `Normal` y `Diagnóstico`; sus frecuencias concretas solo aparecen en ajustes avanzados.
@@ -308,8 +307,8 @@ Como usuario quiero saber si existe una versión nueva y decidir por separado si
 - **FR-056**: Una actualización disponible DEBE aparecer en Ajustes y como notificación nativa; la descarga DEBE mostrar progreso.
 - **FR-057**: Instalar DEBE exigir confirmación, avisar del cierre y quedar bloqueado mientras haya un diagnóstico guiado, exportación, importación o borrado/restablecimiento en curso, mostrando el motivo del bloqueo.
 - **FR-058**: El actualizador DEBE usar un endpoint fijo de GitHub Releases, ejecutarse desde el backend, no enviar identificadores ni telemetría y aislar todos sus fallos del resto de la aplicación. No existe selección de canal: solo se publican versiones estables.
-- **FR-059**: El icono de bandeja DEBE distinguir cinco estados: `normal`, `aviso`, `crítico`, `desconocido` y `desconectado`, mapeados desde la clasificación en vivo y el estado del colector. Un clic DEBE mostrar u ocultar la ventana; el menú contextual DEBE ofrecer estado actual, abrir, pausar/reanudar muestreo y salir.
-- **FR-060**: El comportamiento en batería DEBE ser configurable mediante `sampling.on_battery` con valores `mantener`, `bajo consumo` y `pausar`; el valor inicial es `mantener`. Un cambio de fuente de alimentación DEBE aplicarse en la siguiente muestra.
+- **FR-059**: El icono de bandeja DEBE distinguir cinco estados: `normal`, `aviso`, `crítico`, `desconocido` y `desconectado`, mapeados desde la clasificación en vivo y el estado del colector. Un clic DEBE mostrar u ocultar la ventana; el menú contextual DEBE ofrecer estado actual, abrir, pausar/reanudar muestreo y salir. Con el muestreo pausado el icono usa el estado `desconocido` con el texto «Muestreo en pausa» en el tooltip y en el menú; no se emiten alertas mientras dure la pausa.
+- **FR-060**: El comportamiento en batería DEBE ser configurable mediante `sampling.on_battery` con valores `keep` (mantener), `low_power` (bajo consumo) y `pause` (pausar); el valor inicial es `keep`. Un cambio de fuente de alimentación DEBE aplicarse en la siguiente muestra.
 - **FR-061**: Deshabilitar la monitorización en bandeja DEBE corregir atómicamente cualquier configuración dependiente incompatible (`startup.mode=tray` → `window`, `lifecycle.close_action=tray` → `exit`) y comunicarlo en la respuesta.
 - **FR-062**: Un control dependiente de otro ajuste DEBE permanecer visible, deshabilitado y con una explicación de la condición que lo habilita; nunca DEBE ocultarse.
 - **FR-063**: `Eliminar todos mis datos` y `Restablecer ThrottleWatch` DEBEN ejecutarse como transacciones; un fallo parcial DEBE revertir lo posible y comunicar qué no pudo completarse.
@@ -342,7 +341,7 @@ Como usuario quiero saber si existe una versión nueva y decidir por separado si
 - **NFR-001 — Fluidez:** animaciones y navegación a 60 fps en hardware objetivo; los gráficos pueden actualizarse a la frecuencia de muestreo sin bloquear la UI. El material de vidrio (desenfoque de fondo) NO DEBE elevar el consumo pasivo por encima de NFR-003; si lo hace, el nivel baja a `reducido`.
 - **NFR-002 — Latencia:** una muestra válida debe verse en menos de 1,5 s en el percentil 95.
 - **NFR-003 — Consumo:** monitorización pasiva con objetivo inferior al 1 % de CPU promedio y 180 MB de memoria en un equipo de referencia moderno.
-- **NFR-004 — Resiliencia:** la caída del colector no debe cerrar la interfaz; debe reiniciarse con retroceso limitado o pedir intervención.
+- **NFR-004 — Resiliencia:** la caída del colector no debe cerrar la interfaz; debe reiniciarse con retroceso limitado según los parámetros `collector.*` o pedir intervención.
 - **NFR-005 — Accesibilidad:** WCAG 2.2 nivel AA según el principio XII de la constitución: navegación completa por teclado, foco visible y no oculto, contraste (texto ≥ 4,5:1; texto grande, iconos y trazos ≥ 3:1), estados no dependientes solo del color, lectores de pantalla (Narrador y NVDA), temas de contraste de Windows, objetivos ≥ 24×24 px y movimiento reducido.
 - **NFR-006 — Seguridad:** IPC local con autenticación efímera, esquema validado y lista cerrada de comandos.
 - **NFR-007 — Retención:** siete días por defecto; el usuario puede elegir 1, 7, 30 días o solo sesión.
@@ -359,6 +358,27 @@ Como usuario quiero saber si existe una versión nueva y decidir por separado si
 ### Parámetros iniciales (ruleset v1)
 
 Los valores siguientes son los iniciales de la versión 1 de reglas. Se almacenan en configuración versionada (`ruleset-v1`), son revisables tras validar el corpus de trazas y cualquier cambio exige nueva versión de reglas. Su presencia aquí evita que la implementación los invente.
+
+Cada parámetro tiene un identificador estable en inglés (`grupo.nombre`) que coincide con la clave de `ruleset-v1.json` y con la entrada de `traceability.md`. La tabla siguiente los enumera; ningún número de decisión puede existir en el código sin uno (constitución VII).
+
+| Grupo | Identificadores (valor inicial) |
+|---|---|
+| Estado térmico | `thermal.margin_warn_c` (8), `thermal.margin_critical_c` (3), `thermal.abs_warn_c` (85), `thermal.abs_critical_c` (95) |
+| Núcleos activos y carga | `load.active_core_util_pct` (80), `load.start_threshold_pct` (30) |
+| Ventanas | `window.stable_s` (60), `window.step_s` (10), `window.turbo_min_s` (60) |
+| Ventana de turbo | `turbo.end_power_drop_pct` (15), `turbo.end_drop_window_s` (5) |
+| Mesetas | `plateau.thermal_margin_c` (3), `plateau.thermal_stddev_c` (1,5), `plateau.power_cv_pct` (3) |
+| Reglas | `rules.reason_occupancy_pct` (20), `rules.chassis_limit_drop_pct` (10), `rules.chassis_plateau_drop_pct` (15), `rules.chassis_min_steps` (2), `rules.chassis_min_span_s` (180), `rules.oem_step_window_s` (5), `rules.power_margin_a_c` (3), `rules.power_margin_b_c` (8), `rules.freq_drop_vs_turbo_pct` (8) |
+| Gravedad | `severity.below_base_ratio` (0,97), `severity.min_duration_s` (30) |
+| Sesión | `session.indeterminate_share_pct` (50), `session.class_min_s` (60), `session.class_min_share_pct` (10), `session.gap_s` (60), `session.max_h` (24) |
+| Confianza | `confidence.medium_min` (0,45), `confidence.high_min` (0,75) |
+| Potencial | `potential.range_low_factor` (0,5), `potential.tier_barely_max_pct` (3), `potential.tier_moderate_max_pct` (10), `potential.round_step_pct` (5) |
+| Prueba guiada | `guided.preflight_max_s` (30), `guided.rest_s` (60), `guided.warmup_s` (90), `guided.load_s` (short 180, standard 240, long 360), `guided.recovery_s` (120), `guided.measure_head_s` (20), `guided.measure_tail_s` (120), `guided.stop_over_limit_c` (2), `guided.stop_over_limit_samples` (3), `guided.stop_low_freq_ratio` (0,5), `guided.stop_low_freq_s` (10), `guided.stop_missing_sensor_samples` (3), `guided.stop_generator_timeout_s` (5) |
+| Alertas | `alerts.min_persistence_s` (90), `alerts.cooldown_min` (30) |
+| Muestreo | `sampling.interval_ms` (low_power 5000, normal 1000, diagnostic 500) |
+| Vidrio | `glass.degrade_fps` (50), `glass.degrade_window_s` (3), `glass.degrade_idle_cpu_pct` (1), `glass.degrade_idle_window_s` (30), `glass.restore_fps` (55), `glass.restore_window_s` (60) |
+| Almacenamiento y registro | `storage.retry_s` (60), `logging.frontend_max_per_min` (60), `logging.detailed_hours` (24) |
+| Colector | `collector.max_message_bytes` (1 MiB), `collector.max_invalid_messages` (3), `collector.max_restarts` (3), `collector.restart_window_min` (10), `collector.stall_intervals` (3), `collector.parent_check_s` (2) |
 
 **Límite térmico efectivo**: Intel, `TjMax − TCC offset` leídos de `MSR_TEMPERATURE_TARGET`; AMD, límite de Tctl por familia según la tabla versionada `thermal-limits-v1` (por ejemplo, 95 °C en Zen 4/Zen 5 de sobremesa) o el que exponga el colector. Sin límite conocido se usan umbrales absolutos y el anillo indica escala aproximada.
 
@@ -407,7 +427,7 @@ En Intel el nivel A requiere el acceso avanzado. En AMD de consumo no existe un 
 | 5 | `thermal_probable` | — | B: meseta térmica (causa alternativa listada: «posible límite de potencia simultáneo, no medible en este nivel»). C: meseta térmica con frecuencia activa < base |
 | 6 | `platform_limited` · `external_prochot` | ocupación `PROCHOT` ≥ 20 % sin `THERMAL` | — |
 | 7 | `platform_limited` · `chassis_thermal` | el límite de potencia efectivo baja ≥ 10 % durante la sesión sin cambio de plan ni de alimentación, con margen > 8 °C, de forma progresiva (≥ 2 escalones o descenso repartido en ≥ 3 min) | B: el nivel de la meseta de potencia baja ≥ 15 % a lo largo de la sesión con carga y contexto constantes y margen > 8 °C, de forma progresiva |
-| 7b | `indeterminate` (causa alternativa `oem_mode_change`) | el límite de potencia efectivo baja ≥ 10 % en un único escalón de ≤ 5 s sin cambio de plan ni de alimentación; no se recomienda ventilar | B: ídem sobre el nivel de la meseta de potencia (≥ 15 %) |
+| 7b | `indeterminate` (causa alternativa `oem_mode_change`) | el límite de potencia efectivo baja ≥ 10 % en un único escalón de ≤ 5 s sin cambio de plan ni de alimentación; no se recomienda ventilar y se registra el evento informativo `oem_mode_change` | B: ídem sobre el nivel de la meseta de potencia (≥ 15 %) |
 | 8 | `power_limited` | ocupación de potencia ≥ 20 % con margen > 3 °C | B: meseta de potencia con margen > 8 °C |
 | 9 | `indeterminate` | frecuencia activa ≥ 8 % por debajo de la de la ventana de turbo sin meseta ni razón; causas alternativas: gestión de energía de Windows (EcoQoS, EPP, modo eficiencia), plan energético | ídem |
 | 10 | `normal` | carga sostenida sin nada de lo anterior | ídem |
@@ -446,11 +466,13 @@ La gravedad del informe es `below_base` si esa clase acumuló ≥ 30 s en `below
 
 El detalle por núcleo se mantiene siempre en memoria para la pantalla CPU; el histórico se agrega por grupo salvo en sesiones guiadas o en perfil Diagnóstico.
 
-**Alertas**: tipos `thermal_confirmed`, `power_limited`, `platform_limited`, `collector_lost` y `guided_finished`; `update_available` pertenece al actualizador. Las alertas de limitación solo se emiten con gravedad `below_base`. Persistencia mínima 90 s; enfriamiento 30 min por tipo; periodo de silencio opcional (sin valor inicial). Una alerta de limitación abre `Análisis` centrado en el evento.
+**Alertas**: tipos `thermal_confirmed`, `power_limited`, `platform_limited`, `collector_lost` y `guided_finished`; `update_available` pertenece al actualizador. Las alertas de limitación exigen gravedad `below_base` **y** `certainty = observed` (razones directas, nivel A): una clase inferida por mesetas (niveles B/C, incluida `thermal_probable`) nunca genera notificación; se comunica solo en la ventana y en el icono de bandeja (`aviso`). Persistencia mínima 90 s; enfriamiento 30 min por tipo; periodo de silencio opcional (sin valor inicial). Una alerta de limitación abre `Análisis` centrado en el evento.
 
 **Prueba guiada**: comprobación ≤ 30 s; reposo opcional 60 s (omitible); calentamiento progresivo 90 s; carga sostenida 180 s (`corta`), 240 s (`estándar`) o 360 s (`larga`), de modo que los últimos 120 s quedan siempre fuera de la ventana de turbo; recuperación 120 s. Parada automática (FR-085): temperatura > límite efectivo + 2 °C durante 3 muestras; temperatura en el límite con frecuencia activa < 50 % de la base durante 10 s; 3 muestras consecutivas sin sensor crítico; generador sin respuesta durante 5 s. Alcanzar el límite térmico **no** detiene la prueba. Ocultar la ventana o suspender el equipo cancela la prueba. Atajo de parada: `Ctrl+Shift+X`.
 
 **Ventana**: tamaño mínimo 480×600 px lógicos; si la altura útil del monitor es menor (por ejemplo, 1080p al 200 %), el mínimo de altura pasa a esa altura útil, nunca por debajo de 500 px lógicos. Con altura útil inferior a 500 px lógicos, la ventana se abre maximizada y el contenido se desplaza verticalmente, con barra de título, banner global y `Detener ahora` fijos. Tamaño inicial 1100×760 centrado en la pantalla principal, reducido al área útil si no cabe.
+
+**Vidrio (degradación automática)** (`glass.*`): el nivel efectivo baja de `full` a `reduced` cuando la tasa de fotogramas de la WebView es < 50 fps sostenidos durante 3 s (`glass.degrade_fps`, `glass.degrade_window_s`) o cuando la CPU atribuible a composición en reposo supera el 1 % durante 30 s (`glass.degrade_idle_cpu_pct`, `glass.degrade_idle_window_s`). Vuelve al nivel preferido solo tras 60 s por encima de 55 fps (`glass.restore_fps`, `glass.restore_window_s`: histéresis). La degradación no modifica `appearance.glass`; el estado degradado es visible en Ajustes › Apariencia. Valores provisionales hasta el spike de vidrio (T019c); su cambio exige nueva versión de reglas.
 
 **Atajos**: `Ctrl+1`…`Ctrl+6` navegación en el orden de la barra lateral; `Ctrl+,` Ajustes; `Ctrl+Shift+X` detener prueba; `Ctrl+E` exportar; `F1` ayuda; `Esc` cierra diálogos y tooltips.
 
@@ -459,6 +481,8 @@ El detalle por núcleo se mantiene siempre en memoria para la pantalla CPU; el h
 **Exportación**: CSV en formato largo (`timestamp_utc, monotonic_ms, sensor_id, metric, scope, value, status, quality`), separador coma, punto decimal, UTF-8 con BOM, tiempos UTC ISO-8601, nombre `throttlewatch_<tipo>_<fecha>_<id-corto>.<ext>`. La anonimización conserva fabricante, modelo comercial, topología y versiones; elimina nombre de equipo, usuario, números de serie, direcciones MAC, rutas, huella de monitores y GUID de plan energético.
 
 **Almacenamiento**: datos en `%LOCALAPPDATA%\ThrottleWatch`; registros en `logs/` en JSON por líneas (UTC), rotación de 5 ficheros × 5 MB y nivel `info`; `Registro detallado` sube a `debug` durante 24 h o hasta reiniciar (FR-086). La interfaz reenvía al backend solo `warn` y `error` (y `debug` con registro detallado), con un máximo de 60 eventos por minuto. Los registros se borran con `Eliminar todos mis datos`, con `Restablecer` y al salir con retención `solo sesión`. Disco lleno: modo solo memoria con aviso y reintento cada 60 s. Base de datos dañada: se renombra a `.corrupt-<fecha>`, se crea una nueva y se ofrece exportar la dañada.
+
+**Colector (supervisión)** (`collector.*`; los valores normativos del protocolo están en `contracts/ipc-protocol.md`): tamaño máximo por mensaje 1 MiB (`collector.max_message_bytes`); cierre y reinicio tras 3 mensajes inválidos consecutivos (`collector.max_invalid_messages`); como máximo 3 reinicios con retroceso en una ventana de 10 min (`collector.max_restarts`, `collector.restart_window_min`), después estado `failed` con intervención del usuario; sidecar bloqueado si faltan 3 intervalos de muestra (`collector.stall_intervals`); comprobación del proceso padre cada 2 s (`collector.parent_check_s`).
 
 ### Entidades clave
 
@@ -476,11 +500,11 @@ El detalle por núcleo se mantiene siempre en memoria para la pantalla CPU; el h
 ## Criterios de éxito medibles
 
 - **SC-001**: En pruebas moderadas con personas (no automatizables en CI), al menos el 90 % de nuevos usuarios identifica correctamente el estado principal en menos de 10 s.
-- **SC-002**: El 100 % de las cifras de potencial o rendimiento muestra método, entradas usadas (límite de potencia o carga de prueba), tramo, rango redondeado y confianza; ninguna cifra aparece sin método A o medición guiada.
+- **SC-002**: El 100 % de las cifras de potencial o rendimiento muestra método, entradas usadas (límite de potencia o carga de prueba), tramo, rango redondeado y confianza; ninguna cifra aparece sin nivel A o medición guiada.
 - **SC-003**: Ninguna traza “caliente sin limitación” ni “fin de turbo” del corpus se etiqueta como limitación térmica confirmada o probable.
 - **SC-004**: Al menos el 95 % de las trazas de nivel A con ocupación `THERMAL` ≥ 20 % se clasifica como térmica confirmada, y ninguna traza con solo `PROCHOT` lo hace.
 - **SC-005**: En trazas de nivel A, el motor acierta la clase (térmica, potencia, equipo, mixta, normal) en al menos el 90 % de las ventanas etiquetadas.
-- **SC-016**: Con las mismas trazas degradadas artificialmente a nivel B (eliminando razones y límites), el motor coincide con la etiqueta de nivel A en al menos el 80 % de las ventanas en que emite una causa, y nunca invierte térmica por potencia con confianza media.
+- **SC-016**: Con las mismas trazas degradadas artificialmente a nivel B (eliminando razones, límites y TCC offset), el motor coincide con la etiqueta de nivel A en al menos el 80 % de las ventanas en que emite una causa, según esta equivalencia: `thermal_confirmed` → `thermal_probable` y `mixed_limit` → `thermal_probable` cuentan como acierto; `power_limited` → `power_limited` y `platform_limited` → `platform_limited` cuentan como acierto; `indeterminate` no cuenta. Ninguna ventana etiquetada térmica o mixta se clasifica `power_limited` con confianza `media` (inversión térmica → potencia), y ninguna etiquetada potencia se clasifica `thermal_probable` con confianza `media`.
 - **SC-017**: Al menos el 80 % de las trazas etiquetadas como gestión térmica del fabricante se clasifican `platform_limited · chassis_thermal`, y ninguna recibe la recomendación de no mejorar la refrigeración.
 - **SC-018**: La gravedad (`boost` / `below_base`) coincide con la etiqueta en al menos el 95 % de las ventanas limitadas del corpus.
 - **SC-006**: El panel mantiene los presupuestos de consumo y latencia definidos en NFR-001 a NFR-003 durante una sesión de una hora.
