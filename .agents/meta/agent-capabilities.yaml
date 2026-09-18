@@ -1,0 +1,80 @@
+# Capacidades de herramientas de agentes validadas para este repositorio.
+# Estados: VERIFICADO (comprobado en ejecución) | DOCUMENTADO (doc oficial vigente, no probado) | NO_VERIFICABLE | NO_PRESENTE
+# Regla: si `installed_version` == `validated_version`, reutilizar; si no, ejecutar scripts/agent/detect-capability-changes.mjs
+# y revisar solo el adaptador afectado. Nunca regenerar automáticamente.
+validated_at: "2026-09-18"
+tools:
+  claude-code:
+    validated_version: "2.1.276"
+    modality: "CLI (Windows, Git Bash/PowerShell); extensión VS Code presente pero no probada"
+    instructions:
+      mechanism: "CLAUDE.md en raíz con importación `@AGENTS.md`; no lee AGENTS.md por sí solo"
+      state: "DOCUMENTADO"
+      source: "https://code.claude.com/docs/en/memory"
+    rules:
+      path: ".claude/rules/*.md"
+      path_scoped: "frontmatter `paths:` con globs"
+      state: "DOCUMENTADO"
+    skills:
+      path: ".claude/skills/<name>/SKILL.md"
+      reads_agents_skills: false
+      state: "VERIFICADO (skills speckit-* cargadas en esta sesión)"
+    agents:
+      path: ".claude/agents/*.md"
+      fields: [name, description, tools, disallowedTools, model, permissionMode, maxTurns, skills]
+      read_only_recipe: "tools: Read, Glob, Grep + permissionMode: plan"
+      state: "DOCUMENTADO"
+    permissions:
+      path: ".claude/settings.json"
+      keys: ["permissions.allow", "permissions.ask", "permissions.deny"]
+      state: "DOCUMENTADO"
+    hooks:
+      state: "DOCUMENTADO (no se usan en este repo)"
+    verify_commands: ["/context", "/agents", "/doctor"]
+    restart_required_after: ["settings.json", ".claude/rules", ".claude/agents", ".claude/skills"]
+  codex-cli:
+    validated_version: "0.154.0"
+    modality: "CLI (Windows)"
+    instructions:
+      mechanism: "AGENTS.override.md > AGENTS.md por directorio desde la raíz Git; concatenación; límite project_doc_max_bytes 32 KiB"
+      state: "DOCUMENTADO (mención de AGENTS.md verificada en `codex debug prompt-input`)"
+      source: "https://learn.chatgpt.com/docs/agent-configuration/agents-md"
+    rules:
+      mechanism: "sin rules con alcance por rutas; se referencian desde AGENTS.md"
+      state: "NO_PRESENTE"
+    skills:
+      path: ".agents/skills/<name>/SKILL.md (repo) y ~/.agents/skills (usuario)"
+      reads_claude_skills: false
+      state: "VERIFICADO (.claude/skills ausente del prompt; rutas .agents documentadas)"
+      source: "https://learn.chatgpt.com/docs/build-skills"
+    agents:
+      path: ".codex/agents/*.toml"
+      fields: [name, description, developer_instructions, model, model_reasoning_effort, sandbox_mode, mcp_servers]
+      feature_flag: "multi_agent = stable/true (codex features list)"
+      state: "DOCUMENTADO"
+    permissions:
+      mechanism: "sandbox_mode y approval policy en config.toml / por agente"
+      state: "DOCUMENTADO"
+    hooks:
+      feature_flag: "hooks = stable/true"
+      state: "DOCUMENTADO (no se usan)"
+    verify_commands: ["codex debug prompt-input", "codex features list"]
+  opencode:
+    validated_version: "1.17.9"
+    modality: "CLI (Windows)"
+    status: "NO_VERIFICABLE — configuración global inválida (mcp.servers.enabled ausente); no configurado en este repo"
+    instructions:
+      mechanism: "AGENTS.md (o CLAUDE.md como alternativa); `instructions` en opencode.json"
+      state: "DOCUMENTADO"
+      source: "https://opencode.ai/docs/rules/"
+    skills:
+      paths: [".opencode/skills", ".claude/skills", ".agents/skills"]
+      duplicate_risk: "una skill con el mismo nombre en .claude y .agents puede aparecer dos veces (sin verificar)"
+      state: "DOCUMENTADO"
+    agents:
+      path: ".opencode/agents/*.md"
+      state: "DOCUMENTADO (no creado)"
+  not_supported:
+    - { name: Cursor, version: "1.2.4", reason: "no se usa en el proyecto" }
+    - { name: "Gemini Code Assist / Antigravity", reason: "sin binario en PATH; no se usa" }
+    - { name: Cline, reason: "extensión presente; no se usa" }

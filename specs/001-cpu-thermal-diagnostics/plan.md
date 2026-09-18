@@ -50,6 +50,7 @@ Según la «Gobernanza» de la constitución, toda excepción documenta motivo, 
 
 | ID | Principio | Excepción | Motivo | Alternativa descartada | Riesgo y mitigación | Retirada |
 |---|---|---|---|---|---|---|
+| A1 | XVII (aclaración de ámbito, no excepción) | `scripts/**` (utillaje de desarrollo y de agentes, ejecutado con Node fuera de la aplicación) no pertenece a las tres capas del principio XVII y puede escribir en consola con `console.*`; ESLint excluirá `scripts/**` de `no-console` mediante `overrides` (T135). | Los scripts no se empaquetan ni se distribuyen y no tienen acceso al envoltorio de la interfaz. | Crear un envoltorio para scripts: complejidad sin beneficio. | Ninguno para el usuario; los scripts no manejan datos del usuario. | No aplica. |
 | E1 | XIII (cobertura bloqueante en CI) | Durante el lote L00 y hasta cerrar CHK-L01, CI **publica** la cobertura de cada pila pero no bloquea por umbral. | Sin código de aplicación la cobertura no es medible o es trivialmente 0 %, y bloquear forzaría tests vacíos. | Bloquear desde el primer commit. | Código de L00/L01 sin umbral. Se mitiga porque L01 exige los tests de contrato en las tres pilas y CHK-L01 activa el bloqueo. | Al cerrar CHK-L01; fecha límite **2026-10-31**, ampliable solo mediante esta tabla. |
 
 ## Arquitectura

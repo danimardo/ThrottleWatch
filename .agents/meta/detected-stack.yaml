@@ -1,0 +1,80 @@
+# Stack detectado por inspección del repositorio. Estados: VERIFICADO | DOCUMENTADO | INFERIDO | NO_VERIFICABLE | NO_PRESENTE
+# Regenerar a mano tras cada lote que cambie manifiestos; la fecha indica cuándo se comprobó.
+inspected_at: "2026-09-18"
+repository:
+  root: "F:/Apps/ThrottleWatch"
+  branch: "001-cpu-thermal-diagnostics"
+  main_branch: "main"
+  license: "GPL-3.0"
+  state: "VERIFICADO"
+project_phase:
+  description: "Especificación, plan, tareas y sistema de diseño cerrados; sin código de aplicación"
+  application_code_present: false
+  state: "VERIFICADO"
+languages:
+  - name: TypeScript
+    version_pinned: "6.0.3"
+    version_installed: "6.0.3 (design/harness), 6.0.2 (design/mockup)"
+    where: ["design/harness", "design/mockup", "design/**/*.ts"]
+    state: "VERIFICADO"
+  - name: Svelte
+    version_pinned: "5.57.0"
+    version_installed: "5.57.0"
+    where: ["design/components", "design/examples", "design/harness", "design/mockup"]
+    state: "VERIFICADO"
+  - name: Rust
+    version_pinned: "1.98.1"
+    version_installed: "1.94.0"
+    where: ["apps/desktop/src-tauri (previsto)"]
+    state: "DOCUMENTADO"
+  - name: "C# / .NET"
+    version_pinned: "SDK 10.0.401"
+    version_installed: "10.0.300"
+    where: ["apps/sensor-agent (previsto)"]
+    state: "DOCUMENTADO"
+frameworks:
+  - { name: Vite, version: "8.3.0", state: "VERIFICADO" }
+  - { name: Tauri, version: "2.11.5", state: "DOCUMENTADO", note: "sin código todavía" }
+  - { name: SvelteKit, state: "NO_PRESENTE", note: "prohibido por la constitución" }
+  - { name: Electron, state: "NO_PRESENTE" }
+package_managers:
+  - { name: npm, where: ["design/harness", "design/mockup"], lockfile: "package-lock.json", state: "VERIFICADO" }
+  - { name: pnpm, version_pinned: "12.4.2", version_installed: "11.6.0", where: ["apps (previsto)"], state: "DOCUMENTADO" }
+  - { name: cargo, state: "DOCUMENTADO" }
+build:
+  verified_commands:
+    - "cd design/harness && npm ci && npm run check && npm run build"
+    - "cd design/mockup && npm ci && npm run check && npm run build"
+  planned_commands_source: "specs/001-cpu-thermal-diagnostics/quickstart.md"
+testing:
+  present: []
+  planned: [vitest, testing-library, playwright, cargo-nextest, proptest, xunit-v3]
+  strategy: "historias.md § Estrategia integral de testing"
+  state: "NO_PRESENTE"
+quality:
+  present: ["svelte-check + tsc en design/harness y design/mockup (sin --fail-on-warnings)"]
+  absent: [eslint, prettier, clippy-config, git-hooks, ci]
+ci:
+  state: "NO_PRESENTE"
+security:
+  secrets_in_tracked_files: "ninguno detectado (barrido 2026-09-18)"
+  gitignore_covers: [".env*", "*.pfx", "*.pem", "*.key", ".logs/"]
+speckit:
+  version: "1.0.9.dev0"
+  integrations: [claude, codex]
+  default_integration: claude
+  scripts: powershell
+  state: "VERIFICADO"
+documentation:
+  normative: [".specify/memory/constitution.md (1.5.2)"]
+  descriptive:
+    - "specs/001-cpu-thermal-diagnostics/{spec,plan,research,data-model,ux-visual-spec,quickstart}.md"
+    - "specs/001-cpu-thermal-diagnostics/contracts/"
+    - "historias.md"
+    - "design/AGENTS.md (80 KB)"
+  historical: ["specs/001-cpu-thermal-diagnostics/gap-analysis.md"]
+  missing: ["docs/adr/ (T009)", ".env.example (T137)", "traceability.md (T009a)"]
+environment_limits:
+  - "Toolchains locales por detrás de las versiones fijadas (Rust, .NET SDK, pnpm, Node)"
+  - "Sin código: no se pueden ejecutar tests, build de la app ni Playwright"
+  - "OpenCode no arranca: configuración global inválida"

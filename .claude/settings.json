@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "ask": [
+      "Edit(.specify/memory/constitution.md)",
+      "Bash(git push *)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.local)",
+      "Read(./.env.*.local)",
+      "Read(./.env.development)",
+      "Read(./.env.production)",
+      "Read(./.env.test)",
+      "Read(./**/.env)",
+      "Read(./**/.env.local)",
+      "Read(./**/*.pem)",
+      "Read(./**/*.pfx)",
+      "Read(./**/*.key)",
+      "Read(./**/*.p12)",
+      "Bash(cat *.env)",
+      "Bash(cat .env*)",
+      "Bash(type .env*)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git commit --no-verify *)",
+      "Bash(git reset --hard *)"
+    ]
+  }
+}
