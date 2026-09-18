@@ -294,3 +294,5 @@ Se corrigieron los 4 hallazgos críticos y los 8 altos. Los medios y bajos queda
 | 13.12 | Sin comportamiento definido si la carga integrada no se aprueba | Observación externa sin cifra de rendimiento; US3-4/5 y antes/después diferidas | FR-083, T054 |
 
 Además, T047a (sesiones pasivas) pasa a la fase 2 porque el corte vertical la necesita.
+
+**Segunda pasada de `/speckit-analyze` (2026-09-18).** Sin críticos. Corregidos: FR-078 alineado con la regla 3 (la mixta exige nivel A); US2-2 sin la condición obsoleta sobre la meseta de potencia; US2-7 con bajada progresiva; gravedad «reglas 3–8, salvo 7b»; T044, T068 y T101 reescritas para conectar o añadir en `design/`. Pendientes antes de la fase 3/4: U6 (alertas en B/C), U8 (7b como evento informativo), I14 (SC-016 con mixta degradada) y el resto de medios.

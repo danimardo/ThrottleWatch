@@ -103,7 +103,7 @@ Estas tareas modifican `design/` **antes** de la primera sincronización (T024) 
 - [ ] T041 [US2] Implementar el clasificador como función pura que recorre la tabla ordenada, la gravedad `boost`/`below_base` frente a la frecuencia base, la confianza con techo por nivel y las causas alternativas (incluidas EcoQoS/EPP/plan).
 - [ ] T042 [US2] Implementar segmentación y fusión de `limit_event` persistentes, incluidos `platform` y los marcadores `turbo_end`, y la clasificación de sesión por tiempo acumulado (`class_durations_json`, intervalo analizado).
 - [ ] T043 [P] [US2] Crear el adaptador diagnóstico → props de `StatusHero` (`evidenceLine`), `ReportScreen` (`evidence`, `alternativeCauses`) y `AnalysisScreen` (`AnalysisEvidence`), con nivel de cobertura, gravedad e intervalo analizado.
-- [ ] T044 [US2] Crear narrativa causal solo cuando la secuencia esté sustentada; el fin del turbo nunca es un eslabón.
+- [ ] T044 [US2] Generar la narrativa causal y conectarla a `CausalRail` solo cuando la secuencia esté sustentada; el fin del turbo nunca es un eslabón.
 - [ ] T045 [US2] Ejecutar la regresión del corpus y fijar en CI SC-003, SC-004, SC-005, SC-016, SC-017 y SC-018; calibrar los pesos de la confianza y versionarlos con el ruleset.
 
 **Prueba independiente:** reproducir cada traza (y sus copias degradadas) y obtener clasificación, gravedad, confianza y evidencias esperadas.
@@ -149,7 +149,7 @@ Estas tareas modifican `design/` **antes** de la primera sincronización (T024) 
 
 - [ ] T067 [P] [US6] Implementar lifecycle de ventana/bandeja y preferencia de monitorización, incluido que elegir bandeja en la primera X active `tray.monitoring_enabled`, la corrección atómica de FR-061 y la instancia única.
 - [ ] T067a [P] [US6] Implementar menú de bandeja (Estado, Abrir, Pausar/Reanudar, Salir), clic para mostrar/ocultar y `set_tray_paused`.
-- [ ] T068 [P] [US6] Diseñar iconos de bandeja para normal, aviso, crítico, desconocido y desconectado.
+- [ ] T068 [P] [US6] Diseñar en `design/brand/` los iconos de bandeja para normal, aviso, crítico, desconocido y desconectado (con fuente, variantes claro/oscuro y tamaños de Windows), y sincronizarlos con T024.
 - [ ] T069 [US6] Implementar los cinco tipos de alerta (`thermal_confirmed`, `power_limited`, `platform_limited`, `collector_lost`, `guided_finished`); las de limitación solo con gravedad `below_base` (FR-080); persistencia ≥ 90 s, enfriamiento 30 min por tipo, periodo de silencio opcional y navegación al pulsar (`notification:opened`).
 - [ ] T070 [US6] Integrar notificaciones Windows con texto prudente y acceso a sesión.
 - [ ] T071 [US6] Implementar perfiles 5 s / 1 s / 500 ms, `sampling.on_battery` (`keep`/`low_power`/`pause`) y `sampling.per_core_history`.
@@ -202,7 +202,7 @@ Estas tareas modifican `design/` **antes** de la primera sincronización (T024) 
 - [ ] T098 [US11] Implementar `Buscar actualizaciones` como reintento manual independiente de la cadencia.
 - [ ] T099 [US11] Implementar descarga con progreso, temporales seguros, descarte de parciales y verificación Ed25519, exponiendo el estado `verified` como paso separado.
 - [ ] T100 [US11] Implementar confirmación de instalación, cierre ordenado y bloqueo por diagnóstico/exportación/importación/borrado con motivo.
-- [ ] T101 [P] [US11] Crear UI de Ajustes y notificación nativa enlazada a la versión disponible.
+- [ ] T101 [P] [US11] Conectar `SettingsScreen.updates` a la máquina de estados del actualizador y crear la notificación nativa enlazada a la versión disponible.
 - [ ] T102 [P] [US11] Configurar workflow de GitHub Releases para generar manifiesto y artefactos firmados sin exponer la clave privada.
 - [ ] T103 [US11] Probar cero red desactivado, cadencias, firma inválida, interrupción, bloqueo y aislamiento de errores.
 
