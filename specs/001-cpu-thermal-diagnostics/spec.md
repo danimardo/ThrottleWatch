@@ -180,6 +180,8 @@ Como usuario quiero que la aplicación use de entrada un idioma y tema apropiado
 5. **Dado** que el usuario mueve, redimensiona o maximiza la ventana, **cuando** vuelve a abrir la aplicación, **entonces** se restauran posición, tamaño, estado maximizado y último tamaño restaurado.
 6. **Dado** que cambió la disposición de monitores, **cuando** la posición guardada ya no es visible, **entonces** la ventana se recoloca dentro de la pantalla principal.
 7. **Dado** cualquier estado de la aplicación, incluido onboarding o error inicial, **cuando** se usa la barra superior, **entonces** permite arrastrar, minimizar, maximizar/restaurar, cerrar y maximizar/restaurar con doble clic, con controles accesibles.
+8. **Dado** Windows al 200 % de escala en un monitor cuya altura útil es inferior a 600 px lógicos, **cuando** se abre o se redimensiona la ventana, **entonces** esta cabe en el área útil sin bajar de 480×500 px lógicos y todas las acciones críticas siguen accesibles.
+9. **Dado** un monitor cuya altura útil es inferior a 500 px lógicos (por ejemplo, 1366×768 al 200 %), **cuando** se abre la ventana, **entonces** se maximiza al área útil, el contenido se desplaza verticalmente y la barra de título, el banner global y `Detener ahora` permanecen fijos y visibles.
 
 ---
 
@@ -194,12 +196,13 @@ Como usuario quiero configurar monitorización, bandeja, avisos, privacidad y da
 **Escenarios de aceptación:**
 
 1. **Dado** que no existe una acción de cierre guardada, **cuando** se pulsa la X por primera vez, **entonces** se pregunta entre salir y continuar en la bandeja midiendo, se guarda la elección y se indica dónde cambiarla; elegir bandeja activa la monitorización en segundo plano; cerrar el diálogo con `Esc` no guarda nada ni cierra la ventana.
-7. **Dado** que la monitorización en bandeja está habilitada y la acción de cierre es `bandeja`, **cuando** el usuario deshabilita la monitorización en bandeja, **entonces** la acción de cierre pasa a `salir` en la misma operación y la interfaz lo comunica.
-2. **Dado** `Iniciar con Windows` desactivado por defecto, **cuando** el usuario lo activa, **entonces** puede elegir iniciar mostrando la ventana o, si la monitorización de bandeja está habilitada, iniciar oculto.
-3. **Dado** un usuario no técnico, **cuando** configura el muestreo, **entonces** elige entre `Bajo consumo`, `Normal` y `Diagnóstico`, dejando los valores numéricos en ajustes avanzados.
-4. **Dado** una instalación nueva, **cuando** se consultan notificaciones y retención, **entonces** los avisos están desactivados y la retención es de siete días; también existen `solo sesión`, `1 día` y `30 días`.
-5. **Dado** que el usuario elimina todos sus datos, **cuando** confirma, **entonces** se borran sesiones, muestras, informes y referencias, pero se conservan preferencias y estado del onboarding.
-6. **Dado** que el usuario restablece ThrottleWatch, **cuando** confirma una advertencia diferenciada, **entonces** se eliminan datos y preferencias y el siguiente inicio se comporta como una instalación nueva.
+2. **Dado** que la monitorización en bandeja está habilitada y la acción de cierre es `bandeja`, **cuando** el usuario deshabilita la monitorización en bandeja, **entonces** la acción de cierre pasa a `salir` en la misma operación y la interfaz lo comunica.
+3. **Dado** `Iniciar con Windows` desactivado por defecto, **cuando** el usuario lo activa, **entonces** puede elegir iniciar mostrando la ventana o, si la monitorización de bandeja está habilitada, iniciar oculto.
+4. **Dado** un usuario no técnico, **cuando** configura el muestreo, **entonces** elige entre `Bajo consumo`, `Normal` y `Diagnóstico`, dejando los valores numéricos en ajustes avanzados.
+5. **Dado** una instalación nueva, **cuando** se consultan notificaciones y retención, **entonces** los avisos están desactivados y la retención es de siete días; también existen `solo sesión`, `1 día` y `30 días`.
+6. **Dado** que el usuario elimina todos sus datos, **cuando** confirma, **entonces** se borran sesiones, muestras, informes, referencias y registros técnicos, pero se conservan preferencias y estado del onboarding.
+7. **Dado** que el usuario restablece ThrottleWatch, **cuando** confirma una advertencia diferenciada, **entonces** se eliminan datos, registros técnicos y preferencias y el siguiente inicio se comporta como una instalación nueva.
+8. **Dado** que el usuario activa `Registro detallado` en Ajustes › Acerca de y ayuda, **cuando** pasan 24 horas o reinicia la aplicación (lo que ocurra antes), **entonces** el registro vuelve solo al nivel normal; mientras está activo, su estado es visible.
 
 ---
 
@@ -276,7 +279,7 @@ Como usuario quiero saber si existe una versión nueva y decidir por separado si
 - **FR-028**: La exportación DEBE ofrecer anonimización previa y describir qué campos se omiten.
 - **FR-029**: El sistema DEBE funcionar completamente sin conexión y sin telemetría remota por defecto.
 - **FR-030**: La interfaz principal DEBE ejecutarse sin privilegios administrativos.
-- **FR-031**: El sistema DEBE registrar fallos del colector y del diagnóstico sin incluir datos sensibles innecesarios.
+- **FR-031**: El sistema DEBE registrar fallos del colector y del diagnóstico sin incluir secretos, identificadores personales ni del equipo, según el principio XVII de la constitución.
 - **FR-032**: Preferencias, referencias guiadas, tabla de límites térmicos y reglas aplicadas DEBEN conservar su versión para interpretar diagnósticos históricos.
 - **FR-033**: Toda la interfaz, incluidos onboarding, bandeja, notificaciones, errores y diálogos nativos propios, DEBE estar disponible en español e inglés desde el MVP, sin literales visibles fuera de los catálogos de traducción.
 - **FR-034**: El primer inicio DEBE ofrecer un recorrido de cinco diapositivas, omitible, reanudable y repetible desde Ajustes.
@@ -296,8 +299,8 @@ Como usuario quiero saber si existe una versión nueva y decidir por separado si
 - **FR-047**: `Iniciar con Windows` DEBE estar desactivado por defecto y, al activarse, permitir mostrar la ventana o iniciar oculto; iniciar oculto solo DEBE permitirse si la monitorización en bandeja está habilitada.
 - **FR-048**: Los avisos DEBEN estar desactivados por defecto; el onboarding solo DEBE informar de que pueden habilitarse en Ajustes.
 - **FR-049**: La configuración de muestreo DEBE presentar los perfiles `Bajo consumo`, `Normal` y `Diagnóstico`; sus frecuencias concretas solo aparecen en ajustes avanzados.
-- **FR-050**: `Eliminar todos mis datos` DEBE borrar sesiones, muestras, eventos, informes y referencias guiadas tras confirmación, conservando preferencias y estado del onboarding.
-- **FR-051**: `Restablecer ThrottleWatch` DEBE requerir una confirmación diferenciada, borrar datos y preferencias y provocar un primer inicio limpio.
+- **FR-050**: `Eliminar todos mis datos` DEBE borrar sesiones, muestras, eventos, informes, referencias guiadas y registros técnicos tras confirmación, conservando preferencias y estado del onboarding.
+- **FR-051**: `Restablecer ThrottleWatch` DEBE requerir una confirmación diferenciada, borrar datos, registros técnicos y preferencias y provocar un primer inicio limpio.
 - **FR-052**: La comprobación de actualizaciones DEBE estar desactivada por defecto y, mientras lo esté, NO DEBE realizar tráfico de red.
 - **FR-053**: Con actualizaciones activas, el sistema DEBE comprobar automáticamente como máximo una vez cada 24 horas y ofrecer una comprobación manual que pueda reintentar antes de ese plazo.
 - **FR-054**: Detectar una versión, descargarla e instalarla DEBEN ser tres gestos separados; ningún paso DEBE iniciar automáticamente el siguiente.
@@ -313,7 +316,7 @@ Como usuario quiero saber si existe una versión nueva y decidir por separado si
 - **FR-064**: El mapa de núcleos DEBE permitir alternar la magnitud representada entre temperatura y reloj sin perder la selección de núcleo.
 - **FR-065**: Tras una reanudación desde suspensión o hibernación, el sistema DEBE marcar el hueco, repetir el descubrimiento de capacidades y abrir una sesión pasiva nueva, conservando la interfaz utilizable en todo momento.
 - **FR-066**: La vista de análisis DEBE ofrecer navegación del cursor y selección de rango por teclado, un resumen textual del rango y una tabla accesible equivalente a las series dibujadas.
-- **FR-067**: Una sesión pasiva DEBE comenzar al iniciar el muestreo, tras un hueco superior a 60 s y, como máximo, cada 24 h de duración continua. Su informe DEBE congelarse al cerrarla; mientras está activa, el diagnóstico visible es «en vivo» y se marca como provisional. La retención `solo sesión` DEBE borrar los datos al salir de la aplicación.
+- **FR-067**: Una sesión pasiva DEBE comenzar al iniciar el muestreo, tras un hueco superior a 60 s y, como máximo, cada 24 h de duración continua. Su informe DEBE congelarse al cerrarla; mientras está activa, el diagnóstico visible es «en vivo» y se marca como provisional. La retención `solo sesión` DEBE borrar los datos y los registros técnicos al salir de la aplicación.
 - **FR-068**: La métrica de frecuencia del motor DEBE ser la **frecuencia activa** por procesador lógico (frecuencia mientras ejecuta, sin incluir el reposo), obtenida de `% Processor Performance` × `Processor Frequency` de Windows (calidad `derived`) o de una lectura directa equivalente; el reloj nominal del colector solo DEBE usarse como `substitute`. La interfaz DEBE llamarla «frecuencia activa» y no presentarla como el «effective clock» de otras herramientas.
 - **FR-069**: `térmica confirmada` DEBE exigir el bit de razón `THERMAL` (o su equivalente directo del fabricante). `PROCHOT` sin `THERMAL`, la meseta de temperatura o el margen agotado NO DEBEN producir `confirmada`. En AMD, el equivalente directo es la tabla PM del SMU (solo versiones de la lista permitida): `thermal_flag` se activa cuando el valor THM es ≥ 99 % de su límite **y** PPT, TDC y EDC están por debajo del 95 % de los suyos (el limitador térmico del firmware es el que manda). Hasta que el corpus AMD valide esta equivalencia (T045), la confianza de `thermal_confirmed` en AMD tiene techo `media`.
 - **FR-070**: La confianza máxima DEBE depender del nivel de cobertura del equipo: nivel A → alta, nivel B → media, nivel C → baja; un reloj `substitute` limita a baja.
@@ -331,6 +334,7 @@ Como usuario quiero saber si existe una versión nueva y decidir por separado si
 - **FR-083**: El generador de carga del diagnóstico guiado DEBE medir el trabajo completado por hilo y por segundo, y el informe guiado DEBE mostrar el rendimiento sostenido relativo al inicial desglosado por causa. Si el ADR de T054 aprueba solo la **observación externa**, no existe cifra de rendimiento: el informe guiado muestra clasificación, gravedad y relojes rotulados como observación, sin porcentaje; US3-4, US3-5, la comparación antes/después y la parte guiada de SC-002 quedan diferidas y así se registra en el ADR.
 - **FR-084**: Las razones de limitación DEBEN leerse mediante sus bits de registro (log), que se limpian tras cada lectura, para medir si ocurrieron desde la muestra anterior y no solo en el instante de leer.
 - **FR-085**: La prueba guiada NO DEBE detenerse por alcanzar el límite térmico, que es el fenómeno que mide; DEBE detenerse si la temperatura supera el límite efectivo en más de 2 °C durante 3 muestras (el control térmico del procesador no actúa), si permanece en el límite con frecuencia activa inferior al 50 % de la base durante 10 s (refrigeración gravemente insuficiente), si se pierde el sensor crítico o si el generador deja de responder.
+- **FR-086**: Ajustes › Acerca de y ayuda DEBE ofrecer `Registro detallado`, que eleva el registro técnico al nivel `debug` y se desactiva automáticamente a las 24 horas o al reiniciar la aplicación, lo que ocurra antes. Mientras esté activo, su estado DEBE ser visible. El nivel de registro en la versión instalada NO DEBE poder cambiarse por variables de entorno ni argumentos (constitución XV y XVII).
 - **FR-075**: Cuando el almacenamiento no esté disponible (disco lleno o base de datos dañada), el muestreo DEBE continuar en memoria, la interfaz DEBE avisar de forma persistente y el sistema DEBE reintentar o recuperar el almacenamiento sin intervención destructiva automática sobre los datos existentes.
 
 ### Requisitos no funcionales
@@ -339,13 +343,13 @@ Como usuario quiero saber si existe una versión nueva y decidir por separado si
 - **NFR-002 — Latencia:** una muestra válida debe verse en menos de 1,5 s en el percentil 95.
 - **NFR-003 — Consumo:** monitorización pasiva con objetivo inferior al 1 % de CPU promedio y 180 MB de memoria en un equipo de referencia moderno.
 - **NFR-004 — Resiliencia:** la caída del colector no debe cerrar la interfaz; debe reiniciarse con retroceso limitado o pedir intervención.
-- **NFR-005 — Accesibilidad:** navegación por teclado, foco visible, contraste WCAG AA, estados no dependientes solo del color y movimiento reducido.
+- **NFR-005 — Accesibilidad:** WCAG 2.2 nivel AA según el principio XII de la constitución: navegación completa por teclado, foco visible y no oculto, contraste (texto ≥ 4,5:1; texto grande, iconos y trazos ≥ 3:1), estados no dependientes solo del color, lectores de pantalla (Narrador y NVDA), temas de contraste de Windows, objetivos ≥ 24×24 px y movimiento reducido.
 - **NFR-006 — Seguridad:** IPC local con autenticación efímera, esquema validado y lista cerrada de comandos.
 - **NFR-007 — Retención:** siete días por defecto; el usuario puede elegir 1, 7, 30 días o solo sesión.
-- **NFR-008 — Compatibilidad:** Windows 10 versión 1809 (build 17763) o posterior y Windows 11, de 64 bits, con WebView2 Runtime; las arquitecturas se publican únicamente si todas las dependencias y controladores son compatibles.
+- **NFR-008 — Compatibilidad:** Windows 11 24H2 y 25H2 x64 y Windows 10 22H2 x64 mientras WebView2 y .NET 10 lo admitan oficialmente, con WebView2 Runtime Evergreen (constitución, «Plataforma objetivo»). Solo x64 en el MVP; otras arquitecturas requieren enmienda de la constitución.
 - **NFR-009 — Auditabilidad:** el mismo conjunto de muestras y reglas debe producir el mismo diagnóstico.
 - **NFR-010 — Inicio:** primera información útil en menos de 5 s en un equipo compatible típico.
-- **NFR-011 — Localización:** el 100 % de las claves visibles DEBE existir en ambos catálogos y las variantes inglesa y española no DEBEN romper la ventana mínima ni el escalado de Windows al 200 %.
+- **NFR-011 — Localización:** el 100 % de las claves visibles DEBE existir en ambos catálogos y las variantes inglesa y española no DEBEN romper la ventana mínima ni el escalado de Windows al 200 %, incluido el mínimo reducido a 480×500 px lógicos cuando la altura útil del monitor es inferior a 600.
 - **NFR-012 — Ventana:** los controles propios DEBEN ser accesibles por teclado y lector de pantalla y conservar las convenciones esperadas de minimizar, maximizar/restaurar, doble clic y cierre.
 - **NFR-013 — Actualizaciones:** toda versión instalable DEBE estar firmada y las operaciones de red NO DEBEN bloquear la UI, el muestreo ni el cierre seguro del colector.
 - **NFR-014 — Coherencia de interfaz:** todas las pantallas DEBEN reutilizar el vocabulario visual y los patrones aprobados, sin variantes locales casi equivalentes, y conservar comportamiento y jerarquía en español e inglés, temas claro y oscuro y tamaños compacto, medio y expandido. Los estados aplicables de carga, vacío, datos degradados y error DEBEN estar definidos y ser accesibles.
@@ -446,7 +450,7 @@ El detalle por núcleo se mantiene siempre en memoria para la pantalla CPU; el h
 
 **Prueba guiada**: comprobación ≤ 30 s; reposo opcional 60 s (omitible); calentamiento progresivo 90 s; carga sostenida 180 s (`corta`), 240 s (`estándar`) o 360 s (`larga`), de modo que los últimos 120 s quedan siempre fuera de la ventana de turbo; recuperación 120 s. Parada automática (FR-085): temperatura > límite efectivo + 2 °C durante 3 muestras; temperatura en el límite con frecuencia activa < 50 % de la base durante 10 s; 3 muestras consecutivas sin sensor crítico; generador sin respuesta durante 5 s. Alcanzar el límite térmico **no** detiene la prueba. Ocultar la ventana o suspender el equipo cancela la prueba. Atajo de parada: `Ctrl+Shift+X`.
 
-**Ventana**: tamaño mínimo 480×600 px lógicos; tamaño inicial 1100×760 centrado en la pantalla principal.
+**Ventana**: tamaño mínimo 480×600 px lógicos; si la altura útil del monitor es menor (por ejemplo, 1080p al 200 %), el mínimo de altura pasa a esa altura útil, nunca por debajo de 500 px lógicos. Con altura útil inferior a 500 px lógicos, la ventana se abre maximizada y el contenido se desplaza verticalmente, con barra de título, banner global y `Detener ahora` fijos. Tamaño inicial 1100×760 centrado en la pantalla principal, reducido al área útil si no cabe.
 
 **Atajos**: `Ctrl+1`…`Ctrl+6` navegación en el orden de la barra lateral; `Ctrl+,` Ajustes; `Ctrl+Shift+X` detener prueba; `Ctrl+E` exportar; `F1` ayuda; `Esc` cierra diálogos y tooltips.
 
@@ -454,7 +458,7 @@ El detalle por núcleo se mantiene siempre en memoria para la pantalla CPU; el h
 
 **Exportación**: CSV en formato largo (`timestamp_utc, monotonic_ms, sensor_id, metric, scope, value, status, quality`), separador coma, punto decimal, UTF-8 con BOM, tiempos UTC ISO-8601, nombre `throttlewatch_<tipo>_<fecha>_<id-corto>.<ext>`. La anonimización conserva fabricante, modelo comercial, topología y versiones; elimina nombre de equipo, usuario, números de serie, direcciones MAC, rutas, huella de monitores y GUID de plan energético.
 
-**Almacenamiento**: datos en `%LOCALAPPDATA%\ThrottleWatch`; registros en `logs/` con rotación de 5 ficheros × 5 MB y nivel `info` (nivel `debug` como ajuste avanzado). Disco lleno: modo solo memoria con aviso y reintento cada 60 s. Base de datos dañada: se renombra a `.corrupt-<fecha>`, se crea una nueva y se ofrece exportar la dañada.
+**Almacenamiento**: datos en `%LOCALAPPDATA%\ThrottleWatch`; registros en `logs/` en JSON por líneas (UTC), rotación de 5 ficheros × 5 MB y nivel `info`; `Registro detallado` sube a `debug` durante 24 h o hasta reiniciar (FR-086). La interfaz reenvía al backend solo `warn` y `error` (y `debug` con registro detallado), con un máximo de 60 eventos por minuto. Los registros se borran con `Eliminar todos mis datos`, con `Restablecer` y al salir con retención `solo sesión`. Disco lleno: modo solo memoria con aviso y reintento cada 60 s. Base de datos dañada: se renombra a `.corrupt-<fecha>`, se crea una nueva y se ofrece exportar la dañada.
 
 ### Entidades clave
 

@@ -33,7 +33,7 @@ Integrar `LibreHardwareMonitorLib` en un sidecar .NET propio. No ejecutar la apl
 
 ### Decisión
 
-Empaquetar un binario .NET publicado de forma autocontenida como sidecar Tauri. Comunicación por `stdin/stdout` con NDJSON versionado y `stderr` reservado para logs.
+Empaquetar un binario .NET publicado de forma autocontenida como sidecar Tauri (`bundle.externalBin`). Comunicación por `stdin/stdout` con NDJSON versionado y `stderr` reservado para logs. Rust lo lanza con `std::process::Command` desde su ruta fija y tras verificar su hash; no se usa `tauri-plugin-shell`, para que la WebView no tenga ningún permiso de lanzar procesos (decisión 2026-09-18).
 
 ### Motivos
 
@@ -218,7 +218,7 @@ El idioma del sistema se toma del **primer** idioma de la lista de idiomas de vi
 
 ### Decisión
 
-La ventana Tauri se publica sin decoraciones y monta un componente propio inspirado en el patrón validado de SmartDisk: presentación desacoplada de la API de ventana, región de arrastre, doble clic y tres controles. El tema usa tokens claros/oscuros y `system` escucha el modo de aplicación de Windows (`AppsUseLightTheme`). La geometría se persiste en coordenadas lógicas (mínimo 480×600, inicial 1100×760) y se valida contra monitores activos antes de mostrar la ventana.
+La ventana Tauri se publica sin decoraciones y monta un componente propio inspirado en el patrón validado de SmartDisk: presentación desacoplada de la API de ventana, región de arrastre, doble clic y tres controles. El tema usa tokens claros/oscuros y `system` escucha el modo de aplicación de Windows (`AppsUseLightTheme`). La geometría se persiste en coordenadas lógicas (mínimo 480×600, o 480×500 si la altura útil del monitor no alcanza 600; inicial 1100×760) y se valida contra monitores activos antes de mostrar la ventana.
 
 ### Salvaguardas
 

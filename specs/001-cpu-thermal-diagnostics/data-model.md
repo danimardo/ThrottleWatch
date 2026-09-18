@@ -244,7 +244,7 @@ Clave/valor tipado con versión de esquema. Las claves conocidas son:
 | `guided.notify_on_finish` | boolean | `false` | depende de `notifications.enabled` |
 | `privacy.anonymize_exports` | boolean | `true` | puede cambiarse por exportación; solo afecta a ficheros, nunca hay envío por red |
 | `updates.enabled` | boolean | `false` | `false` prohíbe tráfico del actualizador |
-| `logging.level` | `info`, `debug` | `info` | avanzado; `debug` se desactiva solo al reiniciar la app |
+| `logging.detailed_until` | instante UTC o `null` | `null` | avanzado («Registro detallado», FR-086); activarlo fija ahora + 24 h; se borra al vencer o al reiniciar la app |
 
 Cada fila persiste `key`, `typed_value`, `schema_version` y `updated_at`. Un informe conserva una instantánea de las preferencias que afectaron a su interpretación. El plegado de los bloques «Avanzado» de Ajustes es estado de interfaz por sección y no se persiste.
 
@@ -266,7 +266,7 @@ Repetir el recorrido desde Ayuda no cambia `status`. Un restablecimiento total e
 |---|---|---|
 | `window_key` | text PK | `main` en el MVP |
 | `restored_x`, `restored_y` | integer | coordenadas lógicas validadas al restaurar |
-| `restored_width`, `restored_height` | integer | nunca inferiores al mínimo de diseño (480×600 lógicos); primer arranque 1100×760 centrado |
+| `restored_width`, `restored_height` | integer | nunca inferiores al mínimo de diseño (480×600 lógicos, o 480×500 si la altura útil del monitor no alcanza 600); primer arranque 1100×760 centrado |
 | `maximized` | boolean | se restaura; minimizado no se persiste |
 | `display_fingerprint` | text nullable | detecta cambios de monitores sin identificar al usuario |
 | `updated_at` | datetime | última geometría estable |

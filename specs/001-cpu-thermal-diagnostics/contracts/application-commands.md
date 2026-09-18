@@ -108,6 +108,8 @@ Eventos:
 - `get_technical_summary() -> TechnicalSummary`: versiones, protocolo, estado del colector, cobertura, últimos errores por código, métricas locales; sin identificadores. La UI ofrece «Copiar».
 - `open_logs_folder() -> void`, `open_external_url({ id }) -> void` (solo IDs de una lista cerrada: `docs`, `releases`, `licenses`; nunca URLs libres), `get_third_party_notices() -> Notice[]`.
 - `get_storage_usage() -> { database_bytes, logs_bytes, sessions, oldest_sample_at }`.
+- `log_frontend({ events: FrontendLogEvent[] }) -> void`: única vía de registro de la interfaz (constitución XVII). Cada evento: `{ level: "error" | "warn" | "info" | "debug", code, target, msg, fields? }`, validado contra el esquema `log-event`; como máximo 60 eventos por minuto (el exceso se descarta y se registra el recuento). Solo se aceptan `debug` e `info` con `Registro detallado` activo. Rust añade `ts`, `component: "ui"` y la redacción.
+- `Registro detallado` se gestiona con `set_preference({ key: "logging.detailed_until", value: true | false })`: `true` fija el vencimiento en ahora + 24 h y `false` lo desactiva; `get_preferences` devuelve la fecha de vencimiento o `null`.
 
 ## Ventanas de análisis
 
@@ -137,4 +139,4 @@ Estados expuestos a la UI (`update:state-changed.state`): `idle | checking | up_
 
 ## Errores y seguridad
 
-Todos los errores usan `{ code, message_key, context? }`, con contexto cerrado y sin rutas, excepciones ni identificadores sensibles. Ningún comando acepta ejecutables, URLs, scripts o rutas proporcionadas por la WebView. Los permisos Tauri se reducen a los comandos y API de ventana estrictamente necesarios.
+Todos los errores usan `{ code, message_key, path?, context? }` (constitución XIV): `code` estable en inglés `snake_case` con prefijo de dominio (`guided.already_running`), `path` con la ruta del campo cuando falla una validación (`["value", "quiet_hours", "start"]`) y contexto cerrado, sin rutas de fichero, excepciones, valores rechazados ni identificadores sensibles. Un parámetro inválido devuelve `validation.invalid_parameter` con su `path`. La interfaz valida este formato con Zod y traduce `message_key` desde su catálogo; nunca muestra mensajes crudos. Ningún comando acepta ejecutables, URLs, scripts o rutas proporcionadas por la WebView. Ningún comando acepta ejecutables, URLs, scripts o rutas proporcionadas por la WebView. Los permisos Tauri se reducen a los comandos y API de ventana estrictamente necesarios.

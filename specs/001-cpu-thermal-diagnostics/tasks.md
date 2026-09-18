@@ -7,28 +7,66 @@ Formato: `[ID] [P?] [Historia?] Descripción con ruta`. Las tareas de test indic
 
 **Regla del sistema de diseño:** las pantallas **conectan** componentes de `design/` (copiados por T024) mediante adaptadores; no los recrean. Si una pantalla necesita una pieza que `design/` no tiene, se añade antes en `design/` con justificación, ejemplo y harness (como T118–T133), nunca en `apps/desktop/src/`.
 
+**Lotes y checkpoints** (`historias.md` § «Estrategia integral de testing», § 7–§ 9 y § 35):
+
+- Las tareas se agrupan en **lotes** (`L00`–`L21`), indicados al inicio de cada grupo. El orden de trabajo lo marcan las dependencias, no la numeración.
+- Antes de empezar un lote se añade bajo su encabezado el **plan de pruebas del lote** (plantilla del § 8).
+- Cada lote termina con su tarea **`CHK-Lxx`**, que ejecuta **solo** la suite afectada y registra orden, código de salida, errores y avisos (constitución XVI). No se abre un lote nuevo con tests obligatorios pendientes del anterior.
+- Las tareas de test van **dentro** de su lote; no se alterna «implementar A / test A / implementar B / test B».
+- Las tareas marcadas **TDD** exigen que el test exista y falle antes de implementar (constitución XIII).
+- Identificadores nuevos: `T134`+ para trabajo derivado de la constitución 1.3–1.5; `T-TEST`, `T-UNIT`, `T-COMP`, `T-INT`, `T-PLAY`, `T-E2E`, `T-A11Y`, `T-QUAL` y `T-MUT` para la infraestructura de pruebas (`historias.md` § 37).
+
 ## Fase 1 — Inicialización
+
+**Lote L00 — Infraestructura de desarrollo y pruebas.**
 
 - [ ] T001 Crear monorepo y estructura definida en `plan.md`.
 - [ ] T002 Inicializar Tauri 2 + Svelte + TypeScript estricto en `apps/desktop/`.
 - [ ] T003 [P] Crear solución .NET y proyecto `sensor-agent` en `apps/sensor-agent/`.
 - [ ] T004 [P] Crear crates/módulos Rust `ipc`, `storage`, `diagnostics` y `export` en `apps/desktop/src-tauri/src/`.
-- [ ] T005 [P] Configurar formatos, lint y análisis estático para TypeScript, Rust y C#.
+- [ ] T005 [P] Configurar los formateadores (Prettier con `prettier-plugin-svelte`, `rustfmt`, `dotnet format`) y la configuración base de ESLint, Clippy y analizadores .NET; las reglas obligatorias de la constitución van en T135.
 - [ ] T006 Configurar scripts raíz de build/test/dev y fijar gestores/versiones en archivos de bloqueo.
 - [ ] T007 [P] Configurar CI Windows x64 con cachés y artefactos de pruebas, sin requerir sensores reales.
 - [ ] T008 [P] Crear inventario de licencias y plantilla de `THIRD-PARTY-NOTICES`.
 - [ ] T009 Documentar decisiones ADR iniciales: sidecar, SQLite, `AnalysisChart` SVG, agregación temporal y motor por niveles de cobertura (mesetas, ventana de turbo, techo de potencia) en `docs/adr/`.
-- [ ] T009a Crear `specs/001-cpu-thermal-diagnostics/traceability.md` (FR/NFR/SC/escenario de aceptación → test, o «manual» con motivo) y un check de CI que falle si un requisito no tiene entrada.
+- [ ] T009a Crear `specs/001-cpu-thermal-diagnostics/traceability.md` (FR/NFR/SC/escenario de aceptación → test, o «manual» con motivo) y un check de CI que falle si un requisito no tiene entrada. (= T-ACC-001)
+- [ ] T134 Fijar las toolchains de la constitución: `rust-toolchain.toml` (1.98.1, `rustfmt`, `clippy`), `global.json` (SDK 10.0.401, `rollForward: latestPatch`), `.nvmrc` (24.21.0), `packageManager` (pnpm 12.4.2) y `engines`; npm con `save-exact`; `RestorePackagesWithLockFile` en .NET; CI en modo bloqueado. (= T-TEST-001)
+- [ ] T135 [P] Configurar las reglas obligatorias de análisis estático: ESLint `strict-type-checked`, `no-console`, `consistent-type-assertions` con `assertionStyle: 'never'` y `no-restricted-imports` (`@tauri-apps/api` solo en `lib/bridge/`, `loglevel` solo en `lib/logging/`, `design/examples` y `design/harness` en ninguna parte); Clippy `print_stdout`, `print_stderr`, `dbg_macro` y `disallowed_macros` (macros de `tracing` fuera de `logging/`), y `unwrap_used`/`expect_used` denegados en los módulos de frontera `ipc`, `commands`, `export` y `storage` (permitidos solo en `#[cfg(test)]`); .NET con `Nullable`, `TreatWarningsAsErrors`, `AnalysisLevel latest-recommended` y `BannedApiAnalyzers` (`Console.Write*`, `Debug.Write*`, `Trace.Write*`, `Environment.GetEnvironmentVariable` fuera de su módulo). (Constitución XIV–XVII)
+- [ ] T136 Crear `pnpm check` (`svelte-check --tsconfig <tsconfig de la app> --fail-on-warnings` + `tsc --noEmit -p tsconfig.node.json`) y fijar en CI el orden de la constitución XVI: instalación bloqueada → formato y lint → `pnpm check` → pruebas → compilación → E2E. (FR/constitución XVI)
+- [ ] T137 [P] Crear `.env.example` y los módulos de configuración: `src/lib/config/env.ts` (Zod sobre `import.meta.env`, `envPrefix: 'PUBLIC_'`), validación en `vite.config.ts` con `loadEnv` y fallo de compilación de producción si existe `PUBLIC_LOG_LEVEL`; módulos Rust y .NET para `TW_DEV_*` solo en depuración y en la característica `e2e`. Pruebas de rechazo por variable. (Constitución XV)
+- [ ] T138 [P] Configurar `cargo-deny` (licencias compatibles con GPL-3.0, avisos de seguridad y duplicados), `cargo-about` y el informe equivalente de npm y NuGet; bloquear en CI. (Puerta 8)
+- [ ] T-COMP-001 [P] Configurar Vitest con los proyectos `unit` (node) y `component` (jsdom + Testing Library, condición `browser` para Svelte 5) y `@vitest/coverage-v8`.
+- [ ] T-TEST-003 [P] Configurar perfiles de `cargo-nextest`, `cargo-llvm-cov`, *traits* de xUnit (`Unit`, `Integration`, `Protocol`) y coverlet; umbrales de cobertura de la constitución XIII por pila, que informan sin bloquear hasta el cierre de CHK-L01 (excepción E1 de `plan.md`, fecha límite 2026-10-31). (= T-QUAL-001)
+- [ ] T-PLAY-001 [P] Configurar Playwright con los proyectos `frontend` y `app`, artefactos de fallo (screenshot, trace y vídeo solo en `app`) y etiquetas `@smoke`, `@critical`, `@a11y`, `@visual`. (Incluye T-PLAY-010)
+- [ ] T-PLAY-002 Spike: conducir la WebView2 de una compilación `e2e` de Tauri por CDP desde Playwright en `windows-2025`; documentar el resultado en `docs/spikes/e2e-webview2.md` y la alternativa si falla.
+- [ ] T-PLAY-004 [P] Crear la *fixture* común de Playwright que falla ante `pageerror`, `console.error` y peticiones a otros orígenes no declaradas, comprueba el almacenamiento web vacío y usa una allowlist inicial vacía.
+- [ ] T-TEST-004 Crear y documentar en `quickstart.md` los scripts de `historias.md` § 30 (`test:*`, `verify:batch`, `verify:pr`, `design:check`, `logs:view`).
+- [ ] T-TEST-005 Medir la duración base de cada suite y del pipeline de PR, publicar el informe por suite en CI y fijar los presupuestos (objetivo inicial de PR: ≤ 15 min de mediana).
+- [ ] CHK-L00 Checkpoint: nivel 0 de las tres pilas en CI a cero errores y avisos, un test trivial por pila y por proyecto de Vitest y Playwright en verde, check de trazabilidad activo y tiempos base medidos (T-TEST-005).
 
 ## Fase 2 — Fundamentos bloqueantes
 
+**Lote L01 — Contratos y fixtures** (T010–T013, T016, T143). Fixtures válidos e inválidos **antes** de los tipos.
+
+- [ ] T143 [P] Crear el esquema `log-event` y el formato común de error `{ code, message_key, path?, context? }` en `packages/contracts/`, con fixtures válidos e inválidos. (Constitución XIV y XVII)
 - [ ] T010 Implementar tipos de contrato v1 compartidos a partir de `contracts/telemetry.schema.json`.
 - [ ] T011 [P] Crear fixtures canónicos de handshake, capabilities, sample y error en `packages/contracts/fixtures/`.
 - [ ] T012 [P] Crear tests C# de serialización de fixtures en `apps/sensor-agent/Tests/Protocol/`.
 - [ ] T013 [P] Crear tests Rust de deserialización/validación de fixtures en `apps/desktop/src-tauri/src/ipc/tests/`.
-- [ ] T014 Implementar handshake con nonce, versión y secuencia en sidecar y Rust.
-- [ ] T015 Implementar supervisor de sidecar con estado, timeout, EOF y backoff limitado en `src-tauri/src/ipc/supervisor.rs`.
 - [ ] T016 [P] Crear sidecar falso/replay en `packages/trace-fixtures/tools/`.
+- [ ] T-UNIT-001 [P] Crear `TraceBuilder` (escenarios sintéticos por fases) y los *builders* de muestra y capacidades en `src-tauri/src/test_support/`.
+- [ ] CHK-L01 Checkpoint: los tres lenguajes aceptan y rechazan exactamente los mismos fixtures; umbrales de cobertura activos desde aquí.
+
+**Lote L02 — Handshake, supervisor y registro del backend** (T014, T015, T140, T142). TDD en el rechazo por nonce, versión, secuencia y tamaño.
+
+- [ ] T014 Implementar handshake con nonce, versión y secuencia en sidecar y Rust.
+- [ ] T015 Implementar supervisor de sidecar con estado, timeout, EOF y backoff limitado en `src-tauri/src/ipc/supervisor.rs`; lanzamiento con `std::process::Command` desde la ruta fija de `bundle.externalBin` y verificación de hash (sin `tauri-plugin-shell`).
+- [ ] T140 Implementar el registro del backend (constitución XVII): macros `log_*!` con código obligatorio sobre `tracing`, fichero JSON UTC rotado 5 × 5 MB, formato humano `Europe/Madrid` con `jiff` solo en desarrollo, redacción por lista permitida, agrupación de repetidos a 60 s, escritura no bloqueante, captura de pánicos y validación de los eventos del colector recibidos por `stderr`. Pruebas de redacción, niveles y formato con los dos cambios de hora anuales.
+- [ ] T142 [P] Implementar la clase `Log` del colector con `[LoggerMessage]` sobre `Microsoft.Extensions.Logging`, JSON por `stderr` y captura de excepciones no controladas.
+- [ ] T-INT-001 Pruebas de integración del pipeline con el colector replay como proceso real: handshake, rechazos, EOF, cuelgue, reinicio con *backoff*, secuencias perdidas, valores imposibles como ausentes y PID padre ausente. (NFR-004, NFR-006, SC-010)
+- [ ] CHK-L02 Checkpoint: integración IPC y pruebas de registro en verde.
+
+**Lote L03 — Colector real mínimo y spikes** (T017–T021).
 - [ ] T017 Integrar LibreHardwareMonitorLib con solo CPU habilitada en `apps/sensor-agent/Collector/`.
 - [ ] T018 Implementar catálogo original de hardware/sensores sin normalización de negocio.
 - [ ] T019 [P] Ejecutar spike de lectura sin privilegios en matriz Intel/AMD y documentar `docs/spikes/sensor-access.md`; incluir la fiabilidad de `% Processor Performance` y `Processor Frequency` por procesador lógico frente a APERF/MPERF.
@@ -36,12 +74,29 @@ Formato: `[ID] [P?] [Historia?] Descripción con ruta`. Las tareas de test indic
 - [ ] T019b [P] Grabar el corpus etiquetado inicial (Intel híbrido, Intel anterior, portátil con DTT/DPTF, sobremesa con límites abiertos, AMD Zen 4) según `research.md` § 15, con cargas multihilo, juego de pocos núcleos, AVX2 y reposo caliente.
 - [ ] T020 [P] Ejecutar spike de redistribución, instalación y retirada del acceso bajo nivel en `docs/spikes/low-level-driver.md`.
 - [ ] T021 Resolver la arquitectura de privilegios mediante ADR; bloquear empaquetado si contradice la constitución.
+- [ ] T-INT-005 [P] Suite xUnit `Integration` solo Windows: arrancar el colector real con LibreHardwareMonitorLib en la VM de CI sin sensores, verificar el catálogo degradado (`virtualized-no-sensors`), la ausencia de excepciones y el cierre por EOF.
+- [ ] CHK-L03 Checkpoint: catálogo con hardware falso y arranque real en VM en verde; spikes documentados.
+
+**Lote L04 — Persistencia, reloj y sesiones** (T022, T023, T047a, T-TEST-002). TDD en la migración v1 y en la partición de sesiones.
+
+- [ ] T-TEST-002 Crear los puertos sustituibles de Rust (reloj, IDs, nonce, almacenamiento, diálogos, ventana, bandeja, notificaciones, autostart, HTTP y energía/idioma/tema de Windows) y sus fakes en `test_support` (incluye T-UNIT-002).
 - [ ] T022 Crear SQLite, migración v1 y repositorios base en `src-tauri/src/storage/`.
 - [ ] T023 [P] Implementar reloj monotónico, detección de huecos y modelo de calidad de muestra.
 - [ ] T047a Implementar límites de sesión pasiva (FR-067): apertura, partición por hueco > 60 s / 24 h, congelación del informe y diagnóstico en vivo provisional. (Movida desde la fase 5: el hito de esta fase y el corte vertical necesitan sesiones.)
+- [ ] CHK-L04 Checkpoint: almacenamiento con SQLite temporal, migración v1, huecos, calidad y partición de sesiones con reloj falso en verde.
+
+**Lote L05 — Shell, puente, catálogos y diseño** (T024–T026, T139, T141, T-COMP-002, T-COMP-003, T-PLAY-005).
+
+- [ ] T-PLAY-005 [P] Crear los perfiles de E2E para ambos proyectos (`fresh-install`, `onboarding-midway`, `ready`, `tray-enabled`, `with-history`, `updates-on`): escenarios de mock para `frontend` y directorios de datos sembrados para `app`, con aislamiento por directorio temporal y proceso.
+
+- [ ] T139 Implementar el módulo puente `src/lib/bridge/`: único importador de `@tauri-apps/api`, esquemas Zod por comando y evento con tipos inferidos, resultado discriminado y errores estructurados; prueba de conformidad contra los fixtures de `packages/contracts/` (mismos válidos e inválidos que el JSON Schema). (Constitución IX y XIV)
+- [ ] T141 [P] Implementar `src/lib/logging/` (`createLogger` sobre `loglevel`) y el comando `log_frontend` con validación, límite de 60 eventos por minuto y niveles según `Registro detallado`. (Constitución XVII)
+- [ ] T-COMP-002 [P] Crear `FakeBridge` validado con Zod, escenarios de mock y *builders* de interfaz (`liveSnapshot`, `coverage`, `report`, `session`, `preferences`) en `src/test-support/`.
+- [ ] T-COMP-003 [P] Crear utilidades de consulta por catálogo (`t('key')`) para Testing Library y Playwright.
 - [ ] T024 [P] Crear `scripts/design-sync` que copie `design/{components,icons,illustrations,lib,tokens,brand}` a `apps/desktop/src/design-system/` y un test de CI que falle si la copia difiere; prohibir por lint la importación de `design/examples/` y `design/harness/`. Integrar `tokens.css` desde la copia para claro/oscuro, modo sistema y movimiento reducido.
 - [ ] T025 Crear shell de navegación y estados globales de colector en `apps/desktop/src/`.
 - [ ] T026 Configurar catálogos completos español/inglés, resolución especial de locales y verificador de igualdad/sin literales.
+- [ ] CHK-L05 Checkpoint: igualdad de la copia de diseño, catálogos, conformidad del puente, registro de la interfaz y navegación del shell (componentes) en verde.
 
 **Hito:** handshake, catálogo y muestras sintéticas atraviesan sidecar → Rust → UI → SQLite.
 
@@ -63,6 +118,9 @@ Estas tareas modifican `design/` **antes** de la primera sincronización (T024) 
 - [x] T129 Actualizar `design/README.md`, `AGENTS.md` y `design-system.json` con los componentes nuevos y las props cambiadas; actualizar `design/mockup` a los contratos nuevos; ejecutar harness `check` y `build`.
 - [x] T130 [P] Material de vidrio y catálogo de animaciones en `design/` (tokens `--glass-*`/`--motion-*`, niveles `data-glass`, fondo `tw-ambient`, utilidades `tw-enter`/`tw-pop`, animaciones por componente) según `ux-visual-spec.md` § «Material de vidrio» y § «Animación»; harness y mockup con conmutadores de vidrio y movimiento. (2026-09-18)
 - [ ] T131 [US9] Implementar la preferencia `appearance.glass` (`system|full|reduced|off`): lectura de `UISettings.AdvancedEffectsEnabled`, escucha en caliente, aplicación de `data-glass` y degradación automática por rendimiento con histéresis; test de que `off` y sin `backdrop-filter` mantienen contraste AA.
+- [ ] T144 [P] `SettingsScreen` (sección Acerca de › Avanzado): sustituir `logLevel`/`logLevelOptions`/`onLogLevelChange` (y sus etiquetas) por el interruptor `detailedLogging` con `detailedLoggingUntilLabel` y `onDetailedLoggingChange` (FR-086); actualizar ejemplo, `AGENTS.md`, `design-system.json` y mockup; harness `check` y `build`. Precede a T024.
+- [ ] T150 [P] Alinear `design/harness/package.json` y `design/mockup/package.json` con la constitución: versiones exactas (sin `^` ni `~`) e iguales a la aplicación en `svelte`, `vite`, `typescript` (6.0.3), `@sveltejs/vite-plugin-svelte`, `svelte-check`, `@tsconfig/svelte` y `@types/node`; añadir `--fail-on-warnings` al script `check` de ambos; regenerar sus `package-lock.json`; ejecutar `check` y `build`. Añadir a CI una comprobación de que estas versiones coinciden con las de `apps/desktop`. (Política de versiones; constitución XVI)
+- [ ] T-COMP-004 [P] Añadir Vitest y Testing Library como dependencias de desarrollo del harness de `design/` (mismas versiones que la aplicación) y probar los componentes con comportamiento: foco y `Esc` de `Dialog`, teclado de `SegmentedControl`, cursor y rango por teclado de `AnalysisChart`, orden de `CpuAdvancedTable` y máquina de estados de `OnboardingFlow`.
 
 ## Fase 2c — Revisión del motor en el sistema de diseño (2026-09-18)
 
@@ -70,6 +128,8 @@ Estas tareas modifican `design/` **antes** de la primera sincronización (T024) 
 - [x] T133 [P] Actualizar ejemplos y mockup: hero con gravedad y «Enfriar mejor» en lugar de «Rendimiento disponible», informe con potencial por techo de potencia y rendimiento guiado medido, cobertura con nivel A/B/C, prueba guiada con frecuencia frente a base y rendimiento en vivo; regenerar capturas del README.
 
 ## Fase 3 — Historia 1: estado térmico actual (P1)
+
+**Lote L08 — Normalización** (T027–T029, T028a–e). TDD en la selección de temperatura representativa, P/E/LP y nivel A/B/C.
 
 - [ ] T027 [P] [US1] Crear pruebas del normalizador para Intel homogéneo/híbrido, AMD y legado.
 - [ ] T028 [P] [US1] Implementar las reglas de selección de temperatura representativa (`package`/`Tdie` → máx. núcleos → `Tctl` con offset → `Tctl` sin offset) y margen en `sensor-agent/Normalization/`, según `spec.md` § Parámetros iniciales.
@@ -80,16 +140,25 @@ Estas tareas modifican `design/` **antes** de la primera sincronización (T024) 
 - [ ] T028e [P] [US1] Implementar el cálculo del nivel de cobertura (A/B/C) y su techo de confianza, expuesto en `get_coverage` y en el snapshot.
 - [ ] T028d [P] [US1] Implementar en Rust la lectura del contexto energético (`GetSystemPowerStatus`, `PowerGetActiveScheme`, `WM_POWERBROADCAST`) y su persistencia por frame; detectar reanudación y aplicar FR-065.
 - [ ] T029 [US1] Implementar normalización de temperatura, carga, reloj, potencia y flags conservando metadatos originales.
+- [ ] CHK-L08 Checkpoint: normalizador C# y Rust con fixtures Intel, AMD, legado, híbrido y degradados en verde.
+
+**Lote L09 — Ahora y cobertura** (T030–T035, T-E2E-01, T-E2E-03).
+
 - [ ] T030 [US1] Implementar agregación de snapshot y frescura en `src-tauri/src/telemetry/`.
 - [ ] T031 [P] [US1] Conectar `StatusHero` del sistema de diseño (copia en `src/design-system/`) mediante un adaptador en `src/features/dashboard/`.
 - [ ] T032 [P] [US1] Conectar `StatWidget` para temperatura (con límite efectivo), carga y núcleos activos, frecuencia activa frente a base, y potencia frente a su límite, con mini-tendencias.
 - [ ] T033 [P] [US1] Conectar `CoverageMatrix` y `ContextStrip` a `get_coverage`, `telemetry:snapshot`, `collector:state` y `power:context`; calcular «confianza máxima alcanzable» y el enum de acceso avanzado en Rust.
 - [ ] T034 [US1] Conectar snapshots reales/replay a la pantalla `Ahora` sin lógica de sensor en UI.
 - [ ] T035 [US1] Añadir pruebas UI para niveles A/B/C, parcial, obsoleto, desconectado y CPU híbrida.
+- [ ] T-E2E-01 [US1] E2E-01 smoke (`@smoke`, proyecto `app`, traza `intel-normal`): arranque, ventana no vacía, `Ahora` con conclusión, colector `running`, navegación `Ctrl+1…6`, sin errores de página, consola o red. (= T-PLAY-003)
+- [ ] T-E2E-03 [US1] E2E-03 colector desconectado (`app`, traza `collector-disconnect`): banner global, «Datos insuficientes», reintento y resumen técnico. (SC-010)
+- [ ] CHK-L09 Checkpoint: componentes de `Ahora`, `ContextStrip` y `CoverageMatrix` en ambos idiomas + E2E-01 y E2E-03 en verde.
 
 **Prueba independiente:** abrir modo replay y comprender el estado; los ausentes dicen “No disponible”.
 
 ## Fase 4 — Historia 2: detectar y explicar limitaciones (P1)
+
+**Lote L10 — Ventanas y mesetas** (T036, T037a, T037b, T038–T040a). **TDD.** · **Lote L11 — Clasificador y eventos** (T037c, T041, T042). **TDD.** · **Lote L12 — Narrativa, interfaz y corpus** (T037, T043–T045).
 
 - [ ] T036 [P] [US2] Definir `ruleset-v1.json` con la tabla ordenada de clasificación, mesetas, ventana de turbo, umbral de núcleo activo, gravedad frente a base, ocupación de razones, bandas y techos de confianza de `spec.md` § Parámetros iniciales, más códigos explicables; test que verifique que el fichero coincide con la spec.
 - [ ] T037 [P] [US2] Etiquetar el corpus (T019b) con los bits de razón como verdad de referencia y generar sus copias degradadas a niveles B y C; incluir los casos obligatorios de `research.md` § 15 (fin de turbo, equipo que empieza caliente, degradación lenta, DPTF, PROCHOT externo, Zen 4 por diseño, juego de pocos núcleos, EcoQoS).
@@ -104,11 +173,17 @@ Estas tareas modifican `design/` **antes** de la primera sincronización (T024) 
 - [ ] T042 [US2] Implementar segmentación y fusión de `limit_event` persistentes, incluidos `platform` y los marcadores `turbo_end`, y la clasificación de sesión por tiempo acumulado (`class_durations_json`, intervalo analizado).
 - [ ] T043 [P] [US2] Crear el adaptador diagnóstico → props de `StatusHero` (`evidenceLine`), `ReportScreen` (`evidence`, `alternativeCauses`) y `AnalysisScreen` (`AnalysisEvidence`), con nivel de cobertura, gravedad e intervalo analizado.
 - [ ] T044 [US2] Generar la narrativa causal y conectarla a `CausalRail` solo cuando la secuencia esté sustentada; el fin del turbo nunca es un eslabón.
-- [ ] T045 [US2] Ejecutar la regresión del corpus y fijar en CI SC-003, SC-004, SC-005, SC-016, SC-017 y SC-018; calibrar los pesos de la confianza y versionarlos con el ruleset.
+- [ ] T045 [US2] Ejecutar la regresión del corpus y fijar en CI SC-003, SC-004, SC-005, SC-016, SC-017 y SC-018; calibrar los pesos de la confianza y versionarlos con el ruleset. (= T-ACC-002)
+- [ ] T145 [P] [US2] Pruebas de propiedades (`proptest`) del motor: determinismo (NFR-009), niveles B/C sin `mixed_limit` y techos de confianza por nivel; casos mínimos en `proptest-regressions/`.
+- [ ] CHK-L10 Checkpoint (tras T040a): unitarias de `windows.rs`, `thermal.rs`, `power.rs` y `platform.rs` en verde.
+- [ ] CHK-L11 Checkpoint (tras T042): clasificador, eventos y propiedades en verde.
+- [ ] CHK-L12 Checkpoint: corpus etiquetado y degradado con todos los SC en su umbral; adaptador de evidencias (componentes) en verde.
 
 **Prueba independiente:** reproducir cada traza (y sus copias degradadas) y obtener clasificación, gravedad, confianza y evidencias esperadas.
 
 ## Fase 5 — Historia 3: potencial con mejor refrigeración (P1)
+
+**Lote L13 — Potencial** (T046–T052, T-MUT-001, T-MUT-002). **TDD** en fórmula, cotas y redondeo.
 
 - [ ] T046 [P] [US3] Crear tests del método de techo de potencia: fórmula, acotación por la frecuencia de turbo, rango `[0,5·g, 1,0·g]`, redondeo hacia fuera a múltiplos de 5 %, tramos, ausencia de cifra sin PL1 y tramo cualitativo solo con `below_base`.
 - [ ] T047 [US3] Implementar `diagnostics/potential.rs` con el método de techo de potencia, solo en nivel A, fuera de la ventana de turbo y para clases térmicas, mixta o chasis.
@@ -117,10 +192,16 @@ Estas tareas modifican `design/` **antes** de la primera sincronización (T024) 
 - [ ] T050 [US3] Aplicar restricciones: no serializar ninguna cifra sin método `power_headroom` con entradas o sin `guided_result`.
 - [ ] T051 [P] [US3] Conectar el bloque de potencial y de rendimiento guiado de `ReportScreen` y `StatusHero.performance` (tramo, rango, método y entradas; sostenido/inicial con desglose por causa).
 - [ ] T052 [US3] Añadir pruebas negativas: turbo máximo como referencia, fin de turbo tratado como pérdida, núcleos inactivos en la media, decimales y rangos menores de 5 puntos.
+- [ ] T146 [P] [US3] Propiedades del potencial: el rango redondeado hacia fuera contiene el rango sin redondear, es múltiplo de 5 y no tiene decimales.
+- [ ] T-MUT-001 Piloto de `cargo-mutants` sobre `diagnostics/potential.rs` y `diagnostics/classifier.rs`: registrar mutantes, eliminados, supervivientes, sin cobertura, *timeouts* y tiempo total.
+- [ ] T-MUT-002 Línea base de mutation score y revisión de supervivientes (cobertura, aserción, caso límite, equivalente, código muerto); proponer el registro de `cargo-mutants` en la constitución.
+- [ ] CHK-L13 Checkpoint: unitarias, propiedades y negativas del potencial + aceptación de nivel A frente a degradado en verde; informe del piloto de mutation.
 
 **Prueba independiente:** una traza de nivel A limitada térmicamente muestra el tramo y el rango con su método; la misma degradada a B no muestra cifra y explica por qué; una sesión guiada muestra el rendimiento medido desglosado.
 
 ## Fase 6 — Historia 4: diagnóstico guiado (P2)
+
+**Lote L14 — Estados y paradas** (T055, T056, T057, T059). **TDD** en las paradas de FR-085 y la cancelación. · **Lote L15 — Generador e interfaz** (T056a, T058, T-E2E-04). En CI **nunca** se aplica carga real: se usa el generador falso de la compilación `e2e`.
 
 - [ ] T053 [P] [US4] Ejecutar spike comparando carga integrada y observación externa en `docs/spikes/guided-load.md`.
 - [ ] T054 [US4] Aprobar mediante ADR el modo seguro; si no, implementar guía para carga externa reproducible con la degradación de FR-083 (sin cifra de rendimiento; US3-4/5 y antes/después diferidas).
@@ -130,10 +211,15 @@ Estas tareas modifican `design/` **antes** de la primera sincronización (T024) 
 - [ ] T057 [US4] Implementar controlador de fases, cancelación y watchdog fuera de workers.
 - [ ] T058 [P] [US4] Conectar `GuidedDiagnosticScreen` a `guided:phase`: consentimiento, progreso, temperatura/límite efectivo, frecuencia activa frente a base, rendimiento medido en vivo y `Detener ahora`.
 - [ ] T059 [US4] Probar cancelación, sensor perdido, proceso padre ausente, batería, temperatura por encima del límite + 2 °C, frecuencia < 50 % de la base en el límite, y que alcanzar el límite térmico **no** detiene la prueba.
+- [ ] CHK-L14 Checkpoint: máquina de estados, paradas, watchdog, suspensión y ventana oculta en verde (unitarias + integración con generador falso).
+- [ ] T-E2E-04 [US4] E2E-04 prueba guiada (`app`, generador falso, `guided-standard-intel`): lista previa, fases, `Detener ahora` visible en otra pantalla, `Ctrl+Shift+X`, `Esc` no detiene, cancelación → incompleta, y cerrar la ventana durante la prueba pregunta «Detener y salir»; a 1100×760 y 480×600.
+- [ ] CHK-L15 Checkpoint: rendimiento medido con generador falso, componentes de `GuidedDiagnosticScreen` y E2E-04 en verde.
 
 **Prueba independiente:** completar o cancelar una sesión sin dejar carga activa; obtener informe o motivo explícito.
 
 ## Fase 7 — Historia 5: análisis visual (P2)
+
+**Lote L16 — Análisis** (T060–T066, T-E2E-05). TDD en la agregación (extremos, huecos, bordes de eventos).
 
 - [ ] T060 [P] [US5] Integrar el benchmark reproducible de `AnalysisChart` y validarlo en hardware objetivo con 4 pistas, 3.000 puntos por pista y eventos superpuestos.
 - [ ] T061 [US5] Implementar consulta/agregación por resolución temporal en Rust conservando extremos, huecos, calidad y fronteras de eventos; objetivo 2.000–3.000 puntos por pista y 10.000–12.000 totales.
@@ -142,10 +228,14 @@ Estas tareas modifican `design/` **antes** de la primera sincronización (T024) 
 - [ ] T064 [P] [US5] Conectar `CpuTopologyMap` y `CpuAdvancedTable` por núcleo/grupo, con alternancia temperatura/reloj sin perder la selección (FR-064); si hace falta virtualizar la tabla, se añade antes en `design/`.
 - [ ] T065 [US5] Conectar selección temporal con panel de evidencia y exportación de rango.
 - [ ] T066 [US5] Añadir pruebas visuales, rendimiento y accesibilidad para zoom, cursor/rango por teclado, tabla textual, huecos, calidad reducida y densidad alta.
+- [ ] T-E2E-05 [US5] E2E-05 análisis (`frontend`, perfil `with-history`): cursor y rango por teclado, tabla alternativa, huecos como ausencia y eventos; captura visual.
+- [ ] CHK-L16 Checkpoint: agregación con propiedades, componentes y E2E-05 en verde; benchmark de `AnalysisChart` registrado.
 
 **Prueba independiente:** inspeccionar una sesión y rastrear una conclusión hasta valores sincronizados.
 
 ## Fase 8 — Historia 6: bandeja y alertas (P2)
+
+**Lote L17 — Bandeja y alertas** (T067–T072). TDD en las reglas de alerta; bandeja y notificaciones mediante puertos (lo nativo, en la lista manual de release).
 
 - [ ] T067 [P] [US6] Implementar lifecycle de ventana/bandeja y preferencia de monitorización, incluido que elegir bandeja en la primera X active `tray.monitoring_enabled`, la corrección atómica de FR-061 y la instancia única.
 - [ ] T067a [P] [US6] Implementar menú de bandeja (Estado, Abrir, Pausar/Reanudar, Salir), clic para mostrar/ocultar y `set_tray_paused`.
@@ -154,10 +244,13 @@ Estas tareas modifican `design/` **antes** de la primera sincronización (T024) 
 - [ ] T070 [US6] Integrar notificaciones Windows con texto prudente y acceso a sesión.
 - [ ] T071 [US6] Implementar perfiles 5 s / 1 s / 500 ms, `sampling.on_battery` (`keep`/`low_power`/`pause`) y `sampling.per_core_history`.
 - [ ] T072 [US6] Probar cierre de ventana, reinicio del sidecar y ausencia de alertas por picos breves.
+- [ ] CHK-L17 Checkpoint: reglas de alerta con reloj falso e integración con puertos de bandeja y notificaciones en verde.
 
 **Prueba independiente:** minimizar, provocar una traza persistente y recibir una única alerta explicable.
 
 ## Fase 9 — Historia 7: exportación, importación y privacidad (P3)
+
+**Lote L18 — Exportación, importación y sesiones** (T073–T078, T147, T148, T-E2E-06, T-E2E-07). **TDD** en la anonimización.
 
 - [ ] T073 [P] [US7] Definir esquema JSON de informe/exportación separado del IPC.
 - [ ] T074 [P] [US7] Implementar exportador CSV por streaming y snapshot consistente.
@@ -165,36 +258,59 @@ Estas tareas modifican `design/` **antes** de la primera sincronización (T024) 
 - [ ] T076 [US7] Implementar anonimización por allowlist y test de fuga de identificadores.
 - [ ] T077 [US7] Implementar importador/migrador, reproducción de sesión sin hardware y `reevaluate_report` (evaluación nueva junto a la original; el resultado importado nunca se usa como referencia local).
 - [ ] T078 [US7] Conectar `ExportDialog` (tres alcances) e `ImportResultDialog` a `preview_export`, `export`, `import_session` y sus eventos; CSV según formato fijado en `spec.md`.
+- [ ] T147 [US7] Conectar `SessionsScreen`, `SessionCard` y la apertura de `ReportScreen` a `list_sessions`, `get_session`, `get_report`, `delete_session` (confirmación; la sesión activa no se elimina), `set_session_reference` y `session:changed`/`report:frozen`, con estados vacío, carga y error (HU-18; FR-067, FR-072, FR-073).
+- [ ] T148 [P] [US7] Propiedades de la anonimización (ningún identificador sembrado sobrevive, en cualquier posición) y de la serialización de ida y vuelta de los DTO de exportación.
+- [ ] T-E2E-06 [US7] E2E-06 sesiones (`app`, `with-history`): abrir informe, marcar referencia, eliminar con confirmación y sesión activa no eliminable.
+- [ ] T-E2E-07 [US7] E2E-07 exportar e importar (`app`, puerto de diálogo falso): vista previa de campos, anonimizar, fichero, resultado de importación y reproducción sin sensores. (SC-008)
+- [ ] CHK-L18 Checkpoint: fuga de identificadores, ida y vuelta, migración y reevaluación de importadas, propiedades, componentes de `Sesiones` y E2E-06/07 en verde.
 
 **Prueba independiente:** exportar anónimo, validar esquema, importar y reproducir con el mismo diagnóstico.
 
 ## Fase 10 — Historias 8 y 9: onboarding, idioma, tema y ventana (P1)
 
+**Lote L06 — Onboarding** (T079–T082, T-E2E-02). · **Lote L07 — Tema, movimiento, vidrio y ventana** (T083–T087, T131, T-PLAY-007, T-PLAY-009, T-E2E-09, T-E2E-10, T-E2E-11). Ambos pueden empezar tras L05, en paralelo con US1–US3.
+
 - [ ] T079 [P] [US8] Implementar repositorio y migración de `onboarding_state` con versión, progreso, completado y omitido.
 - [ ] T080 [P] [US8] Conectar `OnboardingFlow` a las cinco diapositivas y al glosario breve de ambos catálogos, sin literales visibles.
 - [ ] T081 [US8] Conectar detección pasiva a la quinta diapositiva y a la salida anticipada hacia `Ahora`.
 - [ ] T082 [US8] Implementar repetición desde Ayuda y `WhatsNewCards` versionadas independientes; omitir sin confirmación.
+- [ ] T-E2E-02 [US8] E2E-02 onboarding (`frontend`, perfiles `fresh-install` y `onboarding-midway`): completar, omitir y reanudar solo con teclado a 1100×760 y 480×600; axe por diapositiva; capturas de las diapositivas 1 y 5. (SC-011)
+- [ ] CHK-L06 Checkpoint: enrutado y estado versionado (unitarias), componentes de onboarding en ambos idiomas y E2E-02 en verde.
 - [ ] T083 [P] [US9] Implementar resolución pura de locale `es/ca/gl/eu/ast/an → es`, resto incluido `pt → en`, y override manual.
 - [ ] T084 [P] [US9] Implementar tema `system/light/dark`, escucha de Windows, preferencia de movimiento (`data-motion`) y montaje del fondo ambiental `tw-ambient` en el shell.
 - [ ] T085 [P] [US9] Configurar ventana sin decoraciones y conectar el `TitleBar` del sistema de diseño con un adaptador único de Tauri.
-- [ ] T086 [US9] Persistir rectángulo restaurado/maximizado (mínimo 480×600, inicial 1100×760) y recuperar geometría fuera de monitores activos; formato de números/fechas con `Intl` según idioma efectivo.
-- [ ] T087 [US9] Añadir pruebas de onboarding, locales, expansión de texto, tema, barra, doble clic y geometría multimonitor.
+- [ ] T086 [US9] Persistir rectángulo restaurado/maximizado (mínimo 480×600, o 480×500 cuando la altura útil del monitor no alcanza 600; inicial 1100×760 ajustado al área útil) y recuperar geometría fuera de monitores activos; recalcular el mínimo al cambiar de monitor o escala; con altura útil inferior a 500, abrir maximizada con desplazamiento vertical y `TitleBar`, banner global y `Detener ahora` fijos; formato de números/fechas con `Intl` según idioma efectivo.
+- [ ] T087 [US9] Añadir pruebas de onboarding, locales, expansión de texto, tema, barra, doble clic y geometría multimonitor (integración con puertos de monitores, incluido 1080p al 200 %).
+- [ ] T-PLAY-007 [P] Configurar los tamaños de ventana de la estrategia (480×600, 480×500, 480×384 maximizada con desplazamiento, 840×760 y 1100×760) y la escala 200 % (`deviceScaleFactor: 2`) en Playwright.
+- [ ] T-PLAY-009 [P] Contrato de estilos (`getComputedStyle`: tokens cargados, cambio de tema, `data-glass="off"`, sin cursor de mano ni subrayado, NFR-015) y líneas base visuales generadas solo en el runner de CI, con un workflow de actualización revisada.
+- [ ] T-E2E-09 [US9] E2E-09 idioma, tema, movimiento y vidrio en caliente (`frontend`, eventos de Windows simulados), `forced-colors: active` y `reduced-motion`; capturas claro/oscuro × es/en.
+- [ ] T-E2E-10 [US9] E2E-10 ventana (`app`): botones de la barra, doble clic y primera X (`Esc` no guarda). El bloqueo de cierre durante una prueba se comprueba en T-E2E-04.
+- [ ] T-E2E-11 [US9] E2E-11 navegación compacta (`frontend`, 480×600, 480×500 y 840×760): `Más` alcanza Sesiones, Diagnóstico guiado y Ajustes; atajos `Ctrl+1…6` y `Ctrl+,`. `Ctrl+E` y `F1` se comprueban en T-E2E-14.
+- [ ] CHK-L07 Checkpoint: resolución de idioma (SC-012), geometría con puertos (SC-013), contrato de estilos, axe y E2E-09/10/11 en verde.
 
 **Prueba independiente:** una instalación limpia puede completarse u omitirse en español/inglés, y al reiniciar conserva preferencias y una ventana visible.
 
 ## Fase 11 — Historia 10: ajustes y ciclo de vida (P2)
+
+**Lote L19 — Ajustes y ciclo de vida** (T088–T094, T149, T-INT-003, T-E2E-08). **TDD** en la corrección atómica FR-061 y en las transacciones de FR-063.
 
 - [ ] T088 [P] [US10] Implementar almacén tipado/versionado de preferencias y validación de dependencias.
 - [ ] T089 [P] [US10] Conectar `SettingsScreen` (secciones y panel avanzado plegado) al almacén de preferencias según `ux-visual-spec.md`.
 - [ ] T090 [US10] Implementar `FirstCloseDialog` y persistencia `exit/tray` (con `dismiss` sin persistir), `CloseBlockedDialog` para prueba/exportación/descarga/instalación, sin confundir minimizar con ocultar.
 - [ ] T091 [US10] Integrar inicio con Windows en modo ventana/bandeja, desactivado por defecto y reversible.
 - [ ] T092 [P] [US10] Implementar perfiles de muestreo y valores iniciales de avisos/retención/anonimización.
-- [ ] T093 [US10] Implementar borrado de datos conservando preferencias y restablecimiento total como transacciones separadas con informe de fallos parciales (FR-063); `get_storage_usage`; `TechnicalSummary`, `LicensesScreen`, `open_logs_folder` y `open_external_url` con lista cerrada.
+- [ ] T093 [US10] Implementar borrado de datos (incluidos los registros técnicos) conservando preferencias y restablecimiento total (datos, registros y preferencias) como transacciones separadas con informe de fallos parciales (FR-050, FR-051, FR-063); `get_storage_usage`; `TechnicalSummary`, `LicensesScreen`, `open_logs_folder` y `open_external_url` con lista cerrada.
 - [ ] T094 [US10] Probar reinicio, dependencias, confirmaciones, fallos parciales y valores de fábrica.
+- [ ] T149 [US10] Implementar `Registro detallado` (FR-086): preferencia `logging.detailed_until`, vencimiento a las 24 h o al reiniciar, estado visible en Ajustes y efecto en las tres capas (incluido el reenvío de `debug` desde la interfaz); pruebas con reloj falso.
+- [ ] T-INT-003 Prueba de superficie: los comandos registrados y los permisos de `capabilities/` coinciden con `contracts/application-commands.md`; tokens de confirmación obligatorios; comandos válidos solo en su estado; ningún comando acepta rutas ni URLs libres.
+- [ ] T-E2E-08 [US10] E2E-08 ajustes (`app`, perfiles `tray-enabled` y `with-history`): dependencias visibles con motivo, corrección de bandeja en el mismo gesto, borrar frente a restablecer con confirmaciones diferenciadas; a 1100×760 y 480×600.
+- [ ] CHK-L19 Checkpoint: transacciones con fallos inyectados, dependencias, registro detallado, superficie de comandos y E2E-08 en verde.
 
 **Prueba independiente:** cada ajuste persiste y las dos acciones destructivas afectan exactamente a los datos documentados.
 
 ## Fase 12 — Historia 11: actualizaciones voluntarias firmadas (P3)
+
+**Lote L20 — Actualizador** (T095–T103, T-INT-004, T-E2E-12). TDD en la máquina de estados y en el tráfico cero.
 
 - [ ] T095 [P] [US11] Documentar ADR de endpoint fijo, plugin oficial, custodia Ed25519 y permisos mínimos.
 - [ ] T096 [P] [US11] Crear estado persistente y máquina de estados del actualizador en Rust.
@@ -205,17 +321,33 @@ Estas tareas modifican `design/` **antes** de la primera sincronización (T024) 
 - [ ] T101 [P] [US11] Conectar `SettingsScreen.updates` a la máquina de estados del actualizador y crear la notificación nativa enlazada a la versión disponible.
 - [ ] T102 [P] [US11] Configurar workflow de GitHub Releases para generar manifiesto y artefactos firmados sin exponer la clave privada.
 - [ ] T103 [US11] Probar cero red desactivado, cadencias, firma inválida, interrupción, bloqueo y aislamiento de errores.
+- [ ] T-INT-004 [P] Servidor HTTP local de releases con manifiesto y artefactos (válido, firma inválida, parcial, interrumpido) y clave de prueba generada para tests; endpoint sustituible solo en `cfg(test)` y en la compilación `e2e`.
+- [ ] T-E2E-12 [US11] E2E-12 actualizador (`app`, perfil `updates-on`): apagado sin tráfico; disponible → descargar → verificada → instalar bloqueado durante una prueba guiada.
+- [ ] CHK-L20 Checkpoint: máquina de estados, tráfico cero (puerta 12), firma inválida y E2E-12 en verde.
 
 **Prueba independiente:** ningún artefacto se descarga sin gesto ni se instala sin firma y confirmación independientes.
 
 ## Fase 13 — Endurecimiento y entrega
 
-- [ ] T104 [P] Implementar retención (incluida `session` = borrado al salir), purga segura, mantenimiento limitado de SQLite, modo solo memoria con disco lleno y recuperación de base de datos dañada (FR-075).
-- [ ] T105 [P] Implementar logs estructurados rotados (5 × 5 MB, nivel `logging.level`) y resumen técnico anónimo.
+**Lote L21 — Endurecimiento** (T104–T117, T-E2E-13, T-E2E-14, T-QUAL-005, T-A11Y-001, T-PLAY-008, T-QUAL-002 a 004, T-MUT-003/004, T-TEST-006).
+
+- [ ] T104 [P] Implementar retención (incluida `session` = borrado de datos **y registros** al salir), purga segura, mantenimiento limitado de SQLite, modo solo memoria con disco lleno y recuperación de base de datos dañada (FR-075). Integración con fallos inyectados en el puerto de almacenamiento y fixtures de base corrupta. (= T-INT-002)
+- [ ] T105 [P] Completar el registro: borrado de registros con datos, restablecimiento y retención `session`; `logs_bytes` en `get_storage_usage`; visor `pnpm logs:view` con formato `Europe/Madrid`; resumen técnico anónimo sin registros en bruto. (La base del registro está en T140–T142.)
 - [ ] T106 [P] Completar teclado, lector de pantalla, contraste, ambos idiomas y movimiento reducido; ejecutar la matriz de ambos temas y tamaños compacto/medio/expandido sobre todas las pantallas.
+- [ ] T-A11Y-001 [P] axe sin infracciones `serious`/`critical` por pantalla y estado, regiones vivas (`polite`/`assertive`), `forced-colors` y `reduced-motion` emulados, contraste del texto sobre vidrio en todos los niveles y guion manual de Narrador y NVDA con registro de versiones. (NFR-005, puerta 5)
+- [ ] T-E2E-14 E2E-14 atajos completos (`frontend`): `Ctrl+E` abre el diálogo de exportación de la sesión activa y `F1` abre la ayuda empaquetada, en ambos idiomas. (HU-17)
+- [ ] T-QUAL-005 Estudio moderado con personas no técnicas para SC-001 (protocolo, muestra propuesta de 10 personas en ambos idiomas, tarea «identificar el estado principal en < 10 s», resultados registrados); entrada «manual» en `traceability.md`.
+- [ ] T-E2E-13 E2E-13 resiliencia (`app`, inyección de fallos `TW_DEV_*`): disco lleno con aviso persistente y modo memoria; base dañada apartada y oferta de exportar. (HU-19)
+- [ ] T-PLAY-008 [P] Matriz de entorno nocturna (temas × idiomas × tamaños × escala 100/125/150/200 %, `forced-colors`, `reduced-motion`, vidrio `off`/`full`) y `--repeat-each=3` para detectar inestables.
+- [ ] T-TEST-006 [P] Selección de suites afectadas por rutas en CI (`historias.md` § 28) y medición periódica de tiempos (T-TEST-005).
+- [ ] T-QUAL-002 [P] Informe de tests inestables: reintento único en CI, marca de *flaky* y apertura automática de incidencia; cuarentena máxima de 5 días laborables.
+- [ ] T-QUAL-003 Verificación nativa del artefacto de release en VM limpias (Windows 11 25H2 y 24H2, Windows 10 22H2): instalación por usuario sin elevación, arranque con códigos `app_started` y `collector_connected` sin `error`, tráfico cero, firma Authenticode y desinstalación conservando y eliminando datos.
+- [ ] T-QUAL-004 [P] Tendencias de rendimiento en CI (solo avisan) y mediciones de release en el equipo de referencia (enlaza con T060, T107 y T108).
+- [ ] T-MUT-003 [P] Evaluar StrykerJS (runner de Vitest, jsdom) y Stryker.NET sobre la resolución de idioma, los esquemas del puente y la normalización de temperatura; decidir su adopción.
+- [ ] T-MUT-004 Mutation selectivo en PR (diff de módulos críticos) y semanal completo; registrar en la constitución las herramientas adoptadas.
 - [ ] T107 Optimizar arranque, memoria, consultas y render hasta cumplir NFR-001 a NFR-003.
 - [ ] T108 Ejecutar sesiones de una hora y pruebas de suspensión/reanudación; medir el crecimiento del almacenamiento por perfil y verificar NFR-016 (puerta 6 de la constitución).
-- [ ] T109 Ejecutar matriz de hardware real y publicar cobertura observada.
+- [ ] T109 Ejecutar matriz de hardware real y publicar cobertura observada. Para SC-009 hacen falta dos generaciones anteriores por fabricante: conseguir la segunda (véase `plan.md`, «Hardware real») o registrar la verificación parcial en el ADR de release.
 - [ ] T110 Completar modelo de amenazas, CSP y revisión de comandos Tauri/sidecar/actualizador.
 - [ ] T111 Completar obligaciones MPL 2.0, avisos, código fuente cubierto y SBOM.
 - [ ] T112 Construir instalador NSIS x64 por usuario sin elevación, con WebView2 bootstrapper, pregunta de conservar datos al desinstalar, reparación y rollback; instalador separado por máquina para el acceso de bajo nivel si el spike lo aprueba.
@@ -224,6 +356,7 @@ Estas tareas modifican `design/` **antes** de la primera sincronización (T024) 
 - [ ] T115 Ejecutar `speckit.converge`, resolver divergencias y registrar decisión de release.
 - [ ] T116 [P] Incorporar a CI `npm ci`, `npm run check` y `npm run build` en `design/harness/` para impedir regresiones del sistema de diseño.
 - [ ] T117 Auditar la aplicación contra `design/components/` y `design/examples/`, eliminar duplicados visuales casi equivalentes y documentar cualquier excepción aprobada.
+- [ ] CHK-L21 Checkpoint de release: nivel 4 completo (E2E, matriz, visual, accesibilidad, mutation programado, rendimiento), T-QUAL-003 y lista manual de release firmada.
 
 ## Dependencias
 
@@ -251,6 +384,8 @@ flowchart TD
 ```
 
 La fase 2b (T118–T129) precede a T024 y a cualquier pantalla que consuma los componentes modificados. US4 puede desarrollarse como observación externa si el spike de carga integrada no supera la puerta de seguridad. US5 puede comenzar con replay mientras se completa hardware real. US6 y US7 pueden avanzar en paralelo una vez estabilizados eventos e informes.
+
+**Orden de lotes:** L00 → L01 → L02 → (L03 ∥ L04) → L05 → (L06 ∥ L07 ∥ L08) → L09 → L10 → L11 → L12 → L13 → (L14 → L15 ∥ L16 ∥ L17 ∥ L18) → L19 → L20 → L21. T144 y T150 (sistema de diseño) preceden a T024 en L05. Un lote solo empieza con el `CHK` de sus predecesores cerrado.
 
 ## Estrategia de MVP
 
