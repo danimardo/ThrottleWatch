@@ -273,3 +273,24 @@ Decisión del propietario: la aplicación no debe leerse como una página web de
 
 **Límites que siguen existiendo.** En AMD de consumo no hay razones de limitación documentadas: el techo realista es el nivel B salvo versiones de la tabla PM incluidas en la lista permitida. La relación cúbica potencia-frecuencia es de primer orden; el rango `[0,5·g, 1,0·g]` y la medición guiada la acotan. Si la puerta de viabilidad falla (nivel A inalcanzable sin UAC en cada arranque ni servicio aceptable), el producto se reposiciona como explicador prudente y se decide explícitamente si continuar.
 
+
+## 13. Resultado de `/speckit-analyze` (2026-09-18)
+
+Se corrigieron los 4 hallazgos críticos y los 8 altos. Los medios y bajos quedan pendientes (véase el informe del análisis).
+
+| # | Hallazgo | Decisión | Dónde |
+|---|---|---|---|
+| 13.1 | La conclusión no incluía el intervalo analizado (constitución I) | FR-010 lo exige; `diagnostic_report` guarda `analyzed_from/to_sequence`, `sustained_load_ms` y `class_durations_json` | `spec.md`, `data-model.md`, T042, T043, T075 |
+| 13.2 | Tareas que recreaban componentes de `design/` (constitución, estándares) | Las pantallas conectan componentes de `design/`; lo nuevo se añade antes en `design/` | `tasks.md` (regla de cabecera; T031, T032, T043, T051, T058, T063, T064, T080, T085, T089) |
+| 13.3 | Puerta 6 sin presupuesto de almacenamiento | NFR-016 (objetivos iniciales a validar en T019 y medir en T108) | `spec.md`, T108 |
+| 13.4 | Reglas del motor sin tests unitarios previos (constitución VII) | T037a–T037c antes de T038–T041 | `tasks.md` |
+| 13.5 | Mixta en nivel B inalcanzable (mesetas con márgenes excluyentes); además, en equilibrio térmico la potencia también se estabiliza | La mixta exige nivel A; en B la meseta térmica basta para `thermal_probable`, con la potencia simultánea como causa alternativa; la meseta de potencia ya no incluye el margen y `power_limited` B exige margen > 8 °C | `spec.md` (mesetas, reglas 3, 5, 8, US2-5, niveles), `research.md` § 6 |
+| 13.6 | Potencial ≈ 0 en `chassis_thermal` porque el PL1 efectivo ya está rebajado | `PL1_ref` = máximo de la sesión en chasis; acotación explícita `g ≤ f_turbo / f_activa − 1` | `spec.md`, `plan.md`, `research.md` § 5, `data-model.md` |
+| 13.7 | Sin regla para resumir una sesión de muchas ventanas | Clase principal por tiempo acumulado (≥ 60 s y ≥ 10 % de la carga sostenida) | `spec.md` § «Clasificación de una sesión», `plan.md` etapa 9 |
+| 13.8 | Un cambio de modo del fabricante a mitad de sesión se tomaba por gestión térmica del chasis | Chasis exige bajada progresiva; un escalón único → `indeterminate` con `oem_mode_change` y sin recomendar ventilar (regla 7b) | `spec.md`, `research.md` § 6 |
+| 13.9 | AMD: THM ≥ 99 % era de hecho un margen agotado | Cuenta como razón directa solo si PPT/TDC/EDC < 95 %; techo de confianza `media` hasta validar con el corpus | FR-069, `ipc-protocol.md` |
+| 13.10 | T069 citaba cuatro tipos de alerta | Cinco tipos; limitación solo `below_base` | T069 |
+| 13.11 | Requisitos sin trazabilidad a pruebas (puerta 1) | `traceability.md` con check de CI; las tareas de test citan sus IDs | T009a |
+| 13.12 | Sin comportamiento definido si la carga integrada no se aprueba | Observación externa sin cifra de rendimiento; US3-4/5 y antes/después diferidas | FR-083, T054 |
+
+Además, T047a (sesiones pasivas) pasa a la fase 2 porque el corte vertical la necesita.

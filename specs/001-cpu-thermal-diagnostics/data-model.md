@@ -206,7 +206,10 @@ Dos resultados son comparables («antes/después») si coinciden `cpu_id`, `dura
 | `cooling_potential_band` | enum nullable | `negligible` (< 3 %), `moderate` (3–10 %), `notable` (> 10 %), `likely_notable` (cualitativo, sin cifra) |
 | `cooling_potential_low/high` | real nullable | Rango 0..1 redondeado hacia fuera a múltiplos de 0,05 |
 | `cooling_potential_method` | enum nullable | `power_headroom` |
-| `power_limit_used_w` / `power_measured_w` | real nullable | Entradas del método |
+| `power_limit_used_w` / `power_measured_w` | real nullable | Entradas del método: PL1_ref usado (PL1 efectivo actual; en `chassis_thermal`, el máximo de la sesión) y potencia medida |
+| `analyzed_from_sequence` / `analyzed_to_sequence` | integer | Intervalo analizado (FR-010) |
+| `sustained_load_ms` | integer | Tiempo con carga sostenida dentro del intervalo |
+| `class_durations_json` | json | Duración acumulada por clase y gravedad; base de la clase principal (`spec.md` § «Clasificación de una sesión») |
 | `guided_session_id` | FK nullable | Si el informe es de un diagnóstico guiado (su `guided_result`) |
 | `thermal_time_ratio` | real nullable | Tiempo, explícitamente no pérdida |
 | `primary_evidence_json` | json | Evidencias |

@@ -56,7 +56,7 @@
 - [x] Contrato de comandos completado (telemetría, cobertura, sesiones, exportación/importación, prueba guiada, bandeja, diagnóstico técnico).
 - [x] Schema IPC ampliado a todos los tipos de mensaje.
 - [x] Componentes de diseño pendientes registrados como T118–T129 y en `design/README.md`.
-- [ ] Pendiente: ejecutar `/speckit.analyze` tras estos cambios para confirmar coherencia entre documentos.
+- [x] `/speckit-analyze` ejecutado (2026-09-18): críticos y altos corregidos (`../gap-analysis.md` § 13); quedan 11 medios y 11 bajos.
 
 ## Revisión del motor (2026-09-18)
 

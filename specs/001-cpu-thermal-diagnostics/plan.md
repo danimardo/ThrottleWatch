@@ -130,8 +130,9 @@ Revisado el 2026-09-18 (véase `gap-analysis.md` § 12). Los valores concretos e
 4. **Rasgos de la ventana estable** (60 s, deslizante cada 10 s): ocupación de cada razón, meseta térmica, meseta de potencia, tendencia del límite o del nivel de meseta de potencia a lo largo de la sesión, razón frecuencia activa / base.
 5. **Clasificación** por la tabla ordenada de `spec.md` (primera regla que se cumple), con subtipo de equipo y gravedad `boost`/`below_base`.
 6. **Confianza**: puntuación de solidez con techo por nivel.
-7. **Potencial** (solo nivel A y clases térmicas, mixta o chasis): método «techo de potencia» `g = (PL1 / P)^(1/3) − 1`, acotado por la frecuencia observada en la ventana de turbo, expresado como `[0,5·g, 1,0·g]` y redondeado a tramos.
+7. **Potencial** (solo nivel A y clases térmicas, mixta o chasis): método «techo de potencia» `g = (PL1_ref / P)^(1/3) − 1` (PL1_ref = PL1 efectivo actual; en chasis, el máximo de la sesión), acotado con `g ≤ f_turbo / f_activa − 1`, expresado como `[0,5·g, 1,0·g]` y redondeado a tramos.
 8. **Eventos**: fusión de ventanas consecutivas de la misma clase en `limit_event` con evidencias como códigos.
+9. **Informe de sesión**: clase principal por tiempo acumulado según `spec.md` § «Clasificación de una sesión», con duración por clase e intervalo analizado.
 
 ### Por qué así
 
