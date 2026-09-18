@@ -1,0 +1,265 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://throttlewatch.local/schemas/ipc-envelope-v1.json",
+  "title": "ThrottleWatch IPC Envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_version",
+    "session_nonce",
+    "sequence",
+    "timestamp_utc",
+    "type",
+    "payload"
+  ],
+  "properties": {
+    "protocol_version": { "const": 1 },
+    "session_nonce": {
+      "type": "string",
+      "minLength": 16,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "timestamp_utc": { "type": "string", "format": "date-time" },
+    "type": {
+      "enum": [
+        "hello",
+        "hello_ack",
+        "capabilities",
+        "start",
+        "started",
+        "set_rate",
+        "snapshot",
+        "sample",
+        "stop",
+        "stopped",
+        "shutdown",
+        "error"
+      ]
+    },
+    "payload": { "type": "object" }
+  },
+  "allOf": [
+    { "if": { "properties": { "type": { "const": "hello" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/helloPayload" } } } },
+    { "if": { "properties": { "type": { "const": "hello_ack" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/helloAckPayload" } } } },
+    { "if": { "properties": { "type": { "const": "capabilities" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/capabilitiesPayload" } } } },
+    { "if": { "properties": { "type": { "const": "start" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/startPayload" } } } },
+    { "if": { "properties": { "type": { "const": "started" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/startPayload" } } } },
+    { "if": { "properties": { "type": { "const": "set_rate" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/setRatePayload" } } } },
+    { "if": { "properties": { "type": { "const": "snapshot" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/emptyPayload" } } } },
+    { "if": { "properties": { "type": { "const": "sample" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/samplePayload" } } } },
+    { "if": { "properties": { "type": { "const": "stop" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/emptyPayload" } } } },
+    { "if": { "properties": { "type": { "const": "stopped" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/emptyPayload" } } } },
+    { "if": { "properties": { "type": { "const": "shutdown" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/emptyPayload" } } } },
+    { "if": { "properties": { "type": { "const": "error" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/errorPayload" } } } }
+  ],
+  "$defs": {
+    "emptyPayload": {
+      "type": "object",
+      "additionalProperties": false
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$"
+    },
+    "helloPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["app_version", "supported_protocols"],
+      "properties": {
+        "app_version": { "$ref": "#/$defs/semver" },
+        "supported_protocols": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "helloAckPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent_version", "selected_protocol", "runtime", "low_level_access"],
+      "properties": {
+        "agent_version": { "$ref": "#/$defs/semver" },
+        "selected_protocol": { "const": 1 },
+        "runtime": { "type": "string", "maxLength": 64 },
+        "low_level_access": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state"],
+          "properties": {
+            "state": { "enum": ["available", "reduced", "missing", "denied", "error", "unknown"] },
+            "provider": { "type": ["string", "null"], "maxLength": 64 },
+            "details_code": { "type": ["string", "null"], "pattern": "^[A-Z0-9_]+$" }
+          }
+        }
+      }
+    },
+    "capabilitiesPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cpu", "groups", "sensors"],
+      "properties": {
+        "cpu": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["vendor", "display_name", "logical_processors", "hybrid"],
+          "properties": {
+            "vendor": { "enum": ["intel", "amd", "other", "unknown"] },
+            "display_name": { "type": "string", "maxLength": 256 },
+            "family": { "type": ["string", "null"] },
+            "model": { "type": ["string", "null"] },
+            "stepping": { "type": ["string", "null"] },
+            "architecture": { "type": ["string", "null"] },
+            "logical_processors": { "type": "integer", "minimum": 1 },
+            "physical_cores": { "type": ["integer", "null"], "minimum": 1 },
+            "hybrid": { "type": "boolean" },
+            "virtualized": { "type": "boolean" }
+          }
+        },
+        "groups": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "kind", "logical_count"],
+            "properties": {
+              "id": { "type": "string", "maxLength": 32 },
+              "kind": { "enum": ["p", "e", "lp_e", "homogeneous", "unknown"] },
+              "physical_count": { "type": ["integer", "null"], "minimum": 1 },
+              "logical_count": { "type": "integer", "minimum": 1 },
+              "logical_ids": {
+                "type": "array",
+                "items": { "type": "integer", "minimum": 0 }
+              }
+            }
+          }
+        },
+        "sensors": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": { "$ref": "#/$defs/sensorDescriptor" }
+        }
+      }
+    },
+    "sensorDescriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source_id", "source_name", "metric", "scope", "unit", "quality"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "source_id": { "type": "string", "maxLength": 512 },
+        "source_name": { "type": "string", "maxLength": 256 },
+        "metric": {
+          "enum": [
+            "temperature",
+            "thermal_headroom",
+            "load",
+            "effective_clock",
+            "clock",
+            "power",
+            "voltage",
+            "thermal_flag",
+            "power_flag",
+            "current_flag"
+          ]
+        },
+        "scope": { "enum": ["package", "group", "core", "thread", "system"] },
+        "scope_ref": { "type": ["string", "null"], "maxLength": 32 },
+        "unit": { "enum": ["celsius", "percent", "megahertz", "watt", "volt", "boolean"] },
+        "quality": { "enum": ["direct", "derived", "substitute", "unknown"] },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tjmax_c": { "type": ["number", "null"] },
+            "tctl_offset_c": { "type": ["number", "null"] },
+            "limit_w": { "type": ["number", "null"] },
+            "base_clock_mhz": { "type": ["number", "null"] },
+            "provenance": { "type": ["string", "null"], "maxLength": 64 }
+          }
+        }
+      }
+    },
+    "startPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["interval_ms", "detail"],
+      "properties": {
+        "interval_ms": { "type": "integer", "minimum": 250, "maximum": 10000 },
+        "detail": { "enum": ["representative", "per_group", "per_core"] }
+      }
+    },
+    "setRatePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["interval_ms"],
+      "properties": {
+        "interval_ms": { "type": "integer", "minimum": 250, "maximum": 10000 }
+      }
+    },
+    "samplePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["monotonic_ms", "duration_ms", "values"],
+      "properties": {
+        "monotonic_ms": { "type": "integer", "minimum": 0 },
+        "duration_ms": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "values": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": { "$ref": "#/$defs/sensorValue" }
+        }
+      }
+    },
+    "sensorValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sensor_id", "status"],
+      "properties": {
+        "sensor_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "number": { "type": "number" },
+        "boolean": { "type": "boolean" },
+        "status": {
+          "enum": ["ok", "missing", "stale", "invalid", "unsupported"]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "const": "ok" } },
+            "required": ["status"]
+          },
+          "then": {
+            "oneOf": [
+              {
+                "required": ["number"],
+                "not": { "required": ["boolean"] }
+              },
+              {
+                "required": ["boolean"],
+                "not": { "required": ["number"] }
+              }
+            ]
+          },
+          "else": {
+            "not": { "required": ["number", "boolean"] }
+          }
+        }
+      ]
+    },
+    "errorPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "message_key"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^[A-Z0-9_]+$" },
+        "severity": { "enum": ["info", "recoverable", "fatal"] },
+        "message_key": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "context": { "type": "object", "additionalProperties": true }
+      }
+    }
+  }
+}

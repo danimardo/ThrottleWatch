@@ -1,0 +1,2810 @@
+{
+  "name": "ThrottleWatch",
+  "kind": "svelte-design-system",
+  "svelteVersion": 5,
+  "language": "typescript",
+  "generatedFrom": "ThrottleWatch visual Design System artifact (a separate claude.ai artifact: tokens, component previews/READMEs, brand book) — not included in this Svelte package; this package re-implements its tokens and components as working code.",
+  "install": {
+    "copyTo": [
+      "src/lib/design-system",
+      "src/design-system"
+    ],
+    "dependencies": [],
+    "cssImport": "tokens/tokens.css",
+    "themeAttribute": {
+      "element": "document.documentElement",
+      "dataset": "theme",
+      "values": [
+        "dark",
+        "light"
+      ],
+      "default": "dark"
+    }
+  },
+  "scope": {
+    "batch1_ahoraScreenAndShell": [
+      "TitleBar",
+      "NavigationItem",
+      "BottomBar",
+      "ToolbarButton",
+      "StatusHero",
+      "StatWidget",
+      "StatusChip",
+      "CausalRail"
+    ],
+    "batch2_basePrimitives": [
+      "Button",
+      "Switch",
+      "SegmentedControl",
+      "Dialog",
+      "OptionRow"
+    ],
+    "batch3_brandAssets": [
+      "brand/app-icon (Windows .ico + PNGs)",
+      "icons/NavIcon.svelte (6 destination glyphs)",
+      "illustrations/Onboarding*.svelte (5 illustrations)"
+    ],
+    "batch4_morePrimitives": [
+      "components/Select.svelte (custom accessible listbox dropdown)",
+      "components/Tooltip.svelte (keyboard + hover accessible tooltip)",
+      "components/ProgressBar.svelte (determinate/indeterminate linear track; StatusHero now built on this)",
+      "components/Banner.svelte (persistent in-page notice, info/warning/critical)",
+      "components/EmptyState.svelte (centered no-content placeholder)"
+    ],
+    "batch5_onboardingFlow": [
+      "components/OnboardingProgress.svelte (step-dot indicator)",
+      "components/OnboardingSlide.svelte (one slide's chrome)",
+      "components/OnboardingFlow.svelte (the 5-slide state machine, presentational — no real detection logic)"
+    ],
+    "batch6_settingsScreen": [
+      "components/SettingsScreen.svelte (the full 11-section Ajustes screen, one exported component; built entirely from batch 1-4 primitives, no new primitives added)"
+    ],
+    "batch7_sessionsScreen": [
+      "components/SessionCard.svelte (one session row: active/completed/cancelled/incomplete/imported, export/delete actions)",
+      "components/SessionsScreen.svelte (loading/error/empty/loaded list, one shared delete-confirmation Dialog)"
+    ],
+    "batch8_guidedDiagnosticScreen": [
+      "components/GuidedDiagnosticScreen.svelte (single component driven by a 12-value phase prop; fixed 5-step stepper; battery-state banner; presentational, no real diagnostic logic)"
+    ],
+    "batch9_cpuScreen": [
+      "components/CoreCell.svelte (one core tile wrapped in Tooltip)",
+      "components/CpuTopologyMap.svelte (per-core-group grid, temperature/clock toggle)",
+      "components/CpuAdvancedTable.svelte (filterable, sortable, hand-rolled virtualized — zero runtime dependencies)",
+      "components/CpuScreen.svelte (composes the two; owns the metric-mode toggle as local view-only state)"
+    ],
+    "batch10_analysisScreen": [
+      "components/AnalysisChart.svelte (hand-rolled SVG synced multi-track chart: shared cursor, gap-aware segments, reduced-quality dashed segments, event bands incl. a two-color pattern for 'mixed' events, drag-to-select brush)",
+      "components/AnalysisScreen.svelte (noHistory/loading/ready status, optional stale/partial data banner, evidence panel prioritizing selectedEventEvidence > rangeEvidence > idle hint)"
+    ],
+    "batch11_reportScreen": [
+      "components/ReportScreen.svelte (narrative report: resultado en una frase, qué se observó, impacto estimado, evidencias, causas alternativas, qué no puede concluirse, recomendaciones, baseline utilizado, comparación antes/después; sections with no content are omitted, never padded)"
+    ],
+    "notYetBuilt": [],
+    "batch12_specReview2026_09_18": [
+      "components/CoverageMatrix.svelte",
+      "components/ContextStrip.svelte",
+      "components/ExportDialog.svelte",
+      "components/ImportResultDialog.svelte",
+      "components/FirstCloseDialog.svelte",
+      "components/CloseBlockedDialog.svelte",
+      "components/WhatsNewCards.svelte",
+      "components/TechnicalSummary.svelte",
+      "components/LicensesScreen.svelte",
+      "lib/access.ts (AdvancedAccessState)",
+      "BottomBar `menu` prop (\"Más\")",
+      "Dialog `size=\"wide\"`",
+      "SettingsScreen: tri-state close action, no crash-report switch, no update channel, `verified` update state, per-section advanced blocks, motion, on-battery, storage usage, export, repeat intro, technicalSummary/coverage snippets",
+      "OnboardingFlow / SettingsScreen.sensors: `advancedAccess` enum instead of a boolean",
+      "GuidedDiagnosticScreen: 6-step stepper with `rest`, `whatWillHappen`, remaining time, headroom stat, use-as-reference",
+      "SessionCard/SessionsScreen: reference tag + toggle, Importar… header; ReportScreen: provisional notice, reevaluated block"
+    ],
+    "batch13_glassAndMotion": [
+      "tokens: --glass-* (rgb/alpha per theme, blur, saturate, border, highlight, sheen, shadow), --ambient-*, --motion-*",
+      "quality levels: [data-glass=full|reduced|off] on <html>; @supports fallback without backdrop-filter",
+      "utilities: .tw-glass / .tw-glass-strong / .tw-glass-subtle, .tw-ambient, .tw-enter (--tw-i stagger), .tw-pop; keyframes tw-rise/pop/drop/fade/bump/glow/sheen-sweep/breathe/ambient-drift/ripple",
+      "tokens.ts: GLASS, MOTION, applyGlassLevel(), applyMotionLevel(), motionIsReduced()",
+      "component motion: StatusHero ring/halo/value swap/tag pop, StatWidget bump + enterIndex, ProgressBar spring + sheen, Button liquid ripple, SegmentedControl/NavigationItem press, BottomBar menu drop, Dialog pop + blurred backdrop, Tooltip/Select pop, AnalysisChart band-in, CausalRail draw, ContextStrip reconnect glow, Onboarding slide pop/rise, staggered entries in CoverageMatrix/WhatsNewCards/SessionsScreen/ReportScreen/SettingsScreen/GuidedDiagnosticScreen",
+      "SettingsAppearanceSection: glass* props (system/full/reduced/off)"
+    ]
+  },
+  "nonNegotiableRules": [
+    "A performance percentage only exists with a valid local baseline — StatusHero.performance is optional for this reason; never fabricate a value for it.",
+    "No user-facing copy lives in this package — this includes accessible-only text (aria-label, title, alt, placeholder), not just visible text; every string is a prop supplied by the app's ES/EN catalog. examples/*.example.svelte are the one exception, hardcoding Spanish for demo brevity.",
+    "CausalRail has no empty state — do not render it with insufficient evidence, and do not mount it below a 980px shell width.",
+    "BottomBar: the 'Ahora' item is always index 0.",
+    "accent-blue is never a status/alert color.",
+    "Elevation is a 1px hairline border only — never add box-shadow or a shadow token.",
+    "Do not add a web font — the sans stack already resolves to Segoe UI on Windows.",
+    "Button's 'destructive' variant is only for a Dialog's confirm button, never the row/entry-point control that opens that dialog.",
+    "Do not draw new onboarding illustrations in a different visual style (e.g. Corporate Memphis / human figures) without the user explicitly asking for that departure — the 5 shipped illustrations, the app icon and NavIcon share one abstract, geometric vocabulary on purpose.",
+    "OnboardingFlow has no business logic and never will — slide 5's detection state (status/coverage/advancedAccessAvailable) is driven entirely by the steps[4] prop object, never computed or simulated inside the component.",
+    "SettingsScreen has no business logic and never will — every disabled state, dependency reason, sensor-coverage status, and update-flow status is a prop the host computes; its only local state is whether its two destructive-action confirmation dialogs are open.",
+    "SessionsScreen/GuidedDiagnosticScreen/CpuScreen/AnalysisScreen/ReportScreen have no business logic either — status/phase/groups/rows/tracks/events and every narrative string are host-computed props; the only local state any of them owns is view-only UI state (dialog-open, metric-mode toggle, table filter/sort/scroll).",
+    "CpuAdvancedTable's virtualization and AnalysisChart's chart are hand-rolled, not a dependency — this system ships zero runtime dependencies; extend the existing hand-rolled approach rather than adding a virtualization or charting library.",
+    "A null sample in AnalysisTrack.points is a real gap, never bridged by interpolation — AnalysisChart breaks the line into separate segments around it.",
+    "ReportScreen never fabricates impactValue — same rule as StatusHero.performance applied to the Informe screen; omit impactValue and supply impactUnavailableTitle/impactUnavailableReason instead when there's no valid baseline.",
+    "A ReportScreen section with empty/undefined content is omitted entirely, never rendered as a padded stub.",
+    "An ARIA role must match real behavior — never assign role/aria-valuenow/aria-valuetext etc. without the interaction to back them up. AnalysisChart's .brush is role=\"slider\" only because arrow keys really move aria-valuenow (see its keyboard model); its outer <svg class=\"plot\"> is role=\"group\", not role=\"img\", because it contains real focusable role=\"button\" event bands.",
+    "AnalysisChart is the definitive production chart, not a placeholder for ECharts — see AGENTS.md \"AnalysisChart: SVG vs. ECharts\" for the verified performance envelope and point-budget guidance."
+  ],
+  "tokens": {
+    "themes": [
+      "dark",
+      "light"
+    ],
+    "defaultTheme": "dark",
+    "color": "tokens/tokens.ts#COLOR_TOKENS",
+    "spacing": "tokens/tokens.ts#SPACING_TOKENS",
+    "radius": "tokens/tokens.ts#RADIUS_TOKENS",
+    "typeStyles": [
+      "value-xl",
+      "value-lg",
+      "value-md",
+      "body",
+      "body-strong",
+      "label",
+      "caption",
+      "tag"
+    ],
+    "breakpoints": {
+      "compact": 700,
+      "expanded": 980
+    },
+    "shadowFamily": null,
+    "glass": {
+      "blurPx": 18,
+      "saturate": 1.35,
+      "alphaDark": {
+        "base": 0.8,
+        "strong": 0.9,
+        "subtle": 0.62
+      },
+      "alphaLight": {
+        "base": 0.76,
+        "strong": 0.88,
+        "subtle": 0.58
+      },
+      "alphaReduced": {
+        "base": 0.92,
+        "strong": 0.96,
+        "subtle": 0.8
+      },
+      "levels": [
+        "full",
+        "reduced",
+        "off"
+      ],
+      "notes": "High alpha on purpose: text on glass must stay AA-legible. Never lowered per component (AGENTS rule 24)."
+    },
+    "motion": {
+      "fastMs": 160,
+      "baseMs": 240,
+      "slowMs": 420,
+      "ambientMs": 48000,
+      "staggerMs": 45,
+      "easeOut": "cubic-bezier(0.2, 0.8, 0.2, 1)",
+      "easeInOut": "cubic-bezier(0.65, 0, 0.35, 1)",
+      "spring": "cubic-bezier(0.34, 1.45, 0.64, 1)",
+      "reduced": "prefers-reduced-motion or [data-motion=reduced] collapse all animation/transition durations; [data-motion=full] overrides the OS preference"
+    }
+  },
+  "classification": {
+    "source": "lib/classification.ts#CLASSIFICATION_META",
+    "values": [
+      "normal",
+      "hot_unproven",
+      "thermal_probable",
+      "thermal_confirmed",
+      "power_limited",
+      "mixed_limit",
+      "indeterminate"
+    ],
+    "opposedPair": [
+      "normal",
+      "indeterminate"
+    ]
+  },
+  "tone": {
+    "source": "tokens/tokens.ts#TONE_TOKENS",
+    "values": [
+      "accent",
+      "thermal",
+      "warm",
+      "normal",
+      "power",
+      "unknown"
+    ]
+  },
+  "components": {
+    "Button": {
+      "path": "components/Button.svelte",
+      "props": [
+        {
+          "name": "label",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "variant",
+          "type": "'primary' | 'secondary' | 'destructive'",
+          "required": false,
+          "default": "primary"
+        },
+        {
+          "name": "icon",
+          "type": "Snippet",
+          "required": false
+        },
+        {
+          "name": "disabled",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "type",
+          "type": "'button' | 'submit'",
+          "required": false,
+          "default": "button"
+        },
+        {
+          "name": "onclick",
+          "type": "() => void",
+          "required": false
+        }
+      ],
+      "notes": "Not a marketing-pill CTA — native rounded-rect. 'destructive' only inside a Dialog's actions, never as a row's entry-point button."
+    },
+    "Switch": {
+      "path": "components/Switch.svelte",
+      "props": [
+        {
+          "name": "checked",
+          "type": "boolean",
+          "bindable": true,
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "disabled",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "onchange",
+          "type": "(checked: boolean) => void",
+          "required": false
+        }
+      ]
+    },
+    "SegmentedControl": {
+      "path": "components/SegmentedControl.svelte",
+      "props": [
+        {
+          "name": "options",
+          "type": "{ value: string; label: string }[]",
+          "required": true
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "bindable": true,
+          "required": false,
+          "default": "options[0].value"
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "disabled",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "onchange",
+          "type": "(value: string) => void",
+          "required": false
+        }
+      ],
+      "notes": "Use for 2-5 exclusive options instead of a dropdown; this system ships no dropdown/select."
+    },
+    "Dialog": {
+      "path": "components/Dialog.svelte",
+      "props": [
+        {
+          "name": "open",
+          "type": "boolean",
+          "bindable": true,
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "body",
+          "type": "Snippet",
+          "required": false,
+          "notes": "overrides description when present"
+        },
+        {
+          "name": "tone",
+          "type": "'default' | 'warning'",
+          "required": false,
+          "default": "default"
+        },
+        {
+          "name": "actions",
+          "type": "Snippet",
+          "required": true,
+          "notes": "compose with Button"
+        },
+        {
+          "name": "onclose",
+          "type": "() => void",
+          "required": false
+        },
+        {
+          "name": "size",
+          "type": "'default' | 'wide'",
+          "required": false,
+          "default": "default",
+          "notes": "wide = 560px, for dialogs with lists/two columns"
+        }
+      ],
+      "notes": "Built on native <dialog> (showModal/close) for built-in focus trap, backdrop and Escape-to-dismiss."
+    },
+    "OptionRow": {
+      "path": "components/OptionRow.svelte",
+      "props": [
+        {
+          "name": "label",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "disabled",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "disabledReason",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "control",
+          "type": "Snippet",
+          "required": true
+        }
+      ],
+      "notes": "Visually dims and swaps in disabledReason, but does not disable the control snippet's contents itself — set disabled on both."
+    },
+    "NavIcon": {
+      "path": "icons/NavIcon.svelte",
+      "props": [
+        {
+          "name": "kind",
+          "type": "'now' | 'analysis' | 'cpu' | 'sessions' | 'guided' | 'settings'",
+          "required": true
+        }
+      ],
+      "notes": "Not itself a Snippet - wrap in one before passing to NavigationItem/BottomBar's icon prop. Colored with currentColor."
+    },
+    "OnboardingWelcome": {
+      "path": "illustrations/OnboardingWelcome.svelte",
+      "props": [
+        {
+          "name": "width",
+          "type": "number | string",
+          "required": false,
+          "default": "100%"
+        },
+        {
+          "name": "height",
+          "type": "number | string",
+          "required": false,
+          "default": "100%"
+        }
+      ],
+      "notes": "Onboarding slide 1"
+    },
+    "OnboardingSignals": {
+      "path": "illustrations/OnboardingSignals.svelte",
+      "props": [
+        {
+          "name": "width",
+          "type": "number | string",
+          "required": false,
+          "default": "100%"
+        },
+        {
+          "name": "height",
+          "type": "number | string",
+          "required": false,
+          "default": "100%"
+        }
+      ],
+      "notes": "Onboarding slide 2"
+    },
+    "OnboardingConclusions": {
+      "path": "illustrations/OnboardingConclusions.svelte",
+      "props": [
+        {
+          "name": "width",
+          "type": "number | string",
+          "required": false,
+          "default": "100%"
+        },
+        {
+          "name": "height",
+          "type": "number | string",
+          "required": false,
+          "default": "100%"
+        }
+      ],
+      "notes": "Onboarding slide 3"
+    },
+    "OnboardingPrivacy": {
+      "path": "illustrations/OnboardingPrivacy.svelte",
+      "props": [
+        {
+          "name": "width",
+          "type": "number | string",
+          "required": false,
+          "default": "100%"
+        },
+        {
+          "name": "height",
+          "type": "number | string",
+          "required": false,
+          "default": "100%"
+        }
+      ],
+      "notes": "Onboarding slide 4"
+    },
+    "OnboardingThisComputer": {
+      "path": "illustrations/OnboardingThisComputer.svelte",
+      "props": [
+        {
+          "name": "width",
+          "type": "number | string",
+          "required": false,
+          "default": "100%"
+        },
+        {
+          "name": "height",
+          "type": "number | string",
+          "required": false,
+          "default": "100%"
+        }
+      ],
+      "notes": "Onboarding slide 5"
+    },
+    "TitleBar": {
+      "path": "components/TitleBar.svelte",
+      "props": [
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "maximized",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "onMinimize",
+          "type": "() => void",
+          "required": true
+        },
+        {
+          "name": "onMaximizeToggle",
+          "type": "() => void",
+          "required": true
+        },
+        {
+          "name": "onClose",
+          "type": "() => void",
+          "required": true
+        },
+        {
+          "name": "icon",
+          "type": "Snippet",
+          "required": false
+        },
+        {
+          "name": "minimizeLabel",
+          "type": "string",
+          "required": true,
+          "notes": "aria-label for the minimize button"
+        },
+        {
+          "name": "maximizeLabel",
+          "type": "string",
+          "required": true,
+          "notes": "aria-label for the maximize button when maximized is false"
+        },
+        {
+          "name": "restoreLabel",
+          "type": "string",
+          "required": true,
+          "notes": "aria-label for the same button when maximized is true"
+        },
+        {
+          "name": "closeLabel",
+          "type": "string",
+          "required": true,
+          "notes": "aria-label for the close button"
+        }
+      ],
+      "notes": "No macOS traffic-light styling. Wire callbacks to @tauri-apps/api/window. The four label props supply the three buttons' accessible names — previously hardcoded Spanish aria-labels (\"Minimizar\"/\"Maximizar\"/\"Restaurar\"/\"Cerrar\")."
+    },
+    "NavigationItem": {
+      "path": "components/NavigationItem.svelte",
+      "props": [
+        {
+          "name": "icon",
+          "type": "Snippet",
+          "required": true
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "active",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "density",
+          "type": "'labeled' | 'icon-only'",
+          "required": false,
+          "default": "labeled"
+        },
+        {
+          "name": "onclick",
+          "type": "() => void",
+          "required": false
+        }
+      ]
+    },
+    "BottomBar": {
+      "path": "components/BottomBar.svelte",
+      "props": [
+        {
+          "name": "items",
+          "type": "BottomBarItem[]",
+          "required": true,
+          "itemShape": {
+            "id": "string",
+            "label": "string",
+            "icon": "Snippet",
+            "active": "boolean?",
+            "onclick": "() => void"
+          }
+        },
+        {
+          "name": "menu",
+          "type": "BottomBarMenu",
+          "required": false,
+          "notes": "{ id, label, icon, menuLabel, items: { id, label, icon?, active?, onclick? }[] } — renders the 4th \"Más\" slot with a popup menu; direct items are then limited to 3"
+        }
+      ],
+      "notes": "items[0] must be 'Ahora'. Max ~4 items. Compact navigation is Ahora, Análisis, CPU + a \"Más\" menu holding Sesiones, Diagnóstico guiado and Ajustes (ux-visual-spec → Navegación)."
+    },
+    "ToolbarButton": {
+      "path": "components/ToolbarButton.svelte",
+      "props": [
+        {
+          "name": "icon",
+          "type": "Snippet",
+          "required": true
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "compact",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "onclick",
+          "type": "() => void",
+          "required": false
+        },
+        {
+          "name": "disabled",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        }
+      ],
+      "notes": "Never use for a destructive/irreversible action."
+    },
+    "StatusHero": {
+      "path": "components/StatusHero.svelte",
+      "props": [
+        {
+          "name": "ringValue",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "ringCaption",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "ringPercent",
+          "type": "number (0-100)",
+          "required": true
+        },
+        {
+          "name": "classification",
+          "type": "Classification",
+          "required": true
+        },
+        {
+          "name": "classificationLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "evidenceLine",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "performance",
+          "type": "{ label: string; rangeText: string; percent: number } | null",
+          "required": false,
+          "default": null
+        },
+        {
+          "name": "noBaselineText",
+          "type": "string",
+          "required": false,
+          "default": "Aún sin referencia comparable"
+        }
+      ],
+      "notes": "Row/column layout switches at 900px of the component's own width via CSS container query, not a prop."
+    },
+    "StatWidget": {
+      "path": "components/StatWidget.svelte",
+      "props": [
+        {
+          "name": "icon",
+          "type": "Snippet",
+          "required": true
+        },
+        {
+          "name": "tone",
+          "type": "Tone",
+          "required": true
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "unit",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "footnote",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "enterIndex",
+          "type": "number",
+          "required": false,
+          "notes": "staggered entrance (--tw-i)"
+        }
+      ],
+      "notes": "Group in a container using grid-template-columns: repeat(auto-fit, minmax(150px, 1fr))."
+    },
+    "StatusChip": {
+      "path": "components/StatusChip.svelte",
+      "props": [
+        {
+          "name": "classification",
+          "type": "Classification",
+          "required": true
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "required": true
+        }
+      ]
+    },
+    "CausalRail": {
+      "path": "components/CausalRail.svelte",
+      "props": [
+        {
+          "name": "nodes",
+          "type": "CausalNode[]",
+          "required": true,
+          "itemShape": {
+            "id": "string",
+            "label": "string",
+            "value": "string",
+            "tone": "Tone",
+            "icon": "Snippet"
+          },
+          "minItems": 2,
+          "maxItems": 4
+        }
+      ],
+      "notes": "No empty state — omit the component entirely when evidence is insufficient or shell width < 980px."
+    },
+    "Select": {
+      "path": "components/Select.svelte",
+      "props": [
+        {
+          "name": "options",
+          "type": "{ value: string; label: string }[]",
+          "required": true
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "bindable": true,
+          "required": false,
+          "notes": "defaults to first option's value"
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "required": true,
+          "notes": "accessible name for the trigger and listbox"
+        },
+        {
+          "name": "disabled",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "onchange",
+          "type": "(value: string) => void",
+          "required": false
+        }
+      ],
+      "notes": "Custom listbox pattern (not a native <select>) so it stays themeable in both dark/light instead of an OS-painted popup. Reach for this only when SegmentedControl's 2-5 option range doesn't fit. Keyboard: ArrowUp/ArrowDown move, Enter/Space choose, Escape closes and returns focus to the trigger."
+    },
+    "Tooltip": {
+      "path": "components/Tooltip.svelte",
+      "props": [
+        {
+          "name": "label",
+          "type": "string",
+          "required": false,
+          "notes": "simple one-line case"
+        },
+        {
+          "name": "body",
+          "type": "Snippet",
+          "required": false,
+          "notes": "overrides label for richer content"
+        },
+        {
+          "name": "placement",
+          "type": "'top' | 'bottom' | 'left' | 'right'",
+          "required": false,
+          "default": "top"
+        },
+        {
+          "name": "children",
+          "type": "Snippet<[{ describedBy: string | undefined }]>",
+          "required": true,
+          "notes": "renders your own trigger element; wire aria-describedby={describedBy} on it yourself"
+        }
+      ],
+      "notes": "Shows on pointer hover AND keyboard focus, and stays open while the pointer is over the tooltip panel itself (short grace-period hide, cancelled on re-entry). Escape closes it. Built specifically because a native title attribute fails the spec's 'accesible por teclado y que no desaparece al mover el puntero hacia el' requirement (CPU core tooltips, Análisis chart tooltips)."
+    },
+    "ProgressBar": {
+      "path": "components/ProgressBar.svelte",
+      "props": [
+        {
+          "name": "percent",
+          "type": "number (0-100)",
+          "required": false,
+          "default": 0,
+          "notes": "ignored when indeterminate"
+        },
+        {
+          "name": "tone",
+          "type": "Tone",
+          "required": false,
+          "default": "accent"
+        },
+        {
+          "name": "indeterminate",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "required": false,
+          "notes": "accessible label via aria-label"
+        }
+      ],
+      "notes": "The 4px hairline-bounded linear track, extracted out of StatusHero's own bar markup so every progress indicator in the app is the same component. Use indeterminate for 'in progress, no known percentage yet' — never fake a percentage."
+    },
+    "Banner": {
+      "path": "components/Banner.svelte",
+      "props": [
+        {
+          "name": "tone",
+          "type": "'info' | 'warning' | 'critical'",
+          "required": false,
+          "default": "info"
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "action",
+          "type": "Snippet",
+          "required": false,
+          "notes": "e.g. a secondary Button"
+        },
+        {
+          "name": "onDismiss",
+          "type": "() => void",
+          "required": false,
+          "notes": "renders a close (X) button when present"
+        },
+        {
+          "name": "dismissLabel",
+          "type": "string",
+          "required": false,
+          "notes": "required whenever onDismiss is set — aria-label for the close (X) button; no copy lives in this package"
+        }
+      ],
+      "notes": "A persistent in-page notice (app/system-level: connection failures, low-power mode, update available) — not a toast, not a Dialog. Deliberately does not reuse StatusIcon: its 6 glyphs are the closed set for diagnostic_report.classification, a different semantic domain from Banner's tones. Draws its own 3 local icon shapes instead. dismissLabel supplies the close button's accessible name — previously a hardcoded aria-label=\"Cerrar\"."
+    },
+    "EmptyState": {
+      "path": "components/EmptyState.svelte",
+      "props": [
+        {
+          "name": "icon",
+          "type": "Snippet",
+          "required": false,
+          "notes": "consumer-supplied, e.g. a NavIcon or StatusIcon"
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "action",
+          "type": "Snippet",
+          "required": false
+        }
+      ],
+      "notes": "Centered 'nothing here yet' placeholder (Análisis before enough history, CPU topology before first reading, a filtered list with no matches). No card/border by default."
+    },
+    "OnboardingProgress": {
+      "path": "components/OnboardingProgress.svelte",
+      "props": [
+        {
+          "name": "stepCount",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "currentStep",
+          "type": "number",
+          "required": true,
+          "notes": "0-based"
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "required": false,
+          "notes": "aria-label/aria-valuetext; falls back to plain digits (e.g. '2/5') when omitted"
+        }
+      ]
+    },
+    "OnboardingSlide": {
+      "path": "components/OnboardingSlide.svelte",
+      "props": [
+        {
+          "name": "illustration",
+          "type": "Snippet",
+          "required": true
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "body",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "stepIndex",
+          "type": "number",
+          "required": true,
+          "notes": "0-based"
+        },
+        {
+          "name": "stepCount",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "progressLabel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "note",
+          "type": "string",
+          "required": false,
+          "notes": "small note above the title, used for the resumed case"
+        },
+        {
+          "name": "extra",
+          "type": "Snippet",
+          "required": false,
+          "notes": "step-specific content below the body"
+        },
+        {
+          "name": "onBack",
+          "type": "() => void",
+          "required": false,
+          "notes": "omit to hide the Atrás button entirely"
+        },
+        {
+          "name": "backLabel",
+          "type": "string",
+          "required": true,
+          "notes": "always pass it; only rendered when onBack is set"
+        },
+        {
+          "name": "onSkip",
+          "type": "() => void",
+          "required": false
+        },
+        {
+          "name": "skipLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "onNext",
+          "type": "() => void",
+          "required": true
+        },
+        {
+          "name": "nextLabel",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "notes": "Use directly only for a custom flow that doesn't fit OnboardingFlow's fixed 5-slide shape."
+    },
+    "OnboardingFlow": {
+      "path": "components/OnboardingFlow.svelte",
+      "props": [
+        {
+          "name": "steps",
+          "type": "[Content, Content, Content, Content, DetectionContent]",
+          "required": true,
+          "notes": "exactly 5, fixed order matching the 5 illustrations; Content = { title, body }"
+        },
+        {
+          "name": "initialStep",
+          "type": "number",
+          "required": false,
+          "default": 0,
+          "notes": "0-based; a resumed session"
+        },
+        {
+          "name": "resumedNote",
+          "type": "string",
+          "required": false,
+          "notes": "shown once, only on the slide initialStep points to"
+        },
+        {
+          "name": "backLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "nextLabel",
+          "type": "string",
+          "required": true,
+          "notes": "used on slides 1-4"
+        },
+        {
+          "name": "finishLabel",
+          "type": "string",
+          "required": true,
+          "notes": "replaces nextLabel on slide 5"
+        },
+        {
+          "name": "onSkip",
+          "type": "() => void",
+          "required": false,
+          "notes": "shown on slides 1-4 only"
+        },
+        {
+          "name": "skipLabel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "onFinish",
+          "type": "() => void",
+          "required": true
+        },
+        {
+          "name": "progressLabel",
+          "type": "(step: number, count: number) => string",
+          "required": false,
+          "notes": "1-based step/count for display; falls back to plain digits"
+        }
+      ],
+      "detectionContentFields": [
+        {
+          "name": "status",
+          "type": "'detecting' | 'complete' | 'partial'"
+        },
+        {
+          "name": "detectingLabel",
+          "type": "string?"
+        },
+        {
+          "name": "coverageTitle",
+          "type": "string?"
+        },
+        {
+          "name": "coverageDescription",
+          "type": "string?"
+        },
+        {
+          "name": "advancedAccessAvailable",
+          "type": "boolean?"
+        },
+        {
+          "name": "advancedAccessNote",
+          "type": "string?"
+        },
+        {
+          "name": "onRetry",
+          "type": "(() => void)?"
+        },
+        {
+          "name": "retryLabel",
+          "type": "string?"
+        },
+        {
+          "name": "onRequestAdvancedAccess",
+          "type": "(() => void)?"
+        },
+        {
+          "name": "requestAccessLabel",
+          "type": "string?"
+        }
+      ],
+      "notes": "Presentational only — see nonNegotiableRules. Never computes or simulates detection itself. Slide 5 detection uses `advancedAccess: AdvancedAccessState` (not a boolean): only installable renders the request button; denied/error render warning/critical banners."
+    },
+    "SettingsScreen": {
+      "path": "components/SettingsScreen.svelte",
+      "props": [
+        {
+          "name": "general",
+          "type": "SettingsGeneralSection",
+          "required": true,
+          "notes": "tri-state close action (SegmentedControl, none selected while unset + closeActionUndecidedText), iniciar con Windows, iniciar oculto (disabled + reason)"
+        },
+        {
+          "name": "language",
+          "type": "SettingsLanguageSection",
+          "required": true,
+          "notes": "one Select row"
+        },
+        {
+          "name": "appearance",
+          "type": "SettingsAppearanceSection",
+          "required": true,
+          "notes": "tema + movimiento + efecto de vidrio (three SegmentedControl rows)"
+        },
+        {
+          "name": "monitoring",
+          "type": "SettingsMonitoringSection",
+          "required": true,
+          "notes": "perfil, en batería, folded Avanzado: intervalo exacto + detalle por núcleo"
+        },
+        {
+          "name": "tray",
+          "type": "SettingsTraySection",
+          "required": true,
+          "notes": "background monitoring, notifications, probar notificación, folded Avanzado: periodo de silencio + alertRulesNote"
+        },
+        {
+          "name": "privacy",
+          "type": "SettingsPrivacySection",
+          "required": true,
+          "notes": "retención (4 spec values), espacio usado, anonimizar exportaciones, Exportar…, eliminar datos. NO crash-report switch — zero network besides the updater"
+        },
+        {
+          "name": "sensors",
+          "type": "SettingsSensorsSection",
+          "required": true,
+          "notes": "status vocabulary + advancedAccess enum (lib/access.ts) + optional `coverage` Snippet to embed CoverageMatrix"
+        },
+        {
+          "name": "diagnostics",
+          "type": "SettingsDiagnosticsSection",
+          "required": true,
+          "notes": "duración short/standard/long, exigir CA, avisar al terminar (disabled + reason), read-only safetyLimits"
+        },
+        {
+          "name": "updates",
+          "type": "SettingsUpdatesSection",
+          "required": true,
+          "notes": "status idle|checking|upToDate|available|downloading|verified|installing|error; Descargar only in available, Instalar only in verified (installDisabled + reason). No channel."
+        },
+        {
+          "name": "about",
+          "type": "SettingsAboutSection",
+          "required": true,
+          "notes": "version, Repetir introducción, links (external flag + hint), optional technicalSummary Snippet, folded Avanzado: nivel de registro"
+        },
+        {
+          "name": "riskZone",
+          "type": "SettingsRiskZoneSection",
+          "required": true,
+          "notes": "'restablecer ThrottleWatch' (opens an internal confirm Dialog; resetStatus drives the same in-progress/error rendering as privacy's delete action)"
+        },
+        {
+          "name": "footer",
+          "type": "Snippet",
+          "required": false,
+          "notes": "optional extra content after \"Zona de riesgo\" (e.g. a build id)"
+        }
+      ],
+      "sectionInterfaces": [
+        "SettingsGeneralSection",
+        "SettingsLanguageSection",
+        "SettingsAppearanceSection",
+        "SettingsMonitoringSection",
+        "SettingsTraySection",
+        "SettingsPrivacySection",
+        "SettingsSensorsSection",
+        "SettingsDiagnosticsSection",
+        "SettingsUpdatesSection",
+        "SettingsAboutSection",
+        "SettingsRiskZoneSection"
+      ],
+      "notes": "See gap-analysis.md §10 (2026-09-18) for why the shape is what it is. Per-section \"Avanzado\" fold state is view-only and never persisted."
+    },
+    "SessionCard": {
+      "path": "components/SessionCard.svelte",
+      "props": [
+        {
+          "name": "status",
+          "type": "'active' | 'completed' | 'cancelled' | 'incomplete' | 'imported'",
+          "required": true
+        },
+        {
+          "name": "typeLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "dateLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "durationLabel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "statusLabel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "classification",
+          "type": "Classification",
+          "required": false
+        },
+        {
+          "name": "classificationLabel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "importedLabel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "selected",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "openLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "onOpen",
+          "type": "() => void",
+          "required": true
+        },
+        {
+          "name": "exportLabel",
+          "type": "string",
+          "required": false,
+          "notes": "omit to hide the export icon button"
+        },
+        {
+          "name": "onExport",
+          "type": "() => void",
+          "required": false
+        },
+        {
+          "name": "exportDisabled",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "exportDisabledReason",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "deleteLabel",
+          "type": "string",
+          "required": false,
+          "notes": "omit to hide the delete icon button entirely"
+        },
+        {
+          "name": "onRequestDelete",
+          "type": "() => void",
+          "required": false,
+          "notes": "fires immediately, no confirmation of its own — SessionsScreen owns the one shared confirm Dialog"
+        },
+        {
+          "name": "isReference",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "referenceLabel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "referenceActionLabel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "onToggleReference",
+          "type": "() => void",
+          "required": false,
+          "notes": "only rendered for completed sessions"
+        },
+        {
+          "name": "enterIndex",
+          "type": "number",
+          "required": false,
+          "notes": "staggered entrance; SessionsScreen passes the list index"
+        }
+      ],
+      "notes": "Live-pulsing dot for 'active'; StatusChip for 'completed'/'imported' with a classification; muted tag otherwise."
+    },
+    "SessionsScreen": {
+      "path": "components/SessionsScreen.svelte",
+      "props": [
+        {
+          "name": "status",
+          "type": "'loading' | 'error' | 'loaded'",
+          "required": true
+        },
+        {
+          "name": "sessions",
+          "type": "SessionsScreenSession[]",
+          "required": true,
+          "notes": "SessionCard's props plus a required id"
+        },
+        {
+          "name": "onDeleteSession",
+          "type": "(id: string) => void",
+          "required": true
+        },
+        {
+          "name": "loadingLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "emptyTitle",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "emptyDescription",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "emptyIcon",
+          "type": "Snippet",
+          "required": false
+        },
+        {
+          "name": "emptyAction",
+          "type": "Snippet",
+          "required": false
+        },
+        {
+          "name": "errorTitle",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "errorDescription",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "retryLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "onRetry",
+          "type": "() => void",
+          "required": true
+        },
+        {
+          "name": "deleteDialogTitle",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "deleteDialogDescription",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "deleteDialogCancelLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "deleteDialogConfirmLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "importLabel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "onImport",
+          "type": "() => void",
+          "required": false
+        },
+        {
+          "name": "importDisabled",
+          "type": "boolean",
+          "required": false
+        }
+      ],
+      "notes": "Presentational — see nonNegotiableRules. Only local state is which session's delete confirmation dialog is open (one shared Dialog). Reflows via @container tw-sessions (599px)."
+    },
+    "CoreCell": {
+      "path": "components/CoreCell.svelte",
+      "props": [
+        {
+          "name": "core",
+          "type": "CoreReading",
+          "required": true,
+          "notes": "{ id, index, group?, temperatureLabel?, clockLabel?, tone: Tone, unavailable?, throttling? }"
+        },
+        {
+          "name": "metricMode",
+          "type": "'temperature' | 'clock'",
+          "required": true
+        },
+        {
+          "name": "tooltipLabel",
+          "type": "(core: CoreReading) => string",
+          "required": true
+        },
+        {
+          "name": "selected",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "onSelect",
+          "type": "(id: string) => void",
+          "required": false
+        }
+      ],
+      "notes": "Wraps a button tile in Tooltip. unavailable draws a diagonal hatch instead of a value; throttling adds a 2px status-thermal bottom-edge bar — both a pattern, not just a color change."
+    },
+    "CpuTopologyMap": {
+      "path": "components/CpuTopologyMap.svelte",
+      "props": [
+        {
+          "name": "groups",
+          "type": "CoreGroup[]",
+          "required": true,
+          "notes": "{ kind: 'p'|'e'|'lp'|'ungrouped', label?, cores: CoreReading[] }; homogeneous = one ungrouped group, hybrid = 2-3 labeled groups, no special-cased branching"
+        },
+        {
+          "name": "metricMode",
+          "type": "'temperature' | 'clock'",
+          "required": true
+        },
+        {
+          "name": "metricModeLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "temperatureModeLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "clockModeLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "tooltipLabel",
+          "type": "(core: CoreReading) => string",
+          "required": true
+        },
+        {
+          "name": "onMetricModeChange",
+          "type": "(mode: 'temperature' | 'clock') => void",
+          "required": false
+        },
+        {
+          "name": "selectedCoreId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "onSelectCore",
+          "type": "(id: string) => void",
+          "required": false
+        },
+        {
+          "name": "coverageTone",
+          "type": "Tone",
+          "required": false
+        },
+        {
+          "name": "coverageTitle",
+          "type": "string",
+          "required": false,
+          "notes": "omit to hide the coverage Banner entirely"
+        },
+        {
+          "name": "coverageDescription",
+          "type": "string",
+          "required": false
+        }
+      ]
+    },
+    "CpuAdvancedTable": {
+      "path": "components/CpuAdvancedTable.svelte",
+      "props": [
+        {
+          "name": "rows",
+          "type": "CoreTableRow[]",
+          "required": true,
+          "notes": "{ id, index, groupLabel?, temperatureLabel, temperatureValue?, clockLabel, clockValue?, loadLabel, loadValue?, throttlingLabel, unavailable? } — host supplies both label and raw sortable value"
+        },
+        {
+          "name": "columnLabels",
+          "type": "CoreTableColumnLabels",
+          "required": true,
+          "notes": "{ index, group, temperature, clock, load, throttling }"
+        },
+        {
+          "name": "filterLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "filterPlaceholder",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "emptyFilterMessage",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "rowHeight",
+          "type": "number",
+          "required": false,
+          "default": 36
+        },
+        {
+          "name": "maxHeight",
+          "type": "number",
+          "required": false,
+          "default": 320
+        }
+      ],
+      "notes": "Filter/sort owned internally (generic list ops, not domain judgment). Hand-rolled windowed virtualization — see nonNegotiableRules."
+    },
+    "CpuScreen": {
+      "path": "components/CpuScreen.svelte",
+      "props": [
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "topologyLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "tableLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "groups",
+          "type": "CoreGroup[]",
+          "required": true
+        },
+        {
+          "name": "metricModeLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "temperatureModeLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "clockModeLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "tooltipLabel",
+          "type": "(core: CoreReading) => string",
+          "required": true
+        },
+        {
+          "name": "selectedCoreId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "onSelectCore",
+          "type": "(id: string) => void",
+          "required": false
+        },
+        {
+          "name": "coverageTone",
+          "type": "Tone",
+          "required": false
+        },
+        {
+          "name": "coverageTitle",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "coverageDescription",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "tableRows",
+          "type": "CoreTableRow[]",
+          "required": true
+        },
+        {
+          "name": "tableColumnLabels",
+          "type": "CoreTableColumnLabels",
+          "required": true
+        },
+        {
+          "name": "tableFilterLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "tableFilterPlaceholder",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "tableEmptyFilterMessage",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "notes": "Composes CpuTopologyMap + CpuAdvancedTable. Owns metricMode as local view-only state."
+    },
+    "GuidedDiagnosticScreen": {
+      "path": "components/GuidedDiagnosticScreen.svelte",
+      "props": [
+        {
+          "name": "phase",
+          "type": "DiagnosticPhase",
+          "required": true,
+          "notes": "12 values: intro|preflight|ready|warming|steadyLoad|recovery|cancelling|cancelled|result|safetyStop|sensorLost|error"
+        },
+        {
+          "name": "batteryState",
+          "type": "'ok' | 'warning' | 'blocked'",
+          "required": true
+        },
+        {
+          "name": "preflightChecks",
+          "type": "PreflightCheck[]",
+          "required": false
+        },
+        {
+          "name": "reading",
+          "type": "DiagnosticLiveReading",
+          "required": false,
+          "notes": "shown during warming/steadyLoad/recovery"
+        },
+        {
+          "name": "result",
+          "type": "DiagnosticResult",
+          "required": false,
+          "notes": "shown during 'result' via StatusChip"
+        },
+        {
+          "name": "stepLabels",
+          "type": "[string, string, string, string, string]",
+          "required": true,
+          "notes": "the 5 stepper captions (Preflight/Calentamiento/Carga estable/Recuperación/Resultado), in that fixed order"
+        },
+        {
+          "name": "stepperLabel",
+          "type": "string",
+          "required": true,
+          "notes": "aria-label for the role=\"list\" stepper"
+        },
+        {
+          "name": "preflightFailedTitle",
+          "type": "string",
+          "required": true,
+          "notes": "Banner title shown when one or more preflightChecks has status: 'failed'"
+        },
+        {
+          "name": "preflightCheckingLabel",
+          "type": "string",
+          "required": true,
+          "notes": "ProgressBar label shown while phase === 'preflight'"
+        },
+        {
+          "name": "temperatureStatLabel",
+          "type": "string",
+          "required": true,
+          "notes": "the Temperatura StatWidget label in the live-reading pair"
+        },
+        {
+          "name": "limitStatLabel",
+          "type": "string",
+          "required": true,
+          "notes": "the Límite StatWidget label in the live-reading pair"
+        }
+      ],
+      "notes": "Presentational — see nonNegotiableRules. Renders its own fixed 5-step stepper and a battery-state Banner. See GuidedDiagnosticScreen.svelte's own Props interface for the exact phase-specific action callbacks (onStart/onStop/onCancel/onRetry/onViewReport/etc.). stepLabels/stepperLabel/preflightFailedTitle/preflightCheckingLabel/temperatureStatLabel/limitStatLabel replaced what used to be hardcoded Spanish copy and aria-labels. 12+1 phases including `rest` (optional, onSkipRest); 6 stepLabels; structured intro via whatWillHappen[] + introDisclaimer; reading.headroomLabel/remainingLabel; result offers onUseAsReference."
+    },
+    "AnalysisChart": {
+      "path": "components/AnalysisChart.svelte",
+      "props": [
+        {
+          "name": "tracks",
+          "type": "AnalysisTrack[]",
+          "required": true,
+          "notes": "{ kind, label, unit?, tone: Tone, points: AnalysisPoint[], min, max }; AnalysisPoint = { t, value: number|null, reducedQuality? }"
+        },
+        {
+          "name": "events",
+          "type": "AnalysisEvent[]",
+          "required": false,
+          "notes": "{ id, kind: 'thermal'|'electrical'|'mixed', startT, endT, label }; 'mixed' renders a diagonal two-color pattern"
+        },
+        {
+          "name": "selectedEventId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "onSelectEvent",
+          "type": "(id: string | undefined) => void",
+          "required": false
+        },
+        {
+          "name": "timeLabel",
+          "type": "(t: number) => string",
+          "required": true
+        },
+        {
+          "name": "legendLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "trackHeight",
+          "type": "number",
+          "required": false,
+          "default": 64
+        },
+        {
+          "name": "onRangeSelect",
+          "type": "(range: [number, number] | null) => void",
+          "required": false
+        },
+        {
+          "name": "valueLabel",
+          "type": "(point: AnalysisPoint | undefined, track: AnalysisTrack) => string",
+          "required": true,
+          "notes": "formats one value for the hover readout and the hidden range table — owns all wording, including \"sin dato\" and any reduced-quality suffix"
+        },
+        {
+          "name": "cursorLabel",
+          "type": "string",
+          "required": true,
+          "notes": "aria-label for the .brush slider control"
+        },
+        {
+          "name": "rangeSummaryLabel",
+          "type": "(range: [number, number]) => string",
+          "required": true,
+          "notes": "one sentence summarizing a [startIndex, endIndex] range — used as the visible summary and as aria-valuetext while a range is armed/committed"
+        },
+        {
+          "name": "resetRangeLabel",
+          "type": "string",
+          "required": true,
+          "notes": "visible text of the clear-range button, shown only when a range is committed"
+        }
+      ],
+      "notes": "Hand-rolled SVG, zero dependencies — the definitive production implementation, not a placeholder for ECharts (see AGENTS.md \"AnalysisChart: SVG vs. ECharts\" for the verified performance envelope: first render stayed under 300ms and keyboard-cursor latency stayed single-digit-ms up to 20,000 points/track x 4 tracks + 100 event bands). One <svg> stacks all tracks by Y-offset so one pointer-move handler draws one shared cursor. A null point value is a real gap, never interpolated — each track draws as one <path> per contiguous gap-free/quality-consistent run, not one node per point. Legend-swatch show/hide is local view-only state. The .brush strip below the plot is a real role=\"slider\" (arrow keys move aria-valuenow, Home/End jump to extremes, Enter/Space arms then commits a range, Escape cancels an armed-not-committed selection) with a visible rangeSummaryLabel sentence and a visually-hidden real <table> as the textual/tabular alternative. The outer <svg class=\"plot\"> is role=\"group\", not role=\"img\", since it has real focusable role=\"button\" event-band children."
+    },
+    "AnalysisScreen": {
+      "path": "components/AnalysisScreen.svelte",
+      "props": [
+        {
+          "name": "status",
+          "type": "'noHistory' | 'loading' | 'ready'",
+          "required": true
+        },
+        {
+          "name": "loadingLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "noHistoryTitle",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "noHistoryDescription",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "noHistoryIcon",
+          "type": "Snippet",
+          "required": false
+        },
+        {
+          "name": "dataNoticeTone",
+          "type": "'warning' | 'critical'",
+          "required": false,
+          "default": "warning"
+        },
+        {
+          "name": "dataNoticeTitle",
+          "type": "string",
+          "required": false,
+          "notes": "omit to hide the one data-notice Banner slot"
+        },
+        {
+          "name": "dataNoticeDescription",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "tracks",
+          "type": "AnalysisTrack[]",
+          "required": true
+        },
+        {
+          "name": "events",
+          "type": "AnalysisEvent[]",
+          "required": false
+        },
+        {
+          "name": "selectedEventId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "onSelectEvent",
+          "type": "(id: string | undefined) => void",
+          "required": false
+        },
+        {
+          "name": "timeLabel",
+          "type": "(t: number) => string",
+          "required": true
+        },
+        {
+          "name": "legendLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "onRangeSelect",
+          "type": "(range: [number, number] | null) => void",
+          "required": false
+        },
+        {
+          "name": "selectedEventEvidence",
+          "type": "AnalysisEvidence",
+          "required": false,
+          "notes": "{ title, description?, items?: { label, value }[] }"
+        },
+        {
+          "name": "rangeEvidence",
+          "type": "AnalysisEvidence",
+          "required": false
+        },
+        {
+          "name": "idleHint",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "evidenceTitle",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "valueLabel",
+          "type": "(point: AnalysisPoint | undefined, track: AnalysisTrack) => string",
+          "required": true,
+          "notes": "passed straight through to the internal AnalysisChart"
+        },
+        {
+          "name": "cursorLabel",
+          "type": "string",
+          "required": true,
+          "notes": "passed straight through to the internal AnalysisChart"
+        },
+        {
+          "name": "rangeSummaryLabel",
+          "type": "(range: [number, number]) => string",
+          "required": true,
+          "notes": "passed straight through to the internal AnalysisChart"
+        },
+        {
+          "name": "resetRangeLabel",
+          "type": "string",
+          "required": true,
+          "notes": "passed straight through to the internal AnalysisChart"
+        }
+      ],
+      "notes": "Evidence priority: selectedEventEvidence > rangeEvidence > idleHint — host does the event/range lookup, this component never does. Reflows via @container tw-analysis (699px)."
+    },
+    "ReportScreen": {
+      "path": "components/ReportScreen.svelte",
+      "props": [
+        {
+          "name": "status",
+          "type": "'loading' | 'ready'",
+          "required": true
+        },
+        {
+          "name": "loadingLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "classification",
+          "type": "Classification",
+          "required": true
+        },
+        {
+          "name": "classificationLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "headline",
+          "type": "string",
+          "required": true,
+          "notes": "resultado en una frase"
+        },
+        {
+          "name": "sessionIncomplete",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "incompleteNoticeTitle",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "incompleteNoticeDescription",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "reducedConfidence",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "reducedConfidenceNoticeTitle",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "reducedConfidenceNoticeDescription",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "observedTitle",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "observedText",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "causalChain",
+          "type": "CausalNode[]",
+          "required": false,
+          "notes": "maps straight to CausalRail — only with a real 2-4 node chain, per CausalRail's own rule"
+        },
+        {
+          "name": "impactTitle",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "impactValue",
+          "type": "string",
+          "required": false,
+          "notes": "see nonNegotiableRules — absent means show the unavailable state"
+        },
+        {
+          "name": "impactUnavailableTitle",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "impactUnavailableReason",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "evidenceTitle",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "evidence",
+          "type": "string[]",
+          "required": false,
+          "notes": "section omitted when empty"
+        },
+        {
+          "name": "alternativeCausesTitle",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "alternativeCauses",
+          "type": "string[]",
+          "required": false
+        },
+        {
+          "name": "cannotConcludeTitle",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "cannotConclude",
+          "type": "string[]",
+          "required": false
+        },
+        {
+          "name": "recommendationsTitle",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "recommendations",
+          "type": "string[]",
+          "required": false,
+          "notes": "rendered as a numbered list"
+        },
+        {
+          "name": "baselineTitle",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "baselineDescription",
+          "type": "string",
+          "required": false,
+          "notes": "shown when a baseline exists"
+        },
+        {
+          "name": "baselineMissingText",
+          "type": "string",
+          "required": false,
+          "notes": "shown instead when it doesn't; this section always renders"
+        },
+        {
+          "name": "comparisonTitle",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "comparisonMetrics",
+          "type": "ReportComparisonMetric[]",
+          "required": false,
+          "notes": "{ label, beforeValue, afterValue }; omitted when empty"
+        },
+        {
+          "name": "comparisonBeforeLabel",
+          "type": "string",
+          "required": false,
+          "notes": "required whenever comparisonMetrics is non-empty — the before/after table's own left column header"
+        },
+        {
+          "name": "comparisonAfterLabel",
+          "type": "string",
+          "required": false,
+          "notes": "required whenever comparisonMetrics is non-empty — the table's right column header"
+        },
+        {
+          "name": "exportActions",
+          "type": "Snippet",
+          "required": false,
+          "notes": "compose with Button"
+        },
+        {
+          "name": "provisional",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "provisionalNoticeTitle",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "provisionalNoticeDescription",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "reevaluated",
+          "type": "{ title, classification, classificationLabel, headline, note? }",
+          "required": false,
+          "notes": "imported session re-evaluated with the current ruleset, shown next to the original"
+        }
+      ],
+      "notes": "Presentational — see nonNegotiableRules. A section with empty/undefined content is omitted entirely, never rendered as a stub. impactValue never fabricated without a baseline. comparisonBeforeLabel/comparisonAfterLabel replaced what used to be hardcoded \"Antes\"/\"Después\" column headers."
+    },
+    "CoverageMatrix": {
+      "path": "components/CoverageMatrix.svelte",
+      "props": [
+        {
+          "name": "title",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "rows",
+          "type": "CoverageRow[]",
+          "required": true,
+          "notes": "{ id, label, available, quality?: direct|derived|substitute, qualityLabel?, sourceLabel?, reasonLabel? }"
+        },
+        {
+          "name": "columnLabels",
+          "type": "CoverageColumnLabels",
+          "required": true
+        },
+        {
+          "name": "availableLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "unavailableLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "maxConfidenceLabel",
+          "type": "string",
+          "required": true,
+          "notes": "full sentence: strongest conclusion this machine allows"
+        },
+        {
+          "name": "accessState",
+          "type": "AdvancedAccessState",
+          "required": true
+        },
+        {
+          "name": "accessLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "requestAccessLabel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "onRequestAccess",
+          "type": "() => void",
+          "required": false,
+          "notes": "rendered only for accessState=installable"
+        },
+        {
+          "name": "accessRetryLabel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "onAccessRetry",
+          "type": "() => void",
+          "required": false
+        },
+        {
+          "name": "recheckLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "onRecheck",
+          "type": "() => void",
+          "required": true
+        },
+        {
+          "name": "recheckDisabled",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "copySummaryLabel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "onCopySummary",
+          "type": "() => void",
+          "required": false
+        }
+      ],
+      "notes": "FR-023 coverage matrix. Reused as the panel opened from ContextStrip on \"Ahora\" and embedded in Ajustes → Sensores via SettingsSensorsSection.coverage. Collapses to stacked cards below 480px container width."
+    },
+    "ContextStrip": {
+      "path": "components/ContextStrip.svelte",
+      "props": [
+        {
+          "name": "cpuLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "topologyLabel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "powerLabel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "collectorState",
+          "type": "'fresh' | 'stale' | 'disconnected' | 'starting'",
+          "required": true
+        },
+        {
+          "name": "collectorLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "coverageActionLabel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "onCoverage",
+          "type": "() => void",
+          "required": false
+        },
+        {
+          "name": "coverageIcon",
+          "type": "Snippet",
+          "required": false
+        },
+        {
+          "name": "compact",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        }
+      ],
+      "notes": "Always-visible strip above StatusHero: CPU + topology, power source/plan, collector state (dot + text, never color alone) and \"Ver cobertura\". The host decides the state (e.g. stale after > 5 s)."
+    },
+    "ExportDialog": {
+      "path": "components/ExportDialog.svelte",
+      "props": [
+        {
+          "name": "open",
+          "type": "boolean (bindable)",
+          "required": false
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "scopeLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "formatLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "format",
+          "type": "'csv' | 'json'",
+          "required": true
+        },
+        {
+          "name": "formatOptions",
+          "type": "{ value, label }[]",
+          "required": true
+        },
+        {
+          "name": "onFormatChange",
+          "type": "(format) => void",
+          "required": true
+        },
+        {
+          "name": "anonymizeLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "anonymizeDescription",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "anonymize",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "onAnonymizeChange",
+          "type": "(checked) => void",
+          "required": true
+        },
+        {
+          "name": "includedTitle",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "includedFields",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "name": "excludedTitle",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "excludedFields",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "name": "sizeLabel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "fileNameLabel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "cancelLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "confirmLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "confirmDisabled",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "onCancel",
+          "type": "() => void",
+          "required": true
+        },
+        {
+          "name": "onConfirm",
+          "type": "() => void",
+          "required": true
+        }
+      ],
+      "notes": "The single export dialog for session / report / range scopes (FR-028). Included/excluded lists are host-computed (preview_export). Never shows or collects a path: the native save dialog owns it. onCancel is not re-fired after onConfirm."
+    },
+    "ImportResultDialog": {
+      "path": "components/ImportResultDialog.svelte",
+      "props": [
+        {
+          "name": "open",
+          "type": "boolean (bindable)",
+          "required": false
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "'reading' | 'validating' | 'migrating' | 'success' | 'error'",
+          "required": true
+        },
+        {
+          "name": "progressLabel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "warningsTitle",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "warnings",
+          "type": "string[]",
+          "required": false
+        },
+        {
+          "name": "closeLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "onClose",
+          "type": "() => void",
+          "required": true
+        },
+        {
+          "name": "openSessionLabel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "onOpenSession",
+          "type": "() => void",
+          "required": false
+        }
+      ],
+      "notes": "Result of import_session: progress, then success (with \"open session\") or an actionable error; warnings are listed, never hidden."
+    },
+    "FirstCloseDialog": {
+      "path": "components/FirstCloseDialog.svelte",
+      "props": [
+        {
+          "name": "open",
+          "type": "boolean (bindable)",
+          "required": false
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "exitLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "trayLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "trayNote",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "settingsHint",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "onExit",
+          "type": "() => void",
+          "required": true
+        },
+        {
+          "name": "onTray",
+          "type": "() => void",
+          "required": true
+        },
+        {
+          "name": "onDismiss",
+          "type": "() => void",
+          "required": true,
+          "notes": "Escape/backdrop: persists nothing, window stays open; not fired after onExit/onTray"
+        }
+      ],
+      "notes": "FR-046 first-close question. Choosing tray also enables background monitoring (host does it; trayNote says so). No \"remember\" checkbox: the choice is always remembered."
+    },
+    "CloseBlockedDialog": {
+      "path": "components/CloseBlockedDialog.svelte",
+      "props": [
+        {
+          "name": "open",
+          "type": "boolean (bindable)",
+          "required": false
+        },
+        {
+          "name": "reason",
+          "type": "'guided' | 'export' | 'download' | 'install'",
+          "required": true
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "confirmLabel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "onConfirm",
+          "type": "() => void",
+          "required": false,
+          "notes": "omit for install: the window cannot close"
+        },
+        {
+          "name": "cancelLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "onCancel",
+          "type": "() => void",
+          "required": true
+        }
+      ],
+      "notes": "Shown on lifecycle:close-blocked. guided → destructive \"Detener y salir\"; install → single \"Entendido\"."
+    },
+    "WhatsNewCards": {
+      "path": "components/WhatsNewCards.svelte",
+      "props": [
+        {
+          "name": "title",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "cards",
+          "type": "WhatsNewCard[]",
+          "required": true,
+          "notes": "{ id, title, body, actionLabel?, onAction? }"
+        },
+        {
+          "name": "dismissLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "onDismiss",
+          "type": "(id) => void",
+          "required": true
+        },
+        {
+          "name": "dismissAllLabel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "onDismissAll",
+          "type": "() => void",
+          "required": false
+        }
+      ],
+      "notes": "FR-037 post-update notices over \"Ahora\"; never re-runs onboarding, never modal. Host owns which cards are pending."
+    },
+    "TechnicalSummary": {
+      "path": "components/TechnicalSummary.svelte",
+      "props": [
+        {
+          "name": "title",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "note",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "copyLabel",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "copiedLabel",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "copied",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "onCopy",
+          "type": "() => void",
+          "required": true
+        },
+        {
+          "name": "regionLabel",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "notes": "Copyable identifier-free technical summary (get_technical_summary). Lives in Ajustes → Acerca de via SettingsAboutSection.technicalSummary and behind the global collector banner."
+    },
+    "LicensesScreen": {
+      "path": "components/LicensesScreen.svelte",
+      "props": [
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "intro",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "entries",
+          "type": "LicenseEntry[]",
+          "required": true,
+          "notes": "{ id, name, version?, license, text }"
+        }
+      ],
+      "notes": "Third-party notices (MPL 2.0 etc.) as expandable native <details> entries."
+    }
+  },
+  "helpers": {
+    "createWidthTracker": {
+      "path": "lib/responsive.svelte.ts",
+      "returns": "{ width: number; tier: 'compact' | 'medium' | 'expanded' }",
+      "optional": true
+    },
+    "StatusIcon": {
+      "path": "icons/StatusIcon.svelte",
+      "props": [
+        {
+          "name": "kind",
+          "type": "'check' | 'warning' | 'flame' | 'bolt' | 'mixed' | 'unknown'",
+          "required": true
+        }
+      ],
+      "notes": "Internal — used by StatusChip and StatusHero. Not meant to be called directly by app screens."
+    },
+    "lib/access.ts": "AdvancedAccessState = 'not_needed' | 'available' | 'installable' | 'denied' | 'error' — UI-side translation of the IPC low_level_access state (see data-model.md)."
+  },
+  "brandAssets": {
+    "appIcon": {
+      "path": "brand/app-icon/",
+      "files": [
+        "icon.png (1024 master)",
+        "icon.ico (16/24/32/48/64/128/256)",
+        "32x32.png",
+        "128x128.png",
+        "128x128@2x.png",
+        "source.html (editable)"
+      ],
+      "concept": "partial ring gauge on a rounded-square dark backdrop, same motif as StatusHero and the Cover component in the separate visual Design System artifact"
+    },
+    "navIcons": "icons/NavIcon.svelte (see components.NavIcon)",
+    "onboardingIllustrations": "illustrations/Onboarding*.svelte (see components.Onboarding*)"
+  },
+  "examples": [
+    "examples/AhoraScreen.example.svelte",
+    "examples/SettingsSection.example.svelte",
+    "examples/OnboardingIllustrations.example.svelte",
+    "examples/MorePrimitives.example.svelte",
+    "examples/OnboardingFlow.example.svelte",
+    "examples/SettingsScreen.example.svelte",
+    "examples/SessionsScreen.example.svelte",
+    "examples/GuidedDiagnosticScreen.example.svelte",
+    "examples/CpuScreen.example.svelte",
+    "examples/AnalysisScreen.example.svelte",
+    "examples/ReportScreen.example.svelte",
+    "examples/ShellPieces.example.svelte"
+  ],
+  "verification": {
+    "typeCheck": "svelte-check: 0 errors, 0 warnings (Svelte 5.57, TypeScript ~6.0), all eleven batches — reproducible via harness/ (see harness field)",
+    "build": "vite build: succeeded",
+    "visualQA": [
+      "380x720 compact",
+      "860x760 medium",
+      "1400x860 expanded",
+      "settings panel + Dialog open, both themes",
+      "onboarding illustrations sheet, both themes",
+      "app icon downsampled to 16/32/48px",
+      "more-primitives sheet (Tooltip open on a core tile, Select dropdown open, determinate + indeterminate ProgressBar, warning + critical Banner, EmptyState), both themes",
+      "StatusHero re-screenshotted after its internal refactor onto ProgressBar to confirm no visual regression",
+      "onboarding flow: slide 1 (dark+light), mid-flow slide 2 (dark), slide 5 in detecting/complete/partial states (dark), partial coverage stacked with advanced-access-unavailable banner (dark), resumed-session note (dark), slide 5 complete (light spot check)",
+      "SettingsScreen: 420px compact / 860px medium / 1100px expanded (dark), 1100px expanded (light) to confirm the @container reflow and both themes; sensor coverage 'complete' state; update flow 'available' and 'downloading' states reached by actually clicking through the flow; update flow 'error' state; both destructive-action confirmation dialogs open (eliminar datos, restablecer)",
+      "SessionsScreen: all 5 SessionStatus values in one seeded list, forced-empty state, shared delete-confirmation Dialog open",
+      "GuidedDiagnosticScreen: all 12 DiagnosticPhase values and all 3 BatteryState values via a Select-driven demo picker",
+      "CpuScreen: hybrid P/E/LP topology (dark+light), homogeneous topology, 64-core topology with the table scrolled and re-screenshotted to confirm virtualization actually unmounts/replaces rows (visible range shifted from core 0 to core ~22), hovered core tile (Tooltip open), temperature/clock toggle, table filter+sort — narrow-width (420px) column-truncation bug found and fixed via a horizontal-scroll container + row min-width",
+      "AnalysisScreen: idle state both themes, hover cursor + per-track readout including a real gap reading 'sin dato', clicked thermal event band (evidence panel + red band outline), drag-selected range on the brush (evidence panel + reset-zoom action), noHistory and loading states, data-notice Banner (partial), hidden track via legend swatch, 420px compact width; a high-DPI element screenshot of just the <svg> plot confirmed the gap is a real broken segment, the reduced-quality run is dashed, and the 'mixed' event band is a genuine two-color diagonal stripe pattern",
+      "ReportScreen: full narrative with causal chain (dark+light), loading state, session-incomplete + reduced-confidence banners stacked with impact-unavailable (no baseline), 'normal' classification with the causal chain hidden (confirms omission, not empty render), 'mixed_limit' classification's neutral chip, export-action click, 420px compact width"
+    ],
+    "themesChecked": [
+      "dark",
+      "light"
+    ]
+  },
+  "harness": {
+    "path": "harness/",
+    "purpose": "Self-contained npm subproject that reproduces the verification claims above: type-checks and production-builds this package against pinned exact tool versions, and serves a browsable nav over every examples/*.example.svelte file.",
+    "pinnedSvelteVersion": "5.57.0",
+    "commands": {
+      "install": "cd harness && npm install",
+      "check": "npm run check    # svelte-check + tsc, 0 errors/0 warnings expected",
+      "build": "npm run build    # vite build, clean production build expected",
+      "preview": "npm run preview  # serves the build; nav supports ?view=<id> deep links"
+    },
+    "notes": "Not part of the design system itself — do not import from it or copy it into a host app. harness/tsconfig.app.json reaches up into the real components/icons/illustrations/lib/tokens/examples folders directly (no copy step), so npm run check always reflects the actual shipped source."
+  }
+}

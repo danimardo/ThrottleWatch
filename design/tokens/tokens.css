@@ -1,0 +1,497 @@
+/*
+  ThrottleWatch — Design tokens (CSS custom properties)
+  ------------------------------------------------------
+  Original source of these values: the tokens data in the separate
+  ThrottleWatch visual Design System artifact (not a file in this
+  package). Within this package, tokens.css and tokens.ts are the two
+  places the same values live — do not hand-edit color/spacing/radius
+  values in one without updating the other to match.
+
+  Usage: import this file once, near the root of the app
+  (e.g. in your root +layout.svelte or App.svelte):
+
+    import '../design-system/tokens/tokens.css';
+
+  Theme switching is attribute-driven. Set on <html> or <body>:
+
+    document.documentElement.dataset.theme = 'dark' | 'light';
+
+  Dark is the default when no attribute is set (dark is the primary
+  theme this system was designed against; light is the deepened
+  AA-safe variant — see the README "Color" section).
+*/
+
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --bg: #101114;
+  --surface: #1c1c1e;
+  --surface-raised: #242426;
+  --surface-sunken: #2c2c2e;
+  --hairline: rgba(255, 255, 255, 0.14);
+
+  /* Text */
+  --text-primary: #ffffff;
+  --text-secondary: #98989d;
+  --text-tertiary: #67676c;
+
+  /* System accent — navigation, focus, toolbar actions, neutral figures.
+     Never used for a thermal/power alert state. */
+  --accent-blue: #0a84ff;
+
+  /* Status — one token per diagnostic_report.classification family */
+  --status-normal: #32d74b;
+  --status-warm: #ff9f0a;
+  --status-thermal: #ff453a;
+  --status-power: #bf5af2;
+  --status-unknown: #98989d;
+
+  /* Glass (see "Glass material" below) — dark values. Alpha is kept
+     high on purpose: the product is a fast-read instrument and text on
+     glass must stay legible over busy content. */
+  --glass-rgb: 28, 28, 30;
+  --glass-alpha: 0.8;
+  --glass-alpha-strong: 0.9;
+  --glass-alpha-subtle: 0.62;
+  --glass-border: rgba(255, 255, 255, 0.2);
+  --glass-highlight: rgba(255, 255, 255, 0.3);
+  --glass-shadow-color: rgba(0, 0, 0, 0.38);
+  --glass-sheen: linear-gradient(
+    118deg,
+    rgba(255, 255, 255, 0.11) 0%,
+    rgba(255, 255, 255, 0.035) 38%,
+    rgba(255, 255, 255, 0) 62%
+  );
+
+  /* Ambient background the glass refracts (used by .tw-ambient). */
+  --ambient-1: rgba(10, 132, 255, 0.34);
+  --ambient-2: rgba(191, 90, 242, 0.26);
+  --ambient-3: rgba(255, 69, 58, 0.16);
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+
+  --bg: #f2f4f7;
+  --surface: #ffffff;
+  --surface-raised: #ebeff5;
+  --surface-sunken: #e1e7f0;
+  --hairline: rgba(29, 29, 31, 0.12);
+
+  --text-primary: #1d1d1f;
+  --text-secondary: #4b4b50;
+  --text-tertiary: #7a7a80;
+
+  --accent-blue: #0066cc;
+
+  /* Deepened vs. Apple's vivid system colors so every status token
+     clears 4.5:1 text contrast on white — see README "Fundamentos
+     visuales -> Color". Do not lighten these back toward the vivid
+     dark-theme values. */
+  --status-normal: #158237;
+  --status-warm: #b25000;
+  --status-thermal: #d70015;
+  --status-power: #9433c7;
+  --status-unknown: #57575c;
+
+  --glass-rgb: 255, 255, 255;
+  --glass-alpha: 0.76;
+  --glass-alpha-strong: 0.88;
+  --glass-alpha-subtle: 0.58;
+  --glass-border: rgba(255, 255, 255, 0.7);
+  --glass-highlight: rgba(255, 255, 255, 0.95);
+  --glass-shadow-color: rgba(29, 29, 31, 0.14);
+  --glass-sheen: linear-gradient(
+    118deg,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0.18) 38%,
+    rgba(255, 255, 255, 0) 62%
+  );
+
+  --ambient-1: rgba(0, 102, 204, 0.22);
+  --ambient-2: rgba(148, 51, 199, 0.16);
+  --ambient-3: rgba(215, 0, 21, 0.1);
+}
+
+/* Typography ---------------------------------------------------- */
+
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  /*
+    -apple-system only resolves on Apple devices. ThrottleWatch ships
+    on Windows, where this exact stack resolves to Segoe UI — the
+    real native typeface of the target platform. Keep the stack as-is;
+    do not add web fonts (see README).
+  */
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-full: 999px;
+
+  /* Glass material — derived values. Components consume these, never
+     the raw --glass-rgb/--glass-alpha pairs. Three strengths:
+       --glass-bg          content cards (StatWidget, hero, panels)
+       --glass-bg-strong   floating chrome (TitleBar, BottomBar, menus,
+                           dialogs, tooltips) — more opaque so text
+                           above scrolling content stays readable
+       --glass-bg-subtle   inner tiles/chips sitting on other glass */
+  --glass-blur: 18px;
+  --glass-saturate: 1.35;
+  --glass-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  --glass-bg: rgba(var(--glass-rgb), var(--glass-alpha));
+  --glass-bg-strong: rgba(var(--glass-rgb), var(--glass-alpha-strong));
+  --glass-bg-subtle: rgba(var(--glass-rgb), var(--glass-alpha-subtle));
+  --glass-edge: inset 0 1px 0 var(--glass-highlight);
+  --glass-shadow: 0 10px 30px -12px var(--glass-shadow-color), var(--glass-edge);
+  --glass-shadow-strong: 0 18px 48px -16px var(--glass-shadow-color), var(--glass-edge);
+
+  /* Motion — durations, curves and stagger. Every animated component
+     reads these; nothing hardcodes a duration. */
+  --motion-fast: 160ms;
+  --motion-base: 240ms;
+  --motion-slow: 420ms;
+  --motion-ambient: 48s;
+  --motion-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --motion-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
+  --motion-stagger: 45ms;
+}
+
+/* Glass quality levels — set on <html>:
+     document.documentElement.dataset.glass = 'full' | 'reduced' | 'off'
+   'reduced' drops the backdrop blur (the GPU-expensive part) but keeps
+   translucency and the edge light; 'off' renders solid surfaces. The
+   host lowers the level when the WebView's frame budget suffers
+   (plan.md → presupuesto de GPU). Missing attribute = full. */
+[data-glass='reduced'] {
+  --glass-filter: none;
+  --glass-alpha: 0.92;
+  --glass-alpha-strong: 0.96;
+  --glass-alpha-subtle: 0.8;
+}
+[data-glass='off'] {
+  --glass-filter: none;
+  --glass-bg: var(--surface);
+  --glass-bg-strong: var(--surface-raised);
+  --glass-bg-subtle: var(--surface-raised);
+  --glass-border: var(--hairline);
+  --glass-sheen: none;
+  --glass-shadow: none;
+  --glass-shadow-strong: none;
+  --ambient-1: transparent;
+  --ambient-2: transparent;
+  --ambient-3: transparent;
+}
+/* No backdrop-filter support (old WebView2): fall back to near-solid
+   surfaces so text never sits on unblurred content. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --glass-alpha: 0.94;
+    --glass-alpha-strong: 0.97;
+    --glass-alpha-subtle: 0.85;
+  }
+}
+
+/*
+  Native-app affordances, not web-page ones (2026-09-18). ThrottleWatch
+  is a Windows desktop instrument, not a browser tab, and must never
+  read as one:
+
+  - No hover/focus underline on any action, ever. A button, a
+    "link-styled" action (e.g. StatusHero's "Ver informe", a
+    chevron-style OptionRow, Sessions' "Ver cobertura") or a tab NEVER
+    grows a text-decoration on hover. State is communicated with color,
+    weight and the existing focus ring — never an underline appearing
+    or disappearing under the pointer.
+  - No hand ("pointer") cursor on buttons, tabs, chips, toggles or
+    chevron rows. Every interactive control in this system uses
+    `cursor: default` (Windows' own convention: native controls don't
+    turn the pointer into a hand). `Button`, `Switch`, `TitleBar`,
+    `ToolbarButton` already do this — match them in any new component.
+    The only accepted exceptions are inside `AnalysisChart`'s plotting
+    surface (`crosshair` while scrubbing, `pointer` on a clickable
+    event band) and native text selection (`cursor: text`), because
+    those are graphical/data affordances, not web links.
+  - Anchor-like elements (`<a href>`) are not used for in-app
+    navigation or actions — every clickable thing is a `<button>` (see
+    also OptionRow's chevron rows and SessionCard's actions). Reserve a
+    real `<a>` only for the rare case of opening something outside the
+    app (and even then, style it like the rest of this rule — no
+    underline, no hand cursor — see `open_external_url` in
+    `application-commands.md`).
+*/
+
+/* Type styles, as utility classes */
+
+.tw-value-xl,
+.value-xl {
+  font-family: var(--font-sans);
+  font-size: 32px;
+  line-height: 38px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.tw-value-lg,
+.value-lg {
+  font-family: var(--font-sans);
+  font-size: 24px;
+  line-height: 29px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.tw-value-md,
+.value-md {
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.tw-body,
+.body {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+}
+.tw-body-strong,
+.body-strong {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 650;
+}
+.tw-label,
+.label {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+.tw-caption,
+.caption {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  line-height: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.tw-tag,
+.tag {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+/*
+  Elevation. Since the glass material (2026-09-18) surfaces float over
+  an ambient background: they get the glass edge light plus one soft
+  --glass-shadow. There is still no generic --shadow-* family — a
+  component either is glass (and uses --glass-shadow) or is flat with a
+  --hairline border. Don't add ad-hoc box-shadows.
+*/
+
+/* Glass material — utility classes. Components generally set these
+   properties in their own scoped styles (scoped rules outrank a global
+   class); the utilities exist for shells and examples. */
+.tw-glass,
+.tw-glass-strong,
+.tw-glass-subtle {
+  border: 1px solid var(--glass-border);
+  background-image: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  box-shadow: var(--glass-shadow);
+}
+.tw-glass {
+  background-color: var(--glass-bg);
+}
+.tw-glass-strong {
+  background-color: var(--glass-bg-strong);
+  box-shadow: var(--glass-shadow-strong);
+}
+.tw-glass-subtle {
+  background-color: var(--glass-bg-subtle);
+  box-shadow: var(--glass-edge);
+}
+
+/* Ambient background the glass refracts: three soft tinted blobs
+   drifting very slowly. Apply to the app shell (the element behind
+   every glass surface). Drift is disabled under reduced motion. */
+.tw-ambient {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(70% 60% at 10% 5%, var(--ambient-1), transparent 68%),
+    radial-gradient(65% 55% at 92% 95%, var(--ambient-2), transparent 68%),
+    radial-gradient(45% 40% at 70% 25%, var(--ambient-3), transparent 68%);
+  background-attachment: fixed;
+  background-size: 140% 140%;
+  animation: tw-ambient-drift var(--motion-ambient) var(--motion-ease-in-out) infinite alternate;
+}
+
+/* Motion utilities */
+.tw-enter {
+  animation: tw-rise var(--motion-slow) var(--motion-ease-out) both;
+  animation-delay: calc(var(--tw-i, 0) * var(--motion-stagger));
+}
+.tw-pop {
+  animation: tw-pop var(--motion-base) var(--motion-spring) both;
+}
+
+@keyframes tw-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes tw-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes tw-drop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes tw-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes tw-bump {
+  0% {
+    transform: none;
+  }
+  35% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes tw-glow {
+  0% {
+    box-shadow: 0 0 0 0 var(--tw-glow-color, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 14px transparent;
+  }
+}
+@keyframes tw-sheen-sweep {
+  from {
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  to {
+    transform: translateX(220%) skewX(-18deg);
+  }
+}
+@keyframes tw-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.03);
+  }
+}
+@keyframes tw-ambient-drift {
+  from {
+    background-position:
+      0% 0%,
+      100% 100%,
+      50% 50%;
+  }
+  to {
+    background-position:
+      30% 20%,
+      70% 80%,
+      40% 70%;
+  }
+}
+@keyframes tw-ripple {
+  from {
+    transform: scale(0);
+    opacity: 0.45;
+  }
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+/* Reduced motion — from the OS (prefers-reduced-motion) or from the
+   app's own preference (`appearance.motion = reduced`, mirrored as
+   document.documentElement.dataset.motion = 'reduced'). Both collapse
+   every animation and transition to an instant state change; fades
+   are the only thing that survives (0.001ms is effectively instant). */
+@media (prefers-reduced-motion: reduce) {
+  .tw-ds,
+  .tw-ds *,
+  .tw-ambient,
+  .tw-enter,
+  .tw-pop {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+[data-motion='reduced'] .tw-ds,
+[data-motion='reduced'] .tw-ds *,
+[data-motion='reduced'] .tw-ambient,
+[data-motion='reduced'] .tw-enter,
+[data-motion='reduced'] .tw-pop {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+/* `full` overrides the OS preference when the person explicitly asked
+   for full motion in Ajustes → Apariencia. */
+@media (prefers-reduced-motion: reduce) {
+  [data-motion='full'] .tw-ds,
+  [data-motion='full'] .tw-ds *,
+  [data-motion='full'] .tw-ambient,
+  [data-motion='full'] .tw-enter,
+  [data-motion='full'] .tw-pop {
+    animation-duration: revert !important;
+    animation-iteration-count: revert !important;
+    transition-duration: revert !important;
+  }
+}

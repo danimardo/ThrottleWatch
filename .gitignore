@@ -1,0 +1,39 @@
+# Node / pnpm / npm
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+npm-debug.log*
+pnpm-debug.log*
+
+# Rust (apps/desktop/src-tauri, once the app exists)
+# Cargo.lock is intentionally tracked for a binary crate (reproducible builds).
+target/
+
+# .NET (apps/sensor-agent, once the app exists)
+bin/
+obj/
+*.user
+
+# Local logs and runtime artifacts
+.logs/
+logs/
+*.log
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Browser automation screenshots taken during verification
+.playwright-mcp/
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+*.pfx
+*.pem
+*.key
