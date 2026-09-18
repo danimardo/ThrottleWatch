@@ -63,13 +63,14 @@
   let closeAction: 'unset' | 'exit' | 'tray' = $state('unset');
   let firstCloseOpen = $state(false);
   let closeFeedback = $state('');
+  // Onboarding slide 5 shows the machine before installing advanced access (level B).
   const advancedAccess: AdvancedAccessState = 'installable';
 
   let whatsNew: WhatsNewCard[] = $state([
     {
       id: 'n1',
       title: 'El acceso avanzado se instala por separado',
-      body: 'ThrottleWatch ya no pide permisos de administrador al abrirse. Si quieres banderas térmicas directas, instálalo desde Ajustes → Sensores.',
+      body: 'ThrottleWatch ya no pide permisos de administrador al abrirse. Instálalo desde Ajustes → Sensores para confirmar la causa y estimar cuánto ayudaría enfriar mejor.',
       actionLabel: 'Ir a Ajustes',
       onAction: () => go('settings')
     }
@@ -96,19 +97,19 @@
 
   // Simulated live samples so the value-change bump and the ring
   // interpolation are visible in the mockup (1 Hz, tiny jitter).
-  let liveTemp = $state('98');
+  let liveTemp = $state('99');
   let liveLoad = $state('92');
-  let livePower = $state('64');
-  let liveRing = $state(93);
+  let livePower = $state('31');
+  let liveRing = $state(99);
   $effect(() => {
     if (showOnboarding) return;
     const id = setInterval(() => {
       if (collectorState !== 'fresh') return;
-      const t = 96 + Math.round(Math.random() * 3);
+      const t = 98 + Math.round(Math.random() * 2);
       liveTemp = String(t);
-      liveRing = t - 5;
+      liveRing = t;
       liveLoad = String(88 + Math.round(Math.random() * 8));
-      livePower = String(60 + Math.round(Math.random() * 9));
+      livePower = String(30 + Math.round(Math.random() * 3));
     }, 1000);
     return () => clearInterval(id);
   });
@@ -186,30 +187,35 @@
       body: 'La detección inicial es pasiva y no solicita permisos de administrador.',
       status: 'complete',
       detectingLabel: 'Detectando sensores…',
-      coverageTitle: 'Cobertura parcial',
-      coverageDescription: 'Temperatura, carga, reloj efectivo (derivado) y potencia disponibles. Sin bandera térmica directa: la confianza máxima será «probable».',
+      coverageTitle: 'Nivel B · con potencia',
+      coverageDescription: 'Temperatura, carga por núcleo, frecuencia activa y potencia disponibles. Sin acceso avanzado, ThrottleWatch infiere la causa pero no puede confirmarla ni estimar cuánto ayudaría enfriar mejor.',
       advancedAccess,
-      advancedAccessNote: 'Puedes instalar el acceso avanzado para obtener banderas térmicas directas. Requiere permisos de administrador una sola vez.',
+      advancedAccessNote: 'Recomendado: el acceso avanzado sube este equipo al nivel A (confirmar la causa y estimar cuánto ayudaría enfriar mejor). Requiere permisos de administrador una sola vez.',
       requestAccessLabel: 'Instalar acceso avanzado',
       onRequestAdvancedAccess: () => {},
       retryLabel: 'Reintentar'
     }
   ];
 
+  // The mockup machine is at coverage level A (advanced access installed after onboarding).
+  const ACCESS_OK = true;
   const coverageRows: CoverageRow[] = [
     { id: 'temperature', label: 'Temperatura', available: true, quality: 'direct', qualityLabel: 'Directo', sourceLabel: 'CPU Package' },
-    { id: 'headroom', label: 'Margen térmico', available: true, quality: 'derived', qualityLabel: 'Derivado', sourceLabel: 'TjMax 100 °C − paquete' },
-    { id: 'load', label: 'Carga', available: true, quality: 'direct', qualityLabel: 'Directo', sourceLabel: 'CPU Total' },
-    { id: 'clock', label: 'Reloj efectivo', available: true, quality: 'derived', qualityLabel: 'Derivado', sourceLabel: '% Processor Performance × base' },
+    { id: 'limit', label: 'Límite térmico efectivo', available: true, quality: 'direct', qualityLabel: 'Directo', sourceLabel: 'TjMax 100 °C − TCC offset 0 °C' },
+    { id: 'load', label: 'Carga por núcleo', available: true, quality: 'direct', qualityLabel: 'Directo', sourceLabel: '% Processor Utility' },
+    { id: 'clock', label: 'Frecuencia activa', available: true, quality: 'derived', qualityLabel: 'Derivado', sourceLabel: '% Processor Performance × base' },
+    { id: 'base', label: 'Frecuencia base', available: true, quality: 'derived', qualityLabel: 'Derivado', sourceLabel: 'Processor Frequency' },
     { id: 'power', label: 'Potencia', available: true, quality: 'direct', qualityLabel: 'Directo', sourceLabel: 'CPU Package Power' },
-    { id: 'thermal_flag', label: 'Bandera térmica', available: false, reasonLabel: 'Requiere acceso avanzado.' },
-    { id: 'power_flag', label: 'Bandera eléctrica', available: false, reasonLabel: 'Requiere acceso avanzado.' }
+    { id: 'power_limit', label: 'Límite de potencia', available: ACCESS_OK, quality: 'direct', qualityLabel: 'Directo', sourceLabel: ACCESS_OK ? 'PL1 45 W · PL2 64 W · Tau 28 s' : undefined, reasonLabel: 'Requiere acceso avanzado.' },
+    { id: 'thermal_flag', label: 'Razón térmica', available: ACCESS_OK, quality: 'direct', qualityLabel: 'Directo', sourceLabel: ACCESS_OK ? 'PERF_LIMIT_REASONS · THERMAL' : undefined, reasonLabel: 'Requiere acceso avanzado.' },
+    { id: 'prochot_flag', label: 'PROCHOT', available: ACCESS_OK, quality: 'direct', qualityLabel: 'Directo', sourceLabel: ACCESS_OK ? 'PERF_LIMIT_REASONS · PROCHOT' : undefined, reasonLabel: 'Requiere acceso avanzado.' },
+    { id: 'power_flag', label: 'Razón de potencia', available: ACCESS_OK, quality: 'direct', qualityLabel: 'Directo', sourceLabel: ACCESS_OK ? 'PERF_LIMIT_REASONS · PL1/PL2' : undefined, reasonLabel: 'Requiere acceso avanzado.' }
   ];
 
   let includedFields = $derived.by(() =>
     exportFormat === 'csv'
       ? ['timestamp_utc', 'monotonic_ms', 'sensor_id', 'metric', 'scope', 'value', 'status', 'quality', 'cpu.vendor', 'cpu.display_name', 'cpu.topology', 'versions']
-      : ['classification', 'confidence_band', 'evidence', 'alternative_causes', 'events', 'baseline', 'ruleset_version', 'cpu.vendor', 'cpu.display_name', 'cpu.topology']
+      : ['classification', 'limit_severity', 'coverage_tier', 'confidence_band', 'cooling_potential', 'evidence', 'alternative_causes', 'events', 'ruleset_version', 'cpu.vendor', 'cpu.display_name', 'cpu.topology']
   );
   let excludedFields = $derived.by(() =>
     exportAnonymize
@@ -401,34 +407,35 @@
                 classification="indeterminate"
                 classificationLabel="DATOS INSUFICIENTES"
                 evidenceLine="El colector no está enviando muestras. La última lectura válida es de hace 12 s."
-                noBaselineText="Sin muestras no se evalúa el rendimiento."
+                noPotentialText="Sin muestras no se evalúa el rendimiento."
               />
             {:else}
               <StatusHero
                 ringValue={liveTemp + '°'}
-                ringCaption="TjMax 100°"
+                ringCaption="Límite 100°"
                 ringPercent={liveRing}
-                classification="thermal_probable"
-                classificationLabel="EVIDENCIA COMPATIBLE CON LIMITACIÓN TÉRMICA"
-                evidenceLine="2 °C hasta el límite · confianza media (sin bandera directa) · observado 3 min 42 s"
-                performance={{ label: 'Rendimiento disponible estimado', rangeText: '76–86 %', percent: 81 }}
+                classification="thermal_confirmed"
+                severity="below_base"
+                classificationLabel="THROTTLING TÉRMICO · BAJO LA FRECUENCIA GARANTIZADA"
+                evidenceLine="Frecuencia activa 2,1 GHz (base 2,6 GHz) · razón THERMAL en el 73 % · confianza alta · nivel A · 3 min 42 s"
+                performance={{ label: 'Enfriar mejor', rangeText: '+10–20 %' }}
               />
             {/if}
             <div class="stat-grid">
-              <StatWidget enterIndex={0} icon={flameIcon} tone={collectorState === 'stale' ? 'unknown' : 'thermal'} label="Temperatura" value={liveTemp} unit="°C" footnote="Margen 2 °C · directo (CPU Package)" />
-              <StatWidget enterIndex={1} icon={loadIcon} tone="accent" label="Carga" value={liveLoad} unit="%" footnote="P 95 % · E 88 % · LP 40 %" />
-              <StatWidget enterIndex={2} icon={clockIcon} tone="warm" label="Reloj efectivo" value="3.4" unit="GHz" footnote="P 3.4 · E 2.6 · derivado · caída sostenida" />
-              <StatWidget enterIndex={3} icon={boltIcon} tone="accent" label="Potencia" value={livePower} unit="W" footnote="Sin límite eléctrico observado" />
+              <StatWidget enterIndex={0} icon={flameIcon} tone={collectorState === 'stale' ? 'unknown' : 'thermal'} label="Temperatura" value={liveTemp} unit="°C" footnote="Límite efectivo 100 °C · directo (CPU Package)" />
+              <StatWidget enterIndex={1} icon={loadIcon} tone="accent" label="Carga" value={liveLoad} unit="%" footnote="Núcleos activos: 6 P · 8 E · 0 LP" />
+              <StatWidget enterIndex={2} icon={clockIcon} tone="thermal" label="Frecuencia activa" value="2.1" unit="GHz" footnote="Base 2,6 GHz · P 2,1 · E 1,8 · derivada" />
+              <StatWidget enterIndex={3} icon={boltIcon} tone="accent" label="Potencia" value={livePower} unit="W" footnote="Límite PL1 45 W · por debajo del límite" />
             </div>
             {#if win.tier === 'expanded' && collectorState !== 'disconnected'}
               <CausalRail nodes={[
-                { id: 'load', label: 'CARGA', value: '92 %', tone: 'accent', icon: loadIcon },
-                { id: 'temp', label: 'TEMPERATURA', value: 'Límite', tone: 'thermal', icon: flameIcon },
-                { id: 'clock', label: 'RELOJ', value: '3.4 GHz ↓', tone: 'thermal', icon: clockIcon },
-                { id: 'perf', label: 'RENDIMIENTO', value: 'Menor', tone: 'thermal', icon: perfIcon }
+                { id: 'load', label: 'CARGA SOSTENIDA', value: '14 núcleos', tone: 'accent', icon: loadIcon },
+                { id: 'temp', label: 'TEMPERATURA', value: 'En el límite', tone: 'thermal', icon: flameIcon },
+                { id: 'power', label: 'POTENCIA', value: `${livePower} de 45 W`, tone: 'accent', icon: boltIcon },
+                { id: 'clock', label: 'FRECUENCIA', value: '2,1 < base 2,6', tone: 'thermal', icon: clockIcon }
               ] satisfies CausalNode[]} />
             {/if}
-            <button class="report-link body-strong" type="button" onclick={() => go('report')}>Ver informe (provisional · sesión en curso) →</button>
+            <button class="report-link body-strong" type="button" onclick={() => go('report')}>Ver informe del último diagnóstico guiado →</button>
           {:else if active === 'analysis'}
             <AnalysisDemo />
           {:else if active === 'cpu'}
@@ -459,9 +466,9 @@
             columnLabels={{ magnitude: 'Magnitud', available: 'Disponible', quality: 'Calidad', source: 'Origen', reason: 'Motivo' }}
             availableLabel="Sí"
             unavailableLabel="No"
-            maxConfidenceLabel="Confianza máxima alcanzable en este equipo: probable (sin bandera térmica directa)"
-            accessState={advancedAccess}
-            accessLabel="Puedes instalar el acceso avanzado para obtener banderas térmicas y eléctricas directas. Requiere permisos de administrador una sola vez."
+            maxConfidenceLabel="Nivel A · completo — confirma la causa y estima el potencial. Confianza máxima alcanzable: alta"
+            accessState="available"
+            accessLabel="Acceso avanzado instalado: razones de limitación, límites de potencia y TCC offset disponibles."
             requestAccessLabel="Instalar acceso avanzado"
             onRequestAccess={() => {}}
             recheckLabel="Volver a comprobar"

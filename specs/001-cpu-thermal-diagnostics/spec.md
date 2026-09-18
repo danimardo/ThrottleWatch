@@ -27,7 +27,7 @@ Como usuario quiero abrir la aplicación y entender en pocos segundos la tempera
 
 **Escenarios de aceptación:**
 
-1. **Dado** un equipo con sensores de CPU disponibles, **cuando** se abre el panel, **entonces** aparecen modelo, temperatura representativa, carga, reloj efectivo o sustituto, potencia cuando exista y antigüedad de la última muestra.
+1. **Dado** un equipo con sensores de CPU disponibles, **cuando** se abre el panel, **entonces** aparecen modelo, temperatura representativa, carga, frecuencia activa (o sustituto marcado), potencia cuando exista y antigüedad de la última muestra.
 2. **Dado** un sensor ausente, **cuando** se muestra su tarjeta, **entonces** figura como “No disponible” con explicación y nunca como `0`.
 3. **Dado** que la temperatura se acerca al límite conocido, **cuando** se actualiza la muestra, **entonces** el panel muestra la distancia al límite y cambia de estado usando color, icono y texto.
 4. **Dado** un procesador híbrido, **cuando** existen grupos P/E/LP, **entonces** la aplicación no mezcla sus relojes en una media sin ponderar ni ocultar la topología.
@@ -40,32 +40,40 @@ Como usuario quiero saber si la CPU reduce su capacidad por temperatura, potenci
 
 **Por qué es prioritaria:** diferencia el producto de un simple termómetro.
 
-**Prueba independiente:** al reproducir trazas conocidas, el motor clasifica correctamente limitación térmica confirmada, probable, por potencia, mixta, sin limitación o indeterminada y enumera las evidencias.
+**Prueba independiente:** al reproducir trazas etiquetadas (véase «Validación del motor» en `research.md`), el motor clasifica correctamente limitación térmica confirmada, probable, por potencia, del equipo, mixta, sin limitación o indeterminada, asigna la gravedad y enumera las evidencias.
 
 **Escenarios de aceptación:**
 
-1. **Dado** un indicador directo de thermal throttling activo bajo carga, **cuando** persiste durante la ventana configurada, **entonces** el diagnóstico es “Limitación térmica confirmada”.
-2. **Dado** calor próximo al límite y caída correlacionada del reloj efectivo bajo carga comparable, pero sin indicador directo, **cuando** la evidencia supera el umbral, **entonces** el diagnóstico es “Evidencia compatible con limitación térmica”, no “confirmada”.
-3. **Dado** reloj reducido, margen térmico holgado e indicador de límite de potencia persistente, **cuando** se diagnostica, **entonces** la causa principal es potencia y no se recomienda mejorar la refrigeración como primera medida.
-4. **Dado** temperatura elevada sin carga o sin referencia de frecuencia, **cuando** se diagnostica, **entonces** se advierte de la temperatura pero no se afirma pérdida de rendimiento.
+1. **Dado** el bit de razón `THERMAL` activo en al menos el 20 % de las muestras de una ventana estable con carga sostenida, **cuando** se diagnostica, **entonces** el diagnóstico es “Limitación térmica confirmada”.
+2. **Dado** que no hay razones directas y la temperatura forma una meseta en el límite térmico efectivo mientras la potencia no forma meseta, **cuando** se diagnostica, **entonces** el diagnóstico es “Evidencia compatible con limitación térmica”, nunca “confirmada”.
+3. **Dado** margen térmico holgado y la potencia de paquete estable en una meseta (o los bits `PL1`/`PL2`/`EDP` activos), **cuando** se diagnostica, **entonces** la causa principal es potencia y no se recomienda mejorar la refrigeración como primera medida.
+4. **Dado** temperatura elevada sin carga sostenida, o dentro de la ventana de turbo, **cuando** se diagnostica, **entonces** se advierte de la temperatura pero no se afirma pérdida de rendimiento.
 5. **Dado** que concurren límites térmicos y eléctricos, **cuando** ambos tienen evidencia material, **entonces** el resultado se muestra como causa mixta y no fuerza una causa única.
+6. **Dado** que la frecuencia cae al terminar la ventana de turbo (PL2 → PL1) con margen térmico, **cuando** se diagnostica, **entonces** se registra el evento informativo “fin del turbo de potencia (esperado)” y **no** se clasifica como limitación térmica.
+7. **Dado** un portátil cuyo límite de potencia efectivo baja durante la sesión con la temperatura de la CPU holgada, **cuando** se diagnostica, **entonces** el resultado es “Limitado por el equipo (gestión térmica del fabricante)” y la aplicación **sí** sugiere mejorar la ventilación del equipo.
+8. **Dado** el bit `PROCHOT` activo sin el bit `THERMAL`, **cuando** se diagnostica, **entonces** el resultado es “Limitado por el equipo (señal externa)” y se sugiere revisar cargador, batería o alimentación, no la refrigeración.
+9. **Dado** una limitación térmica con la frecuencia activa por encima de la frecuencia base, **cuando** se presenta, **entonces** se comunica como “rendimiento limitado por temperatura dentro de especificación” y no genera alerta; solo por debajo de la frecuencia base se comunica como problema.
+10. **Dado** un juego que mantiene pocos núcleos al máximo con una carga total baja, **cuando** se diagnostica, **entonces** la evaluación se hace sobre esos núcleos activos y no se descarta por la carga total.
 
 ---
 
-### Historia 3 — Estimar rendimiento disponible (Prioridad P1)
+### Historia 3 — Estimar cuánto ayudaría mejorar la refrigeración (Prioridad P1)
 
-Como usuario quiero una estimación honesta del rendimiento que conservo y del que podría recuperar con mejor refrigeración.
+Como usuario quiero saber, con honestidad, si mejorar la refrigeración me devolvería rendimiento y aproximadamente cuánto, y ver el rendimiento real que mi equipo sostiene cuando hago una prueba.
 
-**Por qué es prioritaria:** responde a la pregunta principal del producto, pero necesita límites estrictos para no dar falsa precisión.
+**Por qué es prioritaria:** responde a la pregunta principal del producto, pero la versión inicial (razón de relojes frente a un baseline) mezclaba el fin del turbo, el tipo de carga y la calidad del baseline con el efecto del calor. Esta historia sustituye esa cifra por dos medidas con fundamento físico o medido.
 
-**Prueba independiente:** usando una traza con referencia local comparable, se calcula rango, confianza y método; sin referencia, el porcentaje se omite.
+**Prueba independiente:** con una traza de nivel A limitada térmicamente, se calcula el potencial por techo de potencia con su método, tramo y confianza; sin límite de potencia conocido se omite la cifra; con una sesión guiada se muestra el rendimiento medido de la carga de prueba.
 
 **Escenarios de aceptación:**
 
-1. **Dado** un baseline local válido y una carga comparable, **cuando** el reloj efectivo ponderado cae de forma sostenida por evidencia térmica, **entonces** se muestra un intervalo estimado de rendimiento disponible y pérdida potencial.
-2. **Dado** que no existe baseline comparable, **cuando** hay calor o throttling, **entonces** se muestra la limitación y su duración, pero no un porcentaje inventado.
-3. **Dado** un procesador híbrido, **cuando** se estima rendimiento, **entonces** el cálculo se realiza por grupos de núcleos y pondera solo grupos activos.
-4. **Dado** que el resultado estimado es 81,4 %, **cuando** se presenta al usuario, **entonces** se redondea y/o expresa como rango razonable, por ejemplo `~78–84 %`, con nivel de confianza.
+1. **Dado** una limitación térmica, mixta o del equipo (chasis) fuera de la ventana de turbo, con límite de potencia efectivo y potencia medidos, **cuando** la potencia real queda por debajo del límite, **entonces** se muestra el potencial con mejor refrigeración como tramo (`apenas`, `moderado`, `notable`) y un rango redondeado hacia fuera a múltiplos de 5 %.
+2. **Dado** que no se conoce el límite de potencia efectivo, **cuando** hay limitación térmica, **entonces** se muestra la limitación, su duración y su gravedad, pero ninguna cifra; si la gravedad es «por debajo de la frecuencia base» se añade el tramo cualitativo «probablemente notable» con confianza baja.
+3. **Dado** una limitación de potencia pura, **cuando** se presenta, **entonces** se indica que la refrigeración apenas influye y no se cuantifica.
+4. **Dado** un diagnóstico guiado completado, **cuando** se muestra el resultado, **entonces** aparece el rendimiento sostenido **medido** por el generador de carga en relación con el inicial, desglosado por causa (fin del turbo, potencia, temperatura, equipo), rotulado como «rendimiento de la carga de prueba».
+5. **Dado** dos diagnósticos guiados del mismo perfil y contexto energético, **cuando** el usuario compara «antes/después», **entonces** se comparan sus rendimientos medidos, no relojes.
+6. **Dado** un procesador híbrido, **cuando** se estima o mide, **entonces** el cálculo se realiza por grupos y solo con los núcleos activos.
+7. **Dado** cualquier cifra de potencial o rendimiento, **cuando** se presenta, **entonces** nunca lleva decimales ni un rango más estrecho de 5 puntos.
 
 ---
 
@@ -146,7 +154,7 @@ Como usuario no técnico quiero una introducción breve que explique qué observ
 **Escenarios de aceptación:**
 
 1. **Dado** un perfil sin onboarding completado, **cuando** se abre la aplicación, **entonces** aparecen cinco diapositivas sobre propósito, señales, diagnóstico prudente, privacidad/preferencias y detección del equipo.
-2. **Dado** un término como *thermal throttling*, TjMax o baseline, **cuando** aparece en el recorrido, **entonces** incluye una explicación breve en lenguaje corriente.
+2. **Dado** un término como *thermal throttling*, límite térmico (TjMax), frecuencia base o referencia, **cuando** aparece en el recorrido, **entonces** incluye una explicación breve en lenguaje corriente.
 3. **Dado** que el usuario abandona a mitad del recorrido, **cuando** vuelve a abrirlo, **entonces** continúa en la última diapositiva alcanzada.
 4. **Dado** que el usuario pulsa omitir, **cuando** lo hace desde cualquiera de las cuatro primeras diapositivas, **entonces** entra en `Ahora` sin diálogo de confirmación y la detección pasiva continúa allí sin solicitar elevación.
 5. **Dado** que faltan sensores avanzados, **cuando** termina la detección, **entonces** se explica la cobertura reducida y se ofrece instalar o reparar el acceso solo mediante una acción explícita.
@@ -190,7 +198,7 @@ Como usuario quiero configurar monitorización, bandeja, avisos, privacidad y da
 2. **Dado** `Iniciar con Windows` desactivado por defecto, **cuando** el usuario lo activa, **entonces** puede elegir iniciar mostrando la ventana o, si la monitorización de bandeja está habilitada, iniciar oculto.
 3. **Dado** un usuario no técnico, **cuando** configura el muestreo, **entonces** elige entre `Bajo consumo`, `Normal` y `Diagnóstico`, dejando los valores numéricos en ajustes avanzados.
 4. **Dado** una instalación nueva, **cuando** se consultan notificaciones y retención, **entonces** los avisos están desactivados y la retención es de siete días; también existen `solo sesión`, `1 día` y `30 días`.
-5. **Dado** que el usuario elimina todos sus datos, **cuando** confirma, **entonces** se borran sesiones, muestras, informes y baselines, pero se conservan preferencias y estado del onboarding.
+5. **Dado** que el usuario elimina todos sus datos, **cuando** confirma, **entonces** se borran sesiones, muestras, informes y referencias, pero se conservan preferencias y estado del onboarding.
 6. **Dado** que el usuario restablece ThrottleWatch, **cuando** confirma una advertencia diferenciada, **entonces** se eliminan datos y preferencias y el siguiente inicio se comporta como una instalación nueva.
 
 ---
@@ -240,23 +248,23 @@ Como usuario quiero saber si existe una versión nueva y decidir por separado si
 
 - **FR-001**: El sistema DEBE descubrir procesador, topología y sensores disponibles al iniciar y tras reanudar el equipo.
 - **FR-002**: El sistema DEBE registrar la procedencia, unidad, calidad y antigüedad de cada lectura.
-- **FR-003**: El sistema DEBE obtener, cuando estén disponibles, carga, temperatura, reloj efectivo, reloj activo, potencia de paquete, margen térmico e indicadores de límites térmicos/eléctricos.
+- **FR-003**: El sistema DEBE obtener, cuando estén disponibles, carga por procesador lógico, temperatura, frecuencia activa, frecuencia base, potencia de paquete, límite térmico efectivo (TjMax y TCC offset), límites de potencia efectivos (PL1, PL2, Tau) y razones de limitación (`THERMAL`, `PROCHOT`, potencia, corriente).
 - **FR-004**: El sistema DEBE normalizar sensores Intel y AMD a un modelo común sin perder el nombre original.
 - **FR-005**: El sistema DEBE muestrear a 1 Hz por defecto y permitir perfiles de bajo consumo y diagnóstico.
 - **FR-006**: El sistema DEBE conservar un búfer reciente en memoria y un historial local sujeto a retención configurable.
 - **FR-007**: El sistema DEBE representar valores ausentes como desconocidos, nunca como cero.
 - **FR-008**: El sistema DEBE calcular estados térmicos mediante margen al límite cuando exista y mediante reglas conservadoras cuando no exista.
-- **FR-009**: El motor DEBE clasificar: normal, temperatura alta sin limitación demostrada, térmica probable, térmica confirmada, potencia/corriente, mixta e indeterminada.
+- **FR-009**: El motor DEBE clasificar: normal, temperatura alta sin limitación demostrada, térmica probable, térmica confirmada, potencia/corriente, limitada por el equipo (gestión térmica del fabricante o señal externa), mixta e indeterminada; y DEBE asignar a toda limitación una gravedad `boost` (frecuencia activa ≥ base) o `below_base` (< base).
 - **FR-010**: Todo diagnóstico DEBE incluir evidencias favorables, factores alternativos y confianza.
 - **FR-011**: El sistema NO DEBE interpretar el porcentaje de tiempo con throttling como porcentaje de rendimiento perdido.
 - **FR-012**: El sistema NO DEBE usar el turbo máximo anunciado como referencia de rendimiento multinúcleo sostenido.
-- **FR-013**: La estimación de rendimiento DEBE usar un baseline local de carga y topología comparables.
-- **FR-014**: Si la referencia no es válida, el sistema DEBE omitir el porcentaje y explicar qué falta.
-- **FR-015**: La estimación DEBE mostrar un rango y nivel de confianza, no precisión decimal engañosa.
+- **FR-013**: El potencial con mejor refrigeración DEBE calcularse con el método de techo de potencia (límite de potencia efectivo y potencia de paquete medidos) y solo fuera de la ventana de turbo; el rendimiento en porcentaje solo DEBE mostrarse cuando lo mida directamente el generador de carga del diagnóstico guiado. No existe estimación basada en baselines aprendidos.
+- **FR-014**: Si faltan las entradas de un método, el sistema DEBE omitir la cifra y explicar qué falta.
+- **FR-015**: Toda cifra DEBE presentarse como tramo y como rango redondeado hacia fuera a múltiplos de 5 %, con método y confianza, sin decimales.
 - **FR-016**: El sistema DEBE separar grupos de núcleos heterogéneos y ponderar solo grupos activos.
 - **FR-017**: La aplicación DEBE ofrecer una prueba guiada opcional, cancelable y con límites de parada.
 - **FR-018**: La prueba NO DEBE modificar configuración de firmware, voltajes, potencia ni ventiladores.
-- **FR-019**: El panel principal DEBE mostrar estado, temperatura, margen térmico, carga, reloj efectivo, potencia disponible y resumen de diagnóstico.
+- **FR-019**: El panel principal DEBE mostrar estado, temperatura, margen térmico, carga, frecuencia activa, potencia disponible, gravedad y resumen de diagnóstico.
 - **FR-020**: La vista de análisis DEBE incluir series temporales sincronizadas y eventos superpuestos.
 - **FR-021**: La vista de CPU DEBE incluir mapa de núcleos cuando existan datos por núcleo.
 - **FR-022**: La interfaz DEBE ofrecer detalle progresivo desde lenguaje natural hasta sensores originales.
@@ -269,7 +277,7 @@ Como usuario quiero saber si existe una versión nueva y decidir por separado si
 - **FR-029**: El sistema DEBE funcionar completamente sin conexión y sin telemetría remota por defecto.
 - **FR-030**: La interfaz principal DEBE ejecutarse sin privilegios administrativos.
 - **FR-031**: El sistema DEBE registrar fallos del colector y del diagnóstico sin incluir datos sensibles innecesarios.
-- **FR-032**: Preferencias, baseline y reglas aplicadas DEBEN conservar su versión para interpretar diagnósticos históricos.
+- **FR-032**: Preferencias, referencias guiadas, tabla de límites térmicos y reglas aplicadas DEBEN conservar su versión para interpretar diagnósticos históricos.
 - **FR-033**: Toda la interfaz, incluidos onboarding, bandeja, notificaciones, errores y diálogos nativos propios, DEBE estar disponible en español e inglés desde el MVP, sin literales visibles fuera de los catálogos de traducción.
 - **FR-034**: El primer inicio DEBE ofrecer un recorrido de cinco diapositivas, omitible, reanudable y repetible desde Ajustes.
 - **FR-035**: El onboarding DEBE explicar propósito, señales, límites del diagnóstico, privacidad, preferencias esenciales y cobertura del equipo para un usuario no técnico, definiendo brevemente los términos técnicos que utilice.
@@ -288,7 +296,7 @@ Como usuario quiero saber si existe una versión nueva y decidir por separado si
 - **FR-047**: `Iniciar con Windows` DEBE estar desactivado por defecto y, al activarse, permitir mostrar la ventana o iniciar oculto; iniciar oculto solo DEBE permitirse si la monitorización en bandeja está habilitada.
 - **FR-048**: Los avisos DEBEN estar desactivados por defecto; el onboarding solo DEBE informar de que pueden habilitarse en Ajustes.
 - **FR-049**: La configuración de muestreo DEBE presentar los perfiles `Bajo consumo`, `Normal` y `Diagnóstico`; sus frecuencias concretas solo aparecen en ajustes avanzados.
-- **FR-050**: `Eliminar todos mis datos` DEBE borrar sesiones, muestras, eventos, informes y baselines tras confirmación, conservando preferencias y estado del onboarding.
+- **FR-050**: `Eliminar todos mis datos` DEBE borrar sesiones, muestras, eventos, informes y referencias guiadas tras confirmación, conservando preferencias y estado del onboarding.
 - **FR-051**: `Restablecer ThrottleWatch` DEBE requerir una confirmación diferenciada, borrar datos y preferencias y provocar un primer inicio limpio.
 - **FR-052**: La comprobación de actualizaciones DEBE estar desactivada por defecto y, mientras lo esté, NO DEBE realizar tráfico de red.
 - **FR-053**: Con actualizaciones activas, el sistema DEBE comprobar automáticamente como máximo una vez cada 24 horas y ofrecer una comprobación manual que pueda reintentar antes de ese plazo.
@@ -306,13 +314,23 @@ Como usuario quiero saber si existe una versión nueva y decidir por separado si
 - **FR-065**: Tras una reanudación desde suspensión o hibernación, el sistema DEBE marcar el hueco, repetir el descubrimiento de capacidades y abrir una sesión pasiva nueva, conservando la interfaz utilizable en todo momento.
 - **FR-066**: La vista de análisis DEBE ofrecer navegación del cursor y selección de rango por teclado, un resumen textual del rango y una tabla accesible equivalente a las series dibujadas.
 - **FR-067**: Una sesión pasiva DEBE comenzar al iniciar el muestreo, tras un hueco superior a 60 s y, como máximo, cada 24 h de duración continua. Su informe DEBE congelarse al cerrarla; mientras está activa, el diagnóstico visible es «en vivo» y se marca como provisional. La retención `solo sesión` DEBE borrar los datos al salir de la aplicación.
-- **FR-068**: El reloj efectivo DEBE preferir una lectura directa; en su ausencia, el sistema DEBE derivarlo del contador de rendimiento del procesador de Windows (`% Processor Performance` × reloj base) con calidad `derived`, y solo en último término usar el reloj por núcleo del colector con calidad `substitute`. La calidad utilizada DEBE ser visible.
-- **FR-069**: La clasificación `térmica confirmada` DEBE exigir una bandera térmica directa. Cuando el equipo no la expone, la ficha de cobertura DEBE indicar «confianza máxima alcanzable: probable» y el motor NO DEBE emitir `confirmada`.
-- **FR-070**: El porcentaje de rendimiento disponible PUEDE calcularse con reloj `derived` o `substitute`, pero la confianza resultante NO DEBE superar `media` y el método DEBE indicarse junto al rango.
+- **FR-068**: La métrica de frecuencia del motor DEBE ser la **frecuencia activa** por procesador lógico (frecuencia mientras ejecuta, sin incluir el reposo), obtenida de `% Processor Performance` × `Processor Frequency` de Windows (calidad `derived`) o de una lectura directa equivalente; el reloj nominal del colector solo DEBE usarse como `substitute`. La interfaz DEBE llamarla «frecuencia activa» y no presentarla como el «effective clock» de otras herramientas.
+- **FR-069**: `térmica confirmada` DEBE exigir el bit de razón `THERMAL` (o su equivalente directo del fabricante). `PROCHOT` sin `THERMAL`, la meseta de temperatura o el margen agotado NO DEBEN producir `confirmada`.
+- **FR-070**: La confianza máxima DEBE depender del nivel de cobertura del equipo: nivel A → alta, nivel B → media, nivel C → baja; un reloj `substitute` limita a baja.
 - **FR-071**: El contexto energético (fuente de alimentación, plan energético activo y porcentaje de batería cuando exista) DEBE registrarse con cada muestra y estar disponible para el motor y para los informes.
-- **FR-072**: El usuario DEBE poder marcar una sesión completada como referencia (`baseline` de origen `user_marked`) desde Sesiones o desde el Informe, tras confirmación, y DEBE poder retirar esa marca.
-- **FR-073**: Una sesión importada DEBE conservar su informe original y ofrecer una reevaluación con las reglas actuales que se muestra junto al original; su baseline nunca DEBE usarse para la CPU local.
+- **FR-072**: El usuario DEBE poder marcar un diagnóstico guiado completado como referencia para comparaciones «antes/después» desde Sesiones o desde el Informe, tras confirmación, y DEBE poder retirar esa marca. Las sesiones pasivas no pueden ser referencia.
+- **FR-073**: Una sesión importada DEBE conservar su informe original y ofrecer una reevaluación con las reglas actuales que se muestra junto al original; su resultado nunca DEBE usarse como referencia de la CPU local.
 - **FR-074**: Los números y fechas DEBEN formatearse según el idioma efectivo de la interfaz; la temperatura se expresa exclusivamente en grados Celsius en el MVP.
+- **FR-076**: El límite térmico efectivo DEBE ser TjMax menos el offset de activación térmica (TCC offset) cuando el equipo lo exponga; en AMD, el límite de la familia según una tabla versionada o el que informe el colector. El margen siempre se mide contra ese límite efectivo.
+- **FR-077**: Tras cada inicio de carga, el motor DEBE excluir de la decisión de limitación sostenida la ventana de turbo (`max(Tau, 60 s)`) y registrar un escalón de potencia a la baja con carga constante como evento informativo `turbo_end`, nunca como limitación.
+- **FR-078**: Sin razones directas, el motor DEBE atribuir la causa por la magnitud que se estabiliza: meseta de temperatura en el límite → térmica; meseta de potencia con margen → potencia; ambas → mixta. No DEBE usar la caída de frecuencia por sí sola como evidencia térmica.
+- **FR-079**: `limitada por el equipo` DEBE distinguir el subtipo `chassis_thermal` (límite de potencia efectivo que baja durante la sesión con la CPU con margen) y `external_prochot` (`PROCHOT` sin `THERMAL`); para el primero DEBE sugerir mejorar la ventilación del equipo y para el segundo revisar alimentación, cargador o batería.
+- **FR-080**: Solo las limitaciones de gravedad `below_base` DEBEN generar alertas; las de gravedad `boost` se comunican como comportamiento dentro de especificación.
+- **FR-081**: La condición de carga sostenida y la frecuencia activa DEBEN evaluarse sobre los núcleos activos (utilidad ≥ 80 %), no sobre la carga total.
+- **FR-082**: La cobertura DEBE mostrar el nivel del equipo (A completo, B con potencia, C básico) y lo que cada nivel permite concluir; el onboarding y la cobertura DEBEN presentar el acceso avanzado como recomendado para alcanzar el nivel A, siempre mediante una acción explícita.
+- **FR-083**: El generador de carga del diagnóstico guiado DEBE medir el trabajo completado por hilo y por segundo, y el informe guiado DEBE mostrar el rendimiento sostenido relativo al inicial desglosado por causa.
+- **FR-084**: Las razones de limitación DEBEN leerse mediante sus bits de registro (log), que se limpian tras cada lectura, para medir si ocurrieron desde la muestra anterior y no solo en el instante de leer.
+- **FR-085**: La prueba guiada NO DEBE detenerse por alcanzar el límite térmico, que es el fenómeno que mide; DEBE detenerse si la temperatura supera el límite efectivo en más de 2 °C durante 3 muestras (el control térmico del procesador no actúa), si permanece en el límite con frecuencia activa inferior al 50 % de la base durante 10 s (refrigeración gravemente insuficiente), si se pierde el sensor crítico o si el generador deja de responder.
 - **FR-075**: Cuando el almacenamiento no esté disponible (disco lleno o base de datos dañada), el muestreo DEBE continuar en memoria, la interfaz DEBE avisar de forma persistente y el sistema DEBE reintentar o recuperar el almacenamiento sin intervención destructiva automática sobre los datos existentes.
 
 ### Requisitos no funcionales
@@ -337,33 +355,70 @@ Como usuario quiero saber si existe una versión nueva y decidir por separado si
 
 Los valores siguientes son los iniciales de la versión 1 de reglas. Se almacenan en configuración versionada (`ruleset-v1`), son revisables tras validar el corpus de trazas y cualquier cambio exige nueva versión de reglas. Su presencia aquí evita que la implementación los invente.
 
+**Límite térmico efectivo**: Intel, `TjMax − TCC offset` leídos de `MSR_TEMPERATURE_TARGET`; AMD, límite de Tctl por familia según la tabla versionada `thermal-limits-v1` (por ejemplo, 95 °C en Zen 4/Zen 5 de sobremesa) o el que exponga el colector. Sin límite conocido se usan umbrales absolutos y el anillo indica escala aproximada.
+
 **Estado térmico**
 
-| Condición | Con TjMax conocido | Sin TjMax |
+| Condición | Con límite efectivo conocido | Sin límite conocido |
 |---|---|---|
 | Normal | margen > 8 °C | < 85 °C |
 | Temperatura alta | margen ≤ 8 °C | ≥ 85 °C |
 | En el límite / crítica | margen ≤ 3 °C | ≥ 95 °C |
 
-Sin TjMax el anillo del hero indica que la escala es aproximada. Ningún estado térmico implica por sí solo limitación.
+Ningún estado térmico implica por sí solo limitación.
 
 **Temperatura representativa**: prioridad `package`/`Tdie` directo → máximo de núcleos → `Tctl` con offset conocido → `Tctl` sin offset (calidad `substitute`). En AMD, si coexisten `Tctl` y `Tdie`, se prefiere `Tdie`. La tarjeta indica cuál se usa.
 
-**Ventanas**: instantánea 1–3 s (solo visualización); corta 30 s (eventos); estable 60–120 s (comparación y cuantificación).
+**Niveles de cobertura**
 
-**Evidencia**
+| Nivel | Señales disponibles | Qué puede concluir | Confianza máxima |
+|---|---|---|---|
+| A — completo | temperatura, frecuencia activa, carga por núcleo, potencia de paquete, límite de potencia efectivo (PL1/PL2/Tau) y razones de limitación (`THERMAL`, `PROCHOT`, `PL1`, `PL2`, `EDP`, corriente) | todas las clasificaciones, gravedad y potencial cuantificado | alta |
+| B — con potencia | temperatura, frecuencia activa, carga por núcleo y potencia de paquete | térmica/potencia/mixta/equipo **probables** por mesetas; sin cifra de potencial | media |
+| C — básico | temperatura, frecuencia activa y carga por núcleo | solo «meseta en el límite con frecuencia activa por debajo de la base» como térmica probable; el resto, indeterminado | baja |
 
-| Tipo | Regla v1 |
-|---|---|
-| Directa persistente | bandera térmica activa en ≥ 50 % de las muestras de una ventana de 30 s con carga ≥ 70 % |
-| Correlacionada | margen ≤ 8 °C seguido de caída del reloj efectivo ≥ 8 % respecto a la mediana de los 60 s previos, con carga ≥ 70 % y variación de carga ≤ 15 puntos porcentuales, sostenida ≥ 60 s |
-| Eléctrica | bandera de límite de potencia/corriente activa ≥ 50 % de la ventana corta, o potencia estable en el ±3 % de un límite conocido con margen térmico > 8 °C |
-| Mixta | evidencia térmica y eléctrica materiales en la misma ventana estable |
-| Insuficiente | temperatura sin carga ≥ 70 %, carga variable, o sensores de calidad `substitute` en más de una magnitud crítica |
+En Intel el nivel A requiere el acceso avanzado. En AMD de consumo no existe un registro documentado de razones de limitación: se usa la tabla PM del SMU solo para versiones incluidas en una lista permitida y versionada; fuera de ella el techo es el nivel B.
 
-**Confianza**: puntuación 0..1 calculada a partir de calidad de sensores, cobertura, duración de la evidencia, dispersión y antigüedad del baseline; bandas `baja` < 0,45 ≤ `media` < 0,75 ≤ `alta`. Techos: sin bandera directa → ≤ `media`; reloj `derived`/`substitute` → ≤ `media`; cobertura parcial → ≤ `media`.
+**Carga sostenida y frecuencia activa**: un procesador lógico está activo si su utilidad es ≥ 80 % en la muestra. Hay carga sostenida cuando al menos un núcleo físico permanece activo durante toda la ventana. La frecuencia activa de un grupo es la mediana de la frecuencia activa de sus núcleos activos. La carga total no es condición.
 
-**Baseline aprendido**: ventanas de ≥ 120 s con carga ≥ 70 % (variación ≤ 15 pp), margen térmico ≥ 15 °C y sin bandera eléctrica; se requieren ≥ 3 ventanas; caduca a los 30 días o al cambiar la huella de CPU, la versión del normalizador o el contexto energético. Prioridad de uso: `guided` > `user_marked` > `learned`.
+**Ventanas**: instantánea 1–3 s (solo visualización); estable 60 s (decisión), deslizante cada 10 s; sesión (tendencias del límite de potencia).
+
+**Ventana de turbo**: tras cada inicio de carga (paso de < 30 % a carga sostenida) se excluyen de la decisión sostenida los primeros `max(Tau, 60 s)`, con Tau leído de `MSR_PKG_POWER_LIMIT` cuando esté disponible. Un escalón de potencia ≥ 15 % a la baja en ≤ 5 s con carga constante se registra como evento `turbo_end` («fin del turbo de potencia, esperado»).
+
+**Mesetas** (en la ventana estable, fuera de la ventana de turbo):
+- Meseta térmica: margen ≤ 3 °C y desviación típica de la temperatura ≤ 1,5 °C.
+- Meseta de potencia: coeficiente de variación de la potencia de paquete ≤ 3 % y margen > 8 °C.
+
+**Ocupación de razones**: fracción de muestras de la ventana estable en que el bit de registro (log) de la razón estaba activo; los bits se limpian tras cada lectura.
+
+**Reglas de clasificación** (se evalúan en este orden; la primera que se cumple decide):
+
+| # | Clasificación | Nivel A (razones directas) | Niveles B/C (inferencia) |
+|---|---|---|---|
+| 1 | `indeterminate` | falta temperatura o frecuencia activa | ídem |
+| 2 | `hot_unproven` / `normal` | sin carga sostenida, o dentro de la ventana de turbo: `hot_unproven` si la temperatura es alta, si no `normal` | ídem |
+| 3 | `mixed_limit` | ocupación `THERMAL` ≥ 20 % y ocupación de potencia (`PL1`/`PL2`/`EDP`/corriente) ≥ 20 % | meseta térmica y meseta de potencia simultáneas (solo B) |
+| 4 | `thermal_confirmed` | ocupación `THERMAL` ≥ 20 % | — nunca |
+| 5 | `thermal_probable` | — | B: meseta térmica sin meseta de potencia. C: meseta térmica con frecuencia activa < base |
+| 6 | `platform_limited` · `external_prochot` | ocupación `PROCHOT` ≥ 20 % sin `THERMAL` | — |
+| 7 | `platform_limited` · `chassis_thermal` | el límite de potencia efectivo baja ≥ 10 % durante la sesión sin cambio de plan ni de alimentación, con margen > 8 °C | B: el nivel de la meseta de potencia baja ≥ 15 % a lo largo de la sesión con carga y contexto constantes y margen > 8 °C |
+| 8 | `power_limited` | ocupación de potencia ≥ 20 % con margen > 3 °C | B: meseta de potencia |
+| 9 | `indeterminate` | frecuencia activa ≥ 8 % por debajo de la de la ventana de turbo sin meseta ni razón; causas alternativas: gestión de energía de Windows (EcoQoS, EPP, modo eficiencia), plan energético | ídem |
+| 10 | `normal` | carga sostenida sin nada de lo anterior | ídem |
+
+**Gravedad** (reglas 3–8): `below_base` si la frecuencia activa de los núcleos activos es < 97 % de su frecuencia base (`Processor Frequency`) durante ≥ 30 s de la ventana; si no, `boost`. `boost` se comunica como «limitado por encima de la frecuencia garantizada: dentro de especificación»; `below_base`, como «por debajo de la frecuencia garantizada».
+
+**Confianza**: puntuación 0..1 de **solidez de la evidencia** (no es una probabilidad) a partir de nivel de cobertura, calidad de sensores, duración y estabilidad de la ventana; bandas `baja` < 0,45 ≤ `media` < 0,75 ≤ `alta`; techos según el nivel de cobertura (FR-070). Los pesos se calibran con el corpus etiquetado antes de publicar.
+
+**Potencial con mejor refrigeración** (reglas 3, 4, 5 y 7, fuera de la ventana de turbo):
+- Método «techo de potencia» (requiere límite de potencia efectivo PL1 y potencia medida P): `g = (PL1 / P)^(1/3) − 1`, acotado por la frecuencia activa máxima observada en la ventana de turbo de la misma sesión con el mismo número de núcleos activos. El potencial de rendimiento se expresa como `[0,5·g, 1,0·g]`: el extremo inferior cubre cargas limitadas por memoria y la curva tensión-frecuencia.
+- Tramos: `< 3 %` «apenas mejoraría», `3–10 %` «mejora moderada», `> 10 %` «mejora notable». El rango se redondea hacia fuera a múltiplos de 5 %.
+- Sin PL1 conocido: sin cifra; si la gravedad es `below_base`, tramo cualitativo «probablemente notable» con confianza baja.
+- `power_limited`: «la refrigeración apenas influye»; sin cifra.
+
+**Rendimiento medido (diagnóstico guiado)**: el generador cuenta operaciones completadas por hilo y segundo. El informe muestra la mediana de los últimos 120 s de la carga sostenida relativa a la de los primeros 20 s de carga, y desglosa la diferencia según la ocupación de cada causa en la fase sostenida (fin del turbo, potencia, térmica, equipo). Es la única cifra de «rendimiento» en porcentaje de la aplicación y se rotula «rendimiento de la carga de prueba».
+
+**Comparación antes/después**: solo entre diagnósticos guiados completados con el mismo perfil de duración, el mismo contexto energético y la misma versión del generador; compara el rendimiento medido sostenido. No existen baselines aprendidos.
 
 **Perfiles de muestreo**
 
@@ -375,9 +430,9 @@ Sin TjMax el anillo del hero indica que la escala es aproximada. Ningún estado 
 
 El detalle por núcleo se mantiene siempre en memoria para la pantalla CPU; el histórico se agrega por grupo salvo en sesiones guiadas o en perfil Diagnóstico.
 
-**Alertas**: tipos `thermal_confirmed`, `power_limited`, `collector_lost` y `guided_finished`; `update_available` pertenece al actualizador. Persistencia mínima 90 s; enfriamiento 30 min por tipo; periodo de silencio opcional (sin valor inicial). Una alerta térmica abre `Análisis` centrado en el evento.
+**Alertas**: tipos `thermal_confirmed`, `power_limited`, `platform_limited`, `collector_lost` y `guided_finished`; `update_available` pertenece al actualizador. Las alertas de limitación solo se emiten con gravedad `below_base`. Persistencia mínima 90 s; enfriamiento 30 min por tipo; periodo de silencio opcional (sin valor inicial). Una alerta de limitación abre `Análisis` centrado en el evento.
 
-**Prueba guiada**: comprobación ≤ 30 s; reposo opcional 60 s (omitible); calentamiento 90 s; carga sostenida 90 s (`corta`), 180 s (`estándar`) o 300 s (`larga`); recuperación 120 s. Parada automática si el margen es ≤ 1 °C o la temperatura ≥ 100 °C, si faltan 3 muestras consecutivas del sensor crítico o si el generador de carga no responde durante 5 s. Ocultar la ventana o suspender el equipo cancela la prueba. Atajo de parada: `Ctrl+Shift+X`.
+**Prueba guiada**: comprobación ≤ 30 s; reposo opcional 60 s (omitible); calentamiento progresivo 90 s; carga sostenida 180 s (`corta`), 240 s (`estándar`) o 360 s (`larga`), de modo que los últimos 120 s quedan siempre fuera de la ventana de turbo; recuperación 120 s. Parada automática (FR-085): temperatura > límite efectivo + 2 °C durante 3 muestras; temperatura en el límite con frecuencia activa < 50 % de la base durante 10 s; 3 muestras consecutivas sin sensor crítico; generador sin respuesta durante 5 s. Alcanzar el límite térmico **no** detiene la prueba. Ocultar la ventana o suspender el equipo cancela la prueba. Atajo de parada: `Ctrl+Shift+X`.
 
 **Ventana**: tamaño mínimo 480×600 px lógicos; tamaño inicial 1100×760 centrado en la pantalla principal.
 
@@ -396,7 +451,7 @@ El detalle por núcleo se mantiene siempre en memoria para la pantalla CPU; el h
 - **Muestra**: valores coincidentes en un instante monotónico y su estado de validez.
 - **Sesión**: intervalo de monitorización o prueba, contexto energético y resultado.
 - **Contexto energético**: fuente de alimentación, plan energético activo y batería, registrados con cada muestra.
-- **Baseline**: referencia local por carga, topología, perfil energético y versión.
+- **Referencia guiada**: resultado medido de un diagnóstico guiado marcado por el usuario, usado solo para comparaciones «antes/después».
 - **Evento de limitación**: tipo, inicio, fin, severidad y evidencias.
 - **Diagnóstico**: clasificación, confianza, estimación opcional y explicación.
 - **Preferencias**: onboarding, muestreo, retención, alertas, privacidad, idioma, apariencia, ciclo de vida, ventana, inicio con Windows y actualizaciones.
@@ -405,10 +460,13 @@ El detalle por núcleo se mantiene siempre en memoria para la pantalla CPU; el h
 ## Criterios de éxito medibles
 
 - **SC-001**: En pruebas moderadas con personas (no automatizables en CI), al menos el 90 % de nuevos usuarios identifica correctamente el estado principal en menos de 10 s.
-- **SC-002**: El 100 % de los diagnósticos cuantificados muestra baseline, intervalo comparado, rango y confianza.
-- **SC-003**: Ninguna traza “caliente sin caída demostrada” del conjunto de regresión se etiqueta como limitación térmica confirmada.
-- **SC-004**: Al menos el 95 % de las trazas etiquetadas con señal directa persistente se clasifica como limitación térmica confirmada.
-- **SC-005**: El motor distingue correctamente térmica, potencia, mixta e indeterminada en al menos el 90 % del corpus validado.
+- **SC-002**: El 100 % de las cifras de potencial o rendimiento muestra método, entradas usadas (límite de potencia o carga de prueba), tramo, rango redondeado y confianza; ninguna cifra aparece sin método A o medición guiada.
+- **SC-003**: Ninguna traza “caliente sin limitación” ni “fin de turbo” del corpus se etiqueta como limitación térmica confirmada o probable.
+- **SC-004**: Al menos el 95 % de las trazas de nivel A con ocupación `THERMAL` ≥ 20 % se clasifica como térmica confirmada, y ninguna traza con solo `PROCHOT` lo hace.
+- **SC-005**: En trazas de nivel A, el motor acierta la clase (térmica, potencia, equipo, mixta, normal) en al menos el 90 % de las ventanas etiquetadas.
+- **SC-016**: Con las mismas trazas degradadas artificialmente a nivel B (eliminando razones y límites), el motor coincide con la etiqueta de nivel A en al menos el 80 % de las ventanas en que emite una causa, y nunca invierte térmica por potencia con confianza media.
+- **SC-017**: Al menos el 80 % de las trazas etiquetadas como gestión térmica del fabricante se clasifican `platform_limited · chassis_thermal`, y ninguna recibe la recomendación de no mejorar la refrigeración.
+- **SC-018**: La gravedad (`boost` / `below_base`) coincide con la etiqueta en al menos el 95 % de las ventanas limitadas del corpus.
 - **SC-006**: El panel mantiene los presupuestos de consumo y latencia definidos en NFR-001 a NFR-003 durante una sesión de una hora.
 - **SC-007**: Todas las funciones principales son utilizables con teclado y en modo de movimiento reducido.
 - **SC-008**: Una exportación anonimizada supera una prueba automática que busca identificadores excluidos.
@@ -436,7 +494,9 @@ El detalle por núcleo se mantiene siempre en memoria para la pantalla CPU; el h
 - El sidecar se ejecuta con los mismos privilegios que la interfaz (sin elevación) salvo que el spike de acceso de bajo nivel demuestre otra necesidad y se documente como excepción.
 - Las máquinas virtuales no son un caso principal: se soportan solo con cobertura reducida y estado explícito.
 - `LibreHardwareMonitorLib` no expone la clase de núcleo (P/E/LP); el sidecar la deriva de `GetLogicalProcessorInformationEx` y CPUID (hoja 0x1A en Intel). Cuando no puede, los grupos se marcan `unknown`.
-- Es probable que `LibreHardwareMonitorLib` no exponga reloj efectivo ni banderas térmicas/eléctricas directas; el diseño asume que el reloj efectivo se deriva del contador de rendimiento de Windows y que `térmica confirmada` solo existe cuando una bandera directa está disponible (lectura MSR por acceso de bajo nivel o sensor equivalente).
+- Es probable que `LibreHardwareMonitorLib` no exponga frecuencia activa ni razones de limitación; el diseño asume que la frecuencia activa se deriva de los contadores de Windows y que el nivel A (razones, límites de potencia, TCC offset) requiere el acceso avanzado.
+- **El valor diferencial del producto depende del nivel A.** Sin acceso avanzado la aplicación sigue siendo útil como explicación prudente (niveles B y C), pero no confirma causas ni cuantifica. Por eso la fase 0 incluye una puerta de viabilidad (véase `plan.md`).
+- La relación entre frecuencia y potencia se modela como cúbica (P ∝ f·V², con V aproximadamente proporcional a f); es una aproximación de primer orden que el rango `[0,5·g, 1,0·g]` absorbe y que se contrasta con la medición guiada.
 - El idioma del sistema se toma del primer idioma de visualización de Windows; el tema del sistema, del modo de aplicación (`AppsUseLightTheme`).
 - La documentación esencial se empaqueta con la aplicación; «Documentación en línea» abre el navegador del sistema por gesto explícito del usuario y es la única otra acción con red además del actualizador.
 - El instalador es por usuario y sin elevación; el acceso de bajo nivel, si el spike lo aprueba, se instala en un paso separado por máquina. Desinstalar pregunta si conservar los datos.

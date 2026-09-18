@@ -16,7 +16,7 @@ Integrar `LibreHardwareMonitorLib` en un sidecar .NET propio. No ejecutar la apl
 ### Riesgos
 
 - Ningún proyecto garantiza todos los sensores en todo hardware.
-- **Hipótesis de trabajo (a confirmar en T019):** `LibreHardwareMonitorLib` no expone reloj efectivo (solo reloj por núcleo multiplicador × bus), ni banderas PROCHOT/PL1/PL2/EDP como sensores, ni la clase de núcleo P/E/LP. Decisiones derivadas: reloj efectivo derivado del contador PDH en Rust; banderas leídas del MSR por el sidecar cuando el acceso de bajo nivel lo permite; clasificación de núcleos por CPUID/`GetLogicalProcessorInformationEx` en el sidecar. Si el spike contradice la hipótesis, se simplifica; si la confirma y el MSR no es accesible, `thermal_confirmed` queda limitado a equipos con driver instalado y la cobertura lo dice.
+- **Hipótesis de trabajo (a confirmar en T019):** `LibreHardwareMonitorLib` no expone reloj efectivo (solo reloj por núcleo multiplicador × bus), ni banderas PROCHOT/PL1/PL2/EDP como sensores, ni la clase de núcleo P/E/LP. Decisiones derivadas: frecuencia activa y base calculadas con contadores PDH en Rust; razones de limitación, límites de potencia y TCC offset leídos del MSR por el sidecar cuando el acceso de bajo nivel lo permite (nivel A); clasificación de núcleos por CPUID/`GetLogicalProcessorInformationEx` en el sidecar. Si el spike contradice la hipótesis, se simplifica; si la confirma y el MSR no es accesible sin UAC recurrente, se aplica la puerta de viabilidad de `plan.md` (fase 0).
 - El acceso de bajo nivel, firma y redistribución del controlador debe validarse jurídicamente y en el instalador.
 - Los nombres y sensores disponibles cambian por CPU, placa, permisos y versión.
 
@@ -88,64 +88,82 @@ SQLite gestionado por Rust, con WAL, migraciones y escritura por lotes.
 
 ## 5. Qué significa “rendimiento perdido”
 
+*Revisado el 2026-09-18.*
+
 ### Decisión
 
-No usar frecuencia turbo máxima ni una puntuación pública como denominador. Usar baseline local del mismo equipo y carga comparable; denominar el resultado “rendimiento disponible estimado”.
+La aplicación no calcula «rendimiento perdido» comparando relojes con un baseline. Ofrece dos cosas distintas y rotuladas por separado:
+
+1. **Potencial con mejor refrigeración** (monitorización pasiva, solo nivel A): cuánto subiría la frecuencia si el calor dejara de ser el límite. Se calcula con el **techo de potencia**: si la temperatura está en el límite y la potencia P queda por debajo del límite de potencia efectivo PL1, el hueco de potencia marca cuánto podría subir la frecuencia. Con P ∝ f·V² y V aproximadamente proporcional a f, P ∝ f³, así que `g = (PL1 / P)^(1/3) − 1`. Se acota por la frecuencia observada en la ventana de turbo con los mismos núcleos activos (el procesador no pasará de ahí) y se expresa como `[0,5·g, 1,0·g]`.
+2. **Rendimiento medido** (solo diagnóstico guiado): el generador cuenta trabajo completado; se compara el sostenido con el inicial y se desglosa la diferencia por causa.
 
 ### Razón
 
-El turbo máximo suele aplicar a pocos núcleos y condiciones transitorias. Un portátil y un sobremesa con la misma CPU tienen límites sostenidos diferentes. El reloj efectivo de núcleos inactivos tampoco representa capacidad perdida.
+La versión anterior (mediana de reloj actual / mediana de reloj del baseline) tenía cuatro fallos: comparaba contra baselines medidos a menudo durante el turbo PL2; los baselines aprendidos se seleccionaban en momentos de poca exigencia; la «carga %» no distingue tipos de trabajo (AVX, memoria), así que el baseline rara vez era comparable; y el rango, calculado con la dispersión estadística, ignoraba el error sistemático, que domina.
 
-### Limitación conocida
+### Limitaciones conocidas
 
-La razón de relojes no equivale exactamente a razón de rendimiento de toda aplicación. El MVP comunica un rango y la base de la estimación. Una versión futura podría añadir microbenchmark calibrado y contadores IPC, siempre como método separado.
+- La relación cúbica es de primer orden; cerca del máximo la curva tensión-frecuencia es más empinada (el potencial real es menor), y las cargas limitadas por memoria escalan menos que la frecuencia. El extremo inferior `0,5·g` cubre ambos efectos; la medición guiada permite contrastarlo.
+- A igual potencia, un chip más caliente fuga más corriente y rinde algo menos. Por eso mejorar la refrigeración ayuda un poco (del orden del 1–3 %) incluso en limitación de potencia pura; la aplicación lo menciona sin cuantificarlo.
+- Sin PL1 conocido no hay cifra.
 
 ## 6. Detección térmica
 
+*Revisado el 2026-09-18.*
+
 ### Decisión
 
-Motor basado en reglas explicables, no ML, con señales directas, correlación temporal y factores de confusión.
+Motor basado en reglas explicables y deterministas que clasifica por **niveles de cobertura**:
 
-### Motivos
+- **Nivel A**: razones de limitación directas. Intel expone en `MSR_CORE_PERF_LIMIT_REASONS` bits separados para `THERMAL`, `PROCHOT`, `PL1`, `PL2`, `EDP`, `VR_TDC` y otros, con bits de registro que se limpian tras leer. Es la misma fuente que usan ThrottleStop y HWiNFO.
+- **Niveles B/C**: inferencia por **mesetas**: la magnitud que limita se queda clavada en su tope. Temperatura plana en el límite → límite térmico; potencia plana con margen térmico → límite de potencia.
 
-- Determinista, auditable y comprobable con trazas.
-- El corpus inicial no justificaría un modelo estadístico entrenado.
-- Permite explicar “por qué” y revisar umbrales.
+### Por qué mesetas y no «caída de reloj tras calor»
+
+La regla inicial («margen ≤ 8 °C seguido de caída de reloj ≥ 8 %») reproduce exactamente la firma del fin del turbo en Intel: durante Tau (28–56 s) la CPU consume PL2, se calienta, y después baja a PL1. Sin la razón `PL1` a la vista, esa transición se habría clasificado como térmica en casi cualquier portátil. Además, detectar caídas no detecta estados: un equipo que ya empieza caliente o que se degrada lentamente nunca muestra la caída.
+
+### Casos que obligaron a ampliar las clases
+
+- **Gestión térmica del fabricante (Intel DTT/DPTF, AMD STAPM)**: el firmware baja PL1 según la temperatura del chasis. La CPU queda a 70–80 °C, la potencia clavada y la frecuencia baja. Por las razones parece «potencia», pero la causa es térmica del equipo y **mejorar la ventilación sí ayuda**. Se detecta porque el límite de potencia efectivo (o el nivel de la meseta de potencia) baja durante la sesión sin cambio de plan ni de alimentación. Clase `platform_limited · chassis_thermal`.
+- **PROCHOT externo**: el controlador del portátil puede activar PROCHOT# por batería, cargador o VRM, sin relación con la temperatura de la CPU. Intel lo separa del bit `THERMAL`. Clase `platform_limited · external_prochot`; la recomendación es revisar la alimentación.
+- **Boost que opera en el límite térmico por diseño**: Zen 3/4/5 de sobremesa y los Intel de sobremesa con límites abiertos suben hasta el límite térmico y convierten el margen en frecuencia. Estar «limitado térmicamente» ahí es normal. La **frecuencia base** (la garantizada) separa lo informativo (`boost`) de lo problemático (`below_base`).
+- **TCC offset**: muchos portátiles adelantan la activación térmica (TjMax 100 °C, límite real 90 °C). Sin leer el offset, el margen es falso.
 
 ### Regla de comunicación
 
-- Señal directa fiable → “confirmada”.
-- Patrón correlacionado fuerte → “probable/compatible”.
-- Solo calor → “temperatura alta; pérdida no demostrada”.
-- Evidencia eléctrica dominante → “limitada por potencia”.
+- Razón `THERMAL` → «confirmada»; gravedad según la frecuencia base.
+- Meseta térmica sin razones → «compatible con limitación térmica».
+- Solo calor, o calor dentro de la ventana de turbo → «temperatura alta; pérdida no demostrada».
+- Meseta o razón de potencia con margen → «limitada por potencia».
+- Límite de potencia descendente o PROCHOT sin THERMAL → «limitada por el equipo».
+- Caída sin meseta ni razón → «indeterminada», citando como alternativas la gestión de energía de Windows (EcoQoS, EPP, modo eficiencia) y el plan energético.
 
-## 7. Baseline
+## 7. Referencias y comparaciones
+
+*Revisado el 2026-09-18: se eliminan los baselines aprendidos.*
 
 ### Decisión
 
-Mantener referencias por grupos de núcleos, bucket de carga, alimentación/perfil y origen del reloj. Invalidarlas ante cambio de CPU/firmware significativo, versión incompatible del normalizador o calidad insuficiente.
+La única referencia es el **resultado medido de un diagnóstico guiado**, marcado por el usuario. Dos resultados son comparables si coinciden CPU, perfil de duración, contexto energético y versión del generador. La comparación «antes/después» usa el rendimiento medido sostenido, no relojes.
 
-### Construcción
+### Motivo
 
-- **Explícita:** prueba guiada o sesión marcada por el usuario.
-- **Aprendida:** ventanas históricas estables con alto margen térmico y carga suficiente.
-- **Comparativa:** antes/después de una intervención usando la misma versión y protocolo.
-
-Nunca sustituir un baseline ausente por el turbo comercial.
+Un baseline aprendido de la monitorización pasiva exige que la carga actual y la de referencia sean del mismo tipo, y la aplicación no puede saberlo: dos cargas con el mismo porcentaje de uso pueden tener frecuencias muy distintas (AVX, memoria, pocos hilos). Con el generador propio, la carga es idéntica por construcción.
 
 ## 8. Prueba de carga
 
 ### Decisión pendiente de spike
 
-Preferencia inicial: carga integrada simple, progresiva y cancelable, únicamente si puede aislarse y detenerse con garantías. Alternativa: modo guiado que observa una carga externa del usuario.
+Preferencia inicial: carga integrada, progresiva y cancelable, únicamente si puede aislarse y detenerse con garantías. Alternativa: modo guiado que observa una carga externa del usuario; en ese caso no hay rendimiento medido y el informe solo usa el potencial por techo de potencia.
 
 ### Condiciones para aprobar carga integrada
 
 - Watchdog fuera de los workers.
 - Cancelación en menos de 500 ms.
-- Parada ante pérdida del proceso padre, sensor crítico o condición de seguridad.
-- Sin instrucciones AVX extremas como única carga; perfiles documentados.
-- Mensaje explícito de que no es un benchmark homologado.
+- Parada ante pérdida del proceso padre, sensor crítico o las condiciones de FR-085. **No** se para al alcanzar el límite térmico: es el fenómeno que se mide y el procesador se protege solo.
+- Bucle de trabajo fijo y versionado que cuenta operaciones por hilo; sin AVX-512; AVX2 solo en un perfil documentado.
+- Duración de la carga sostenida suficiente para que los últimos 120 s queden fuera de Tau.
+- Mensaje explícito de que no es un benchmark homologado: mide este equipo frente a sí mismo.
 
 ## 9. Privilegios y controlador
 
@@ -171,7 +189,10 @@ Publicar “cobertura observada” y no “compatibilidad total”. La aplicaci�
 - identificación correcta;
 - temperatura disponible;
 - límite/margen disponible;
-- reloj efectivo o sustituto;
+- frecuencia activa y frecuencia base;
+- límite térmico efectivo (TjMax y TCC offset);
+- límites de potencia efectivos y razones de limitación;
+- nivel de cobertura (A/B/C);
 - potencia;
 - indicadores térmicos/eléctricos;
 - confianza máxima alcanzable.
@@ -224,15 +245,39 @@ Actualizador opcional mediante el plugin oficial de Tauri y un endpoint fijo de 
 
 La publicación produce manifiesto y artefactos firmados; instalar se bloquea durante diagnóstico o exportación; no se envían identificadores; desactivar purga cualquier estado o artefacto pendiente del actualizador.
 
+## 15. Validación del motor con corpus etiquetado
+
+*Añadido el 2026-09-18.*
+
+### Decisión
+
+Los criterios SC-003 a SC-005 y SC-016 a SC-018 se miden en CI con un corpus de trazas cuya **verdad de referencia** son los bits de razón de Intel, no una etiqueta manual.
+
+### Protocolo
+
+1. Grabar trazas de nivel A (acceso de bajo nivel instalado) en la matriz de hardware: Intel híbrido, Intel anterior, portátil con DTT/DPTF, sobremesa con límites abiertos, y AMD Zen 4 con tabla PM permitida. Cargas: render multihilo, compilación, juego limitado por CPU (pocos núcleos), carga AVX2 y reposo con calor residual.
+2. Etiquetar cada ventana estable con la clase que dictan los bits (`THERMAL`, `PROCHOT`, potencia, corriente), la tendencia de PL1 y la frecuencia base (gravedad). Las trazas sintéticas se marcan como tales.
+3. Generar copias **degradadas**: B (se eliminan razones, límites y TCC offset) y C (además, potencia). Así se mide cuánto acierta la inferencia sin driver frente a la verdad de nivel A del mismo equipo y la misma carga.
+4. Casos obligatorios: fin de turbo sin calor, equipo que empieza caliente, degradación lenta, DPTF, PROCHOT externo, Zen 4 en su límite por diseño, juego con pocos núcleos, EcoQoS.
+5. Calibrar los pesos de la confianza con este corpus y versionar el resultado con el ruleset.
+
+### Motivo
+
+Sin verdad de referencia objetiva, «90 % de acierto» no es verificable. Los bits de razón de Intel la dan gratis en los equipos que los exponen, y la degradación controlada mide exactamente lo que interesa: cuánto se equivoca el producto en los equipos que no los exponen.
+
 ## Riesgos abiertos
 
 | Riesgo | Impacto | Mitigación/decisión requerida |
 |---|---:|---|
-| Reloj efectivo no disponible ampliamente | Alto | derivado por contador PDH (`derived`), reloj LHM como `substitute`; porcentaje permitido con confianza ≤ `medium` |
-| Banderas térmicas/eléctricas no expuestas por LHM | Alto | lectura MSR en el sidecar vía acceso de bajo nivel; sin ella, techo `thermal_probable` y aviso en cobertura |
+| Frecuencia activa por PDH poco fiable en algún equipo | Medio | contraste con APERF/MPERF en el spike; reloj LHM como `substitute` con confianza baja |
+| Nivel A inalcanzable sin UAC recurrente | **Decisivo** | puerta de viabilidad en fase 0 (`plan.md`); alternativas: servicio privilegiado revisado o reposicionar el producto en niveles B/C |
+| Proveedor de acceso no permite limpiar bits de registro | Medio | usar bits instantáneos con confianza reducida un nivel |
+| AMD sin razones documentadas | Alto | tabla PM del SMU solo con versiones permitidas; si no, nivel B como máximo |
+| Relación potencia-frecuencia cúbica inexacta | Medio | rango `[0,5·g, 1,0·g]`, acotación por la frecuencia de turbo y contraste con la medición guiada |
+| Gestión de energía de Windows (EcoQoS, EPP) confundida con limitación | Medio | sin meseta ni razón → `indeterminate` con esa causa alternativa, nunca térmica |
 | Clasificación P/E/LP no disponible en LHM | Medio | CPUID hoja 0x1A / `GetLogicalProcessorInformationEx` en el sidecar; `unknown` degrada a homogéneo con aviso |
 | Redistribución/instalación de acceso bajo nivel | Alto | revisión de licencia, firma y spike de instalador |
-| Diferenciar límite térmico y potencia sin banderas | Alto | clase indeterminada; no forzar causa |
+| Diferenciar límite térmico y potencia sin razones | Alto | mesetas y ventana de turbo; techo de confianza media en B y baja en C; SC-016 mide el error |
 | Prueba integrada genera carga no representativa | Medio/alto | perfilar carga y ofrecer modo observación externa |
 | SVG con demasiados puntos o segmentos eleva CPU/memoria | Medio | 2.000–3.000 puntos por pista, agregación Rust, ventanas por zoom y benchmark en hardware objetivo |
 | Sensores AMD con semánticas Tctl/Tdie distintas | Medio | normalizador conserva semántica y elige representante con reglas probadas |

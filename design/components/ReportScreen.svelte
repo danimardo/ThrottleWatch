@@ -3,8 +3,9 @@
    * The "Informe" screen — a diagnosis report told as a narrative, not
    * a dashboard: resultado en una frase, qué se observó, impacto
    * estimado, evidencias, causas alternativas, qué no puede
-   * concluirse, recomendaciones, baseline utilizado, and a
-   * before/after comparison. Presentational, like every screen in
+   * concluirse, recomendaciones, método del impacto (its inputs:
+   * power limit and measured power, or the guided test result), and a
+   * before/after comparison between two comparable guided tests. Presentational, like every screen in
    * this system — every section's copy and every stat is
    * host-supplied; this component never computes an impact
    * percentage, never decides which causes are "alternative," and
@@ -23,16 +24,17 @@
    *
    * Three notices are independent booleans, not a single enum,
    * because a session can be incomplete AND running on reduced
-   * confidence AND missing a baseline all at once. They stack in a
+   * confidence AND lacking the inputs of a method all at once. They stack in a
    * fixed order (incomplete, then reduced confidence) above the
    * narrative so simultaneous notices always read the same way; the
-   * missing-baseline case has no banner of its own — it renders
-   * inline as the "Baseline utilizado" section's own missing-state
-   * text, since it isn't a warning about this report so much as a
+   * missing-method case has no banner of its own — it renders
+   * inline as the method section's own missing-state text, since it isn't a warning about this report so much as a
    * plain statement of what evidence the comparison rests on.
    *
-   * `impactValue` absent means "sin porcentaje por falta de
-   * baseline/confianza reducida" — the host decides why (via
+   * `impactValue` absent means "sin cifra: faltan las entradas del
+   * método (límite de potencia) o la confianza es insuficiente"; when
+   * present it is a cooling-potential band/range ("+10–20 %") or a
+   * measured guided result, never a clock ratio — the host decides why (via
    * `impactUnavailableReason`), this component just shows whichever
    * of the two states it's given.
    *
@@ -102,9 +104,9 @@
     recommendationsTitle: string;
     recommendations?: string[];
 
-    baselineTitle: string;
-    baselineDescription?: string;
-    baselineMissingText?: string;
+    methodTitle: string;
+    methodDescription?: string;
+    methodMissingText?: string;
 
     comparisonTitle: string;
     comparisonBeforeLabel?: string;
@@ -145,9 +147,9 @@
     cannotConclude = [],
     recommendationsTitle,
     recommendations = [],
-    baselineTitle,
-    baselineDescription,
-    baselineMissingText,
+    methodTitle,
+    methodDescription,
+    methodMissingText,
     comparisonTitle,
     comparisonBeforeLabel,
     comparisonAfterLabel,
@@ -283,12 +285,12 @@
       </section>
     {/if}
 
-    <section class="block baseline-block" style:--tw-i=8>
-      <span class="caption section-label" style:color="var(--text-tertiary)">{baselineTitle}</span>
-      {#if baselineDescription}
-        <p class="body block-text" style:color="var(--text-secondary)">{baselineDescription}</p>
+    <section class="block method-block" style:--tw-i=8>
+      <span class="caption section-label" style:color="var(--text-tertiary)">{methodTitle}</span>
+      {#if methodDescription}
+        <p class="body block-text" style:color="var(--text-secondary)">{methodDescription}</p>
       {:else}
-        <p class="body block-text" style:color="var(--text-tertiary)">{baselineMissingText}</p>
+        <p class="body block-text" style:color="var(--text-tertiary)">{methodMissingText}</p>
       {/if}
     </section>
   {/if}
@@ -415,7 +417,7 @@
   .comparison-head {
     background: var(--surface-sunken);
   }
-  .baseline-block {
+  .method-block {
     padding-top: var(--space-3);
     border-top: 1px solid var(--hairline);
   }

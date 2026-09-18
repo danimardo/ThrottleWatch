@@ -3,7 +3,7 @@
    * Reference composition exercising every state `ReportScreen`
    * accepts — NOT a component this system exports. A demo control
    * panel toggles: loading, session-incomplete notice, reduced-
-   * confidence notice, whether a baseline/impact percentage is
+   * confidence notice, whether a cooling-potential figure is
    * available at all, and whether the optional `CausalRail` evidence
    * chain is shown (per that component's own "only when backed by a
    * real 2-4 node chain" rule — this demo turns it off entirely
@@ -30,19 +30,21 @@
 
   let classification = $derived.by((): Classification => classificationPreset);
   let classificationLabel = $derived.by(() => {
-    if (classificationPreset === 'thermal_confirmed') return 'Térmico confirmado';
+    if (classificationPreset === 'thermal_confirmed') return 'Throttling térmico · bajo la frecuencia garantizada';
     if (classificationPreset === 'mixed_limit') return 'Térmico + eléctrico';
     return 'Normal';
   });
   let headline = $derived.by(() => {
     if (classificationPreset === 'normal') return 'No se detectó throttling durante esta sesión.';
-    return 'El sistema redujo su rendimiento por límite térmico durante la carga sostenida.';
+    return 'El calor redujo la frecuencia por debajo de la garantizada durante la carga sostenida; enfriar mejor devolvería un 10–20 %.';
   });
 
+  // Before/after = two comparable guided tests (same profile, same power
+  // context, same generator version), compared by MEASURED throughput.
   const comparisonMetrics: ReportComparisonMetric[] = [
-    { label: 'Reloj efectivo medio', beforeValue: '4.1 GHz', afterValue: '2.6 GHz' },
-    { label: 'Rendimiento estimado', beforeValue: '100 %', afterValue: '68 %' },
-    { label: 'Temperatura media', beforeValue: '71°C', afterValue: '96°C' }
+    { label: 'Rendimiento sostenido de la carga de prueba', beforeValue: '78 %', afterValue: '93 %' },
+    { label: 'Frecuencia activa sostenida (P)', beforeValue: '2,1 GHz', afterValue: '2,9 GHz' },
+    { label: 'Temperatura media', beforeValue: '99 °C', afterValue: '88 °C' }
   ];
 </script>
 
@@ -104,7 +106,7 @@
       <Switch bind:checked={showReevaluated} label="Importada: reevaluación" />
     </div>
     <div class="control">
-      <Switch bind:checked={hasBaseline} label="Baseline disponible" />
+      <Switch bind:checked={hasBaseline} label="Potencial cuantificable (nivel A)" />
     </div>
     <div class="control">
       <Switch bind:checked={showCausalChain} label="Mostrar cadena causal" />
@@ -138,43 +140,45 @@
       reducedConfidenceNoticeTitle="Confianza reducida"
       reducedConfidenceNoticeDescription="Uno o más sensores reportaron datos parciales durante esta sesión."
       observedTitle="Qué se observó"
-      observedText="Durante la fase de carga sostenida, la temperatura alcanzó el límite térmico del chip y el reloj efectivo cayó de forma sostenida durante los siguientes 6 minutos, coincidiendo con una caída medible del rendimiento."
+      observedText="Tras el fin del turbo inicial (esperado), la temperatura se quedó clavada en el límite de 100 °C y el procesador declaró la razón térmica en el 73 % de las muestras, con la potencia por debajo de su límite. La frecuencia activa de los núcleos P bajó a 2,1 GHz, por debajo de su base de 2,6 GHz."
       causalChain={showCausalChain
         ? [
             { id: 'load', label: 'CARGA', value: '92 %', tone: 'accent', icon: loadIcon },
-            { id: 'temp', label: 'TEMPERATURA', value: 'Límite', tone: 'thermal', icon: flameIcon },
-            { id: 'clock', label: 'RELOJ', value: '2.6 GHz ↓', tone: 'thermal', icon: clockIcon },
-            { id: 'perf', label: 'RENDIMIENTO', value: '−32 %', tone: 'thermal', icon: perfDownIcon }
+            { id: 'temp', label: 'TEMPERATURA', value: 'En el límite', tone: 'thermal', icon: flameIcon },
+            { id: 'power', label: 'POTENCIA', value: '31 de 45 W', tone: 'accent', icon: perfDownIcon },
+            { id: 'clock', label: 'FRECUENCIA', value: '2,1 < base 2,6', tone: 'thermal', icon: clockIcon }
           ]
         : undefined}
-      impactTitle="Impacto estimado"
-      impactValue={hasBaseline ? '−32 % de rendimiento' : undefined}
-      impactUnavailableTitle={hasBaseline ? undefined : 'Sin porcentaje disponible'}
-      impactUnavailableReason={hasBaseline ? undefined : 'No hay una sesión baseline previa con la que comparar esta carga.'}
+      impactTitle="Enfriar mejor"
+      impactValue={hasBaseline ? '+10–20 % · mejora notable' : undefined}
+      impactUnavailableTitle={hasBaseline ? undefined : 'No cuantificable en este equipo'}
+      impactUnavailableReason={hasBaseline ? undefined : 'Hace falta leer el límite de potencia del procesador (acceso avanzado). Por la gravedad observada, la mejora probablemente sería notable.'}
       evidenceTitle="Evidencias"
       evidence={[
-        'Temperatura sostenida por encima de 94°C durante 6 minutos.',
-        'Reloj efectivo por debajo de 3.0 GHz en el 80 % de las muestras de la fase de carga.',
-        'Ningún límite eléctrico (potencia) activo durante el mismo intervalo.'
+        'Razón THERMAL declarada por el procesador en el 73 % de las muestras de la fase sostenida.',
+        'Temperatura en meseta a 99–100 °C (límite efectivo 100 °C) durante 4 minutos.',
+        'Frecuencia activa de los núcleos P por debajo de la base en el 85 % de las muestras.',
+        'Potencia a 31 W, por debajo de su límite de 45 W: no es una limitación de potencia.'
       ]}
       alternativeCausesTitle="Causas alternativas consideradas"
       alternativeCauses={[
-        'Limitación por política del sistema operativo (descartada: no se detectó cambio de plan de energía).',
-        'Carga de otra aplicación en segundo plano (no puede descartarse por completo con los datos disponibles).'
+        'Fin del turbo de potencia: registrado a los 42 s y excluido del análisis (es el comportamiento previsto).',
+        'Gestión térmica del fabricante: descartada, el límite de potencia no cambió durante la sesión.',
+        'Gestión de energía de Windows (EcoQoS, plan): descartada, el plan no cambió y la carga es de primer plano.'
       ]}
       cannotConcludeTitle="Qué no puede concluirse"
       cannotConclude={[
-        'No se puede determinar si el mismo comportamiento ocurre con una carga más ligera.',
-        'No se dispone de datos suficientes para estimar el impacto en batería.'
+        'El potencial es una estimación física (límite de potencia frente a potencia medida); cargas limitadas por memoria mejorarían menos.',
+        'No se puede afirmar cuál de las medidas de refrigeración es la causa (pasta, ventilador, obstrucción).'
       ]}
       recommendationsTitle="Recomendaciones"
       recommendations={[
         'Revisar la pasta térmica o el sistema de refrigeración si este patrón se repite en cargas similares.',
         'Repetir el diagnóstico guiado en un entorno con temperatura ambiente más baja para comparar.'
       ]}
-      baselineTitle="Baseline utilizado"
-      baselineDescription={hasBaseline ? 'Sesión del 3 de septiembre de 2026, mismo hardware, carga equivalente.' : undefined}
-      baselineMissingText={hasBaseline ? undefined : 'No hay una sesión baseline registrada todavía para este equipo.'}
+      methodTitle="Cómo se ha calculado"
+      methodDescription={hasBaseline ? 'Techo de potencia: límite PL1 45 W frente a 31 W medidos con la temperatura en el límite; ganancia de frecuencia (45/31)^⅓ − 1 ≈ 13 %, acotada por la frecuencia del turbo inicial; rango 0,5–1,0 × y redondeado a múltiplos de 5 %. Nivel de cobertura A.' : undefined}
+      methodMissingText={hasBaseline ? undefined : 'Sin límite de potencia conocido no hay cifra. Nivel de cobertura B.'}
       comparisonTitle="Comparación antes / después"
       comparisonBeforeLabel="Antes"
       comparisonAfterLabel="Después"

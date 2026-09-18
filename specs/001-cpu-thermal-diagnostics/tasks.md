@@ -15,7 +15,7 @@ Formato: `[ID] [P?] [Historia?] Descripción con ruta`.
 - [ ] T006 Configurar scripts raíz de build/test/dev y fijar gestores/versiones en archivos de bloqueo.
 - [ ] T007 [P] Configurar CI Windows x64 con cachés y artefactos de pruebas, sin requerir sensores reales.
 - [ ] T008 [P] Crear inventario de licencias y plantilla de `THIRD-PARTY-NOTICES`.
-- [ ] T009 Documentar decisiones ADR iniciales: sidecar, SQLite, `AnalysisChart` SVG, agregación temporal y baseline local en `docs/adr/`.
+- [ ] T009 Documentar decisiones ADR iniciales: sidecar, SQLite, `AnalysisChart` SVG, agregación temporal y motor por niveles de cobertura (mesetas, ventana de turbo, techo de potencia) en `docs/adr/`.
 
 ## Fase 2 — Fundamentos bloqueantes
 
@@ -28,7 +28,9 @@ Formato: `[ID] [P?] [Historia?] Descripción con ruta`.
 - [ ] T016 [P] Crear sidecar falso/replay en `packages/trace-fixtures/tools/`.
 - [ ] T017 Integrar LibreHardwareMonitorLib con solo CPU habilitada en `apps/sensor-agent/Collector/`.
 - [ ] T018 Implementar catálogo original de hardware/sensores sin normalización de negocio.
-- [ ] T019 [P] Ejecutar spike de lectura sin privilegios en matriz Intel/AMD y documentar `docs/spikes/sensor-access.md`.
+- [ ] T019 [P] Ejecutar spike de lectura sin privilegios en matriz Intel/AMD y documentar `docs/spikes/sensor-access.md`; incluir la fiabilidad de `% Processor Performance` y `Processor Frequency` por procesador lógico frente a APERF/MPERF.
+- [ ] T019a **[Puerta de viabilidad]** Verificar con el proveedor de acceso de bajo nivel instalado si el sidecar lee `0x64F`, `0x1A2` y `0x610` y limpia los bits de registro **sin UAC recurrente**; medir qué parte de la matriz alcanza nivel A, B o C; decidir mediante ADR entre los resultados (a), (b) o (c) de `plan.md` § Fase 0. Bloquea la fase 3.
+- [ ] T019b [P] Grabar el corpus etiquetado inicial (Intel híbrido, Intel anterior, portátil con DTT/DPTF, sobremesa con límites abiertos, AMD Zen 4) según `research.md` § 15, con cargas multihilo, juego de pocos núcleos, AVX2 y reposo caliente.
 - [ ] T020 [P] Ejecutar spike de redistribución, instalación y retirada del acceso bajo nivel en `docs/spikes/low-level-driver.md`.
 - [ ] T021 Resolver la arquitectura de privilegios mediante ADR; bloquear empaquetado si contradice la constitución.
 - [ ] T022 Crear SQLite, migración v1 y repositorios base en `src-tauri/src/storage/`.
@@ -58,61 +60,70 @@ Estas tareas modifican `design/` **antes** de la primera sincronización (T024) 
 - [x] T130 [P] Material de vidrio y catálogo de animaciones en `design/` (tokens `--glass-*`/`--motion-*`, niveles `data-glass`, fondo `tw-ambient`, utilidades `tw-enter`/`tw-pop`, animaciones por componente) según `ux-visual-spec.md` § «Material de vidrio» y § «Animación»; harness y mockup con conmutadores de vidrio y movimiento. (2026-09-18)
 - [ ] T131 [US9] Implementar la preferencia `appearance.glass` (`system|full|reduced|off`): lectura de `UISettings.AdvancedEffectsEnabled`, escucha en caliente, aplicación de `data-glass` y degradación automática por rendimiento con histéresis; test de que `off` y sin `backdrop-filter` mantienen contraste AA.
 
+## Fase 2c — Revisión del motor en el sistema de diseño (2026-09-18)
+
+- [x] T132 [P] Añadir la clasificación `platform_limited` a `lib/classification.ts` y un icono propio en `StatusIcon`; documentar en `AGENTS.md`.
+- [x] T133 [P] Actualizar ejemplos y mockup: hero con gravedad y «Enfriar mejor» en lugar de «Rendimiento disponible», informe con potencial por techo de potencia y rendimiento guiado medido, cobertura con nivel A/B/C, prueba guiada con frecuencia frente a base y rendimiento en vivo; regenerar capturas del README.
+
 ## Fase 3 — Historia 1: estado térmico actual (P1)
 
 - [ ] T027 [P] [US1] Crear pruebas del normalizador para Intel homogéneo/híbrido, AMD y legado.
 - [ ] T028 [P] [US1] Implementar las reglas de selección de temperatura representativa (`package`/`Tdie` → máx. núcleos → `Tctl` con offset → `Tctl` sin offset) y margen en `sensor-agent/Normalization/`, según `spec.md` § Parámetros iniciales.
 - [ ] T028a [P] [US1] Implementar en el sidecar la clasificación de grupos P/E/LP mediante `GetLogicalProcessorInformationEx` y CPUID (hoja 0x1A) con fallback `unknown`.
-- [ ] T028b [P] [US1] Implementar en el sidecar la lectura opcional de banderas térmicas/eléctricas desde MSR (`IA32_THERM_STATUS`, `IA32_PACKAGE_THERM_STATUS`, `MSR_CORE_PERF_LIMIT_REASONS`; equivalentes AMD) cuando el acceso de bajo nivel lo permita; sin acceso, no emitir descriptores.
-- [ ] T028c [P] [US1] Implementar en Rust el reloj efectivo derivado del contador PDH `% Processor Performance` × reloj base como descriptor `host`/`derived`, con test contra trazas `derived-clock-only`.
+- [ ] T028b [P] [US1] Implementar en el sidecar (nivel A, Intel) la lectura de `MSR_CORE_PERF_LIMIT_REASONS` como descriptores separados `thermal_flag`, `prochot_flag`, `power_flag` y `current_flag` usando los bits de registro con limpieza tras cada lectura (lista cerrada de bits, constitución VIII); `MSR_TEMPERATURE_TARGET` (TjMax, TCC offset, límite efectivo) y `MSR_PKG_POWER_LIMIT` (PL1, PL2, Tau; límite efectivo si hay MMIO). Sin acceso, no emitir descriptores.
+- [ ] T028b2 [P] [US1] Implementar en el sidecar (AMD) la lectura de THM/PPT/TDC/EDC desde la tabla PM del SMU solo para versiones de la lista permitida, y la tabla versionada `thermal-limits-v1` por familia.
+- [ ] T028c [P] [US1] Implementar en Rust `active_clock` y `base_clock` por procesador lógico con los contadores PDH `% Processor Performance` y `Processor Frequency` como descriptores `host`/`derived`, con test contra trazas `derived-clock-only`.
+- [ ] T028e [P] [US1] Implementar el cálculo del nivel de cobertura (A/B/C) y su techo de confianza, expuesto en `get_coverage` y en el snapshot.
 - [ ] T028d [P] [US1] Implementar en Rust la lectura del contexto energético (`GetSystemPowerStatus`, `PowerGetActiveScheme`, `WM_POWERBROADCAST`) y su persistencia por frame; detectar reanudación y aplicar FR-065.
 - [ ] T029 [US1] Implementar normalización de temperatura, carga, reloj, potencia y flags conservando metadatos originales.
 - [ ] T030 [US1] Implementar agregación de snapshot y frescura en `src-tauri/src/telemetry/`.
 - [ ] T031 [P] [US1] Crear componente Hero de estado en `src/features/dashboard/StatusHero.svelte`.
-- [ ] T032 [P] [US1] Crear tarjetas de temperatura, carga, reloj y potencia con mini-tendencias.
+- [ ] T032 [P] [US1] Crear tarjetas de temperatura (con límite efectivo), carga y núcleos activos, frecuencia activa frente a base, y potencia frente a su límite, con mini-tendencias.
 - [ ] T033 [P] [US1] Conectar `CoverageMatrix` y `ContextStrip` a `get_coverage`, `telemetry:snapshot`, `collector:state` y `power:context`; calcular «confianza máxima alcanzable» y el enum de acceso avanzado en Rust.
 - [ ] T034 [US1] Conectar snapshots reales/replay a la pantalla `Ahora` sin lógica de sensor en UI.
-- [ ] T035 [US1] Añadir pruebas UI para completo, parcial, obsoleto, desconectado y CPU híbrida.
+- [ ] T035 [US1] Añadir pruebas UI para niveles A/B/C, parcial, obsoleto, desconectado y CPU híbrida.
 
 **Prueba independiente:** abrir modo replay y comprender el estado; los ausentes dicen “No disponible”.
 
 ## Fase 4 — Historia 2: detectar y explicar limitaciones (P1)
 
-- [ ] T036 [P] [US2] Definir `ruleset-v1.json` con los umbrales, ventanas, bandas de confianza y techos de `spec.md` § Parámetros iniciales, más códigos explicables; test que verifique que el fichero coincide con la spec.
-- [ ] T037 [P] [US2] Crear corpus etiquetado para normal, hot-unproven, thermal probable/confirmed, power, mixed e indeterminate.
-- [ ] T038 [US2] Implementar extracción de ventanas robustas y estabilidad de carga en `diagnostics/windows.rs`.
-- [ ] T039 [US2] Implementar evidencia térmica directa e inferida en `diagnostics/thermal.rs`.
-- [ ] T040 [P] [US2] Implementar evidencia de potencia/corriente/contexto en `diagnostics/power.rs`.
-- [ ] T041 [US2] Implementar clasificador, confianza y causas alternativas como función pura.
-- [ ] T042 [US2] Implementar segmentación y fusión de `limit_event` persistentes.
-- [ ] T043 [P] [US2] Crear componentes `DiagnosisBanner`, `EvidenceList` y `AlternativeCauses`.
-- [ ] T044 [US2] Crear narrativa causal solo cuando la secuencia esté sustentada.
-- [ ] T045 [US2] Ejecutar regresión del corpus y fijar métricas de SC-003 a SC-005 en CI.
+- [ ] T036 [P] [US2] Definir `ruleset-v1.json` con la tabla ordenada de clasificación, mesetas, ventana de turbo, umbral de núcleo activo, gravedad frente a base, ocupación de razones, bandas y techos de confianza de `spec.md` § Parámetros iniciales, más códigos explicables; test que verifique que el fichero coincide con la spec.
+- [ ] T037 [P] [US2] Etiquetar el corpus (T019b) con los bits de razón como verdad de referencia y generar sus copias degradadas a niveles B y C; incluir los casos obligatorios de `research.md` § 15 (fin de turbo, equipo que empieza caliente, degradación lenta, DPTF, PROCHOT externo, Zen 4 por diseño, juego de pocos núcleos, EcoQoS).
+- [ ] T038 [US2] Implementar en `diagnostics/windows.rs` los núcleos activos, la detección de inicio de carga y ventana de turbo (`max(Tau, 60 s)`), el evento `turbo_end` y la ventana estable deslizante.
+- [ ] T039 [US2] Implementar en `diagnostics/thermal.rs` la ocupación de `THERMAL` (nivel A) y la meseta térmica contra el límite efectivo (niveles B/C).
+- [ ] T040 [P] [US2] Implementar en `diagnostics/power.rs` la ocupación de razones de potencia y corriente, la meseta de potencia y la tendencia del límite de potencia o del nivel de meseta a lo largo de la sesión.
+- [ ] T040a [P] [US2] Implementar en `diagnostics/platform.rs` `platform_limited` con subtipos `chassis_thermal` y `external_prochot`, y sus recomendaciones.
+- [ ] T041 [US2] Implementar el clasificador como función pura que recorre la tabla ordenada, la gravedad `boost`/`below_base` frente a la frecuencia base, la confianza con techo por nivel y las causas alternativas (incluidas EcoQoS/EPP/plan).
+- [ ] T042 [US2] Implementar segmentación y fusión de `limit_event` persistentes, incluidos `platform` y los marcadores `turbo_end`.
+- [ ] T043 [P] [US2] Crear componentes `DiagnosisBanner`, `EvidenceList` y `AlternativeCauses` con nivel de cobertura y gravedad.
+- [ ] T044 [US2] Crear narrativa causal solo cuando la secuencia esté sustentada; el fin del turbo nunca es un eslabón.
+- [ ] T045 [US2] Ejecutar la regresión del corpus y fijar en CI SC-003, SC-004, SC-005, SC-016, SC-017 y SC-018; calibrar los pesos de la confianza y versionarlos con el ruleset.
 
-**Prueba independiente:** reproducir cada traza y obtener clasificación, confianza y evidencias esperadas.
+**Prueba independiente:** reproducir cada traza (y sus copias degradadas) y obtener clasificación, gravedad, confianza y evidencias esperadas.
 
-## Fase 5 — Historia 3: estimación de rendimiento (P1)
+## Fase 5 — Historia 3: potencial con mejor refrigeración (P1)
 
-- [ ] T046 [P] [US3] Crear tests de comparabilidad, invalidación y ausencia de baseline.
-- [ ] T047 [US3] Implementar repositorio y ciclo de vida de baseline según `data-model.md`, incluidos los criterios del baseline aprendido, la caducidad de 30 días, la prioridad `guided > user_marked > learned` y `set_session_reference`.
+- [ ] T046 [P] [US3] Crear tests del método de techo de potencia: fórmula, acotación por la frecuencia de turbo, rango `[0,5·g, 1,0·g]`, redondeo hacia fuera a múltiplos de 5 %, tramos, ausencia de cifra sin PL1 y tramo cualitativo solo con `below_base`.
+- [ ] T047 [US3] Implementar `diagnostics/potential.rs` con el método de techo de potencia, solo en nivel A, fuera de la ventana de turbo y para clases térmicas, mixta o chasis.
 - [ ] T047a [US3] Implementar límites de sesión pasiva (FR-067): apertura, partición por hueco > 60 s / 24 h, congelación del informe y diagnóstico en vivo provisional.
-- [ ] T048 [US3] Implementar agrupación P/E/LP y ponderación por núcleos activos/carga.
-- [ ] T049 [US3] Implementar ratio, dispersión, rango e impacto de calidad en `diagnostics/performance.rs`.
-- [ ] T050 [US3] Aplicar restricción: no serializar porcentaje sin baseline válido.
-- [ ] T051 [P] [US3] Crear visual `PerformanceRange` con rango, confianza y enlace a método.
-- [ ] T052 [US3] Añadir pruebas negativas contra turbo máximo, media de núcleos inactivos y falsa precisión.
+- [ ] T048 [US3] Implementar agrupación P/E/LP sobre núcleos activos para frecuencia, gravedad y potencial.
+- [ ] T049 [US3] Implementar `guided_result` y la comparabilidad «antes/después» (misma CPU, perfil, contexto energético y versión del generador); `set_session_reference` solo para sesiones guiadas.
+- [ ] T050 [US3] Aplicar restricciones: no serializar ninguna cifra sin método `power_headroom` con entradas o sin `guided_result`.
+- [ ] T051 [P] [US3] Crear visual `CoolingPotential` (tramo, rango, método y entradas) y `GuidedPerformance` (sostenido/inicial con desglose por causa).
+- [ ] T052 [US3] Añadir pruebas negativas: turbo máximo como referencia, fin de turbo tratado como pérdida, núcleos inactivos en la media, decimales y rangos menores de 5 puntos.
 
-**Prueba independiente:** una traza con baseline muestra rango; la misma sin baseline lo omite y explica la ausencia.
+**Prueba independiente:** una traza de nivel A limitada térmicamente muestra el tramo y el rango con su método; la misma degradada a B no muestra cifra y explica por qué; una sesión guiada muestra el rendimiento medido desglosado.
 
 ## Fase 6 — Historia 4: diagnóstico guiado (P2)
 
 - [ ] T053 [P] [US4] Ejecutar spike comparando carga integrada y observación externa en `docs/spikes/guided-load.md`.
 - [ ] T054 [US4] Aprobar mediante ADR el modo seguro; si no, implementar guía para carga externa reproducible.
 - [ ] T055 [P] [US4] Modelar máquina de estados y persistencia parcial de sesión guiada.
-- [ ] T056 [US4] Implementar preflight de sensores, alimentación (`guided.require_ac`), perfil, espacio en disco y generador; fases y límites de parada según `spec.md` (comprobación, reposo omitible, calentamiento, carga según `guided.duration`, recuperación); cancelación al ocultar ventana o suspender; atajo `Ctrl+Shift+X`; `guided.notify_on_finish`.
+- [ ] T056 [US4] Implementar preflight de sensores, alimentación (`guided.require_ac`), perfil, espacio en disco y generador; fases según `spec.md` (comprobación, reposo omitible, calentamiento, carga sostenida de 180/240/360 s, recuperación); **paradas de FR-085** (nunca por alcanzar el límite térmico); cancelación al ocultar ventana o suspender; atajo `Ctrl+Shift+X`; `guided.notify_on_finish`.
+- [ ] T056a [US4] Implementar el generador de carga con bucle fijo y versionado que cuenta operaciones por hilo y segundo, perfil sin AVX-512 y perfil AVX2 documentado; publicar `throughput_ops_s` en cada muestra.
 - [ ] T057 [US4] Implementar controlador de fases, cancelación y watchdog fuera de workers.
-- [ ] T058 [P] [US4] Crear UI de consentimiento, progreso, temperatura/límite y `Detener ahora`.
-- [ ] T059 [US4] Probar cancelación, sensor perdido, proceso padre ausente, batería y umbral de seguridad.
+- [ ] T058 [P] [US4] Crear UI de consentimiento, progreso, temperatura/límite efectivo, frecuencia activa frente a base, rendimiento medido en vivo y `Detener ahora`.
+- [ ] T059 [US4] Probar cancelación, sensor perdido, proceso padre ausente, batería, temperatura por encima del límite + 2 °C, frecuencia < 50 % de la base en el límite, y que alcanzar el límite térmico **no** detiene la prueba.
 
 **Prueba independiente:** completar o cancelar una sesión sin dejar carga activa; obtener informe o motivo explícito.
 
@@ -144,9 +155,9 @@ Estas tareas modifican `design/` **antes** de la primera sincronización (T024) 
 
 - [ ] T073 [P] [US7] Definir esquema JSON de informe/exportación separado del IPC.
 - [ ] T074 [P] [US7] Implementar exportador CSV por streaming y snapshot consistente.
-- [ ] T075 [US7] Implementar informe JSON versionado con eventos, baseline y reglas.
+- [ ] T075 [US7] Implementar informe JSON versionado con eventos, nivel de cobertura, gravedad, potencial (método y entradas), resultado guiado y reglas.
 - [ ] T076 [US7] Implementar anonimización por allowlist y test de fuga de identificadores.
-- [ ] T077 [US7] Implementar importador/migrador, reproducción de sesión sin hardware y `reevaluate_report` (evaluación nueva junto a la original; baseline importado nunca local).
+- [ ] T077 [US7] Implementar importador/migrador, reproducción de sesión sin hardware y `reevaluate_report` (evaluación nueva junto a la original; el resultado importado nunca se usa como referencia local).
 - [ ] T078 [US7] Conectar `ExportDialog` (tres alcances) e `ImportResultDialog` a `preview_export`, `export`, `import_session` y sus eventos; CSV según formato fijado en `spec.md`.
 
 **Prueba independiente:** exportar anónimo, validar esquema, importar y reproducir con el mismo diagnóstico.
@@ -237,4 +248,4 @@ La fase 2b (T118–T129) precede a T024 y a cualquier pantalla que consuma los c
 
 ## Estrategia de MVP
 
-El primer MVP demostrable incluye fundamentos, US1–US3, US8 y US9: onboarding bilingüe, apariencia/ventana, panel actual, diagnóstico explicable y estimación solo con baseline. Si el calendario exige recorte, pueden aplazarse carga integrada, bandeja, exportación avanzada y actualizaciones, pero no los dos idiomas, el tema claro/oscuro ni las salvaguardas que impiden mostrar porcentajes sin evidencia.
+El primer MVP demostrable incluye fundamentos, US1–US3, US8 y US9: onboarding bilingüe, apariencia/ventana, panel actual, diagnóstico explicable por niveles de cobertura y potencial solo por techo de potencia. Si el calendario exige recorte, pueden aplazarse carga integrada, bandeja, exportación avanzada y actualizaciones, pero no los dos idiomas, el tema claro/oscuro ni las salvaguardas que impiden mostrar porcentajes sin evidencia.

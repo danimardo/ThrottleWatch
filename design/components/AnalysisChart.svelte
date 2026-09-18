@@ -1,7 +1,7 @@
 <script lang="ts">
   /**
    * The synced multi-track chart at the heart of Análisis: temperatura,
-   * reloj efectivo, carga, and potencia sharing one time axis, one
+   * frecuencia activa, carga, and potencia sharing one time axis, one
    * cursor, and one event-band layer — all hand-rolled SVG. See this
    * package's AGENTS.md ("AnalysisChart: SVG vs. ECharts") for why this
    * stays a hand-rolled SVG rather than an ECharts wrapper, and the
@@ -78,7 +78,15 @@
   import { TONE_TOKENS, type Tone } from '../tokens/tokens';
 
   export type AnalysisTrackKind = 'temperature' | 'clock' | 'load' | 'power';
-  export type AnalysisEventKind = 'thermal' | 'electrical' | 'mixed';
+  /**
+   * `platform` = limited by the device (manufacturer thermal management
+   * lowering the power limit, or an external PROCHOT) — drawn with a
+   * warm striped pattern, never the thermal red. `info` = an
+   * informative marker that is NOT a limitation (e.g. the end of the
+   * power-turbo window): drawn as a thin dashed vertical line, never a
+   * band, so it cannot be read as a problem.
+   */
+  export type AnalysisEventKind = 'thermal' | 'electrical' | 'mixed' | 'platform' | 'info';
 
   export interface AnalysisPoint {
     t: number;
@@ -228,9 +236,11 @@
     hoverIndex = null;
   }
 
-  function eventBandTone(kind: AnalysisEventKind): { color1: string; color2?: string } {
+  function eventBandTone(kind: AnalysisEventKind): { color1: string; color2?: string; striped?: boolean } {
     if (kind === 'thermal') return { color1: 'var(--status-thermal)' };
     if (kind === 'electrical') return { color1: 'var(--status-power)' };
+    if (kind === 'platform') return { color1: 'var(--status-warm)', striped: true };
+    if (kind === 'info') return { color1: 'var(--text-tertiary)' };
     return { color1: 'var(--status-thermal)', color2: 'var(--status-power)' };
   }
 
@@ -357,6 +367,34 @@
       {@const tone = eventBandTone(evt.kind)}
       {@const x0 = indexToX(evt.startT)}
       {@const x1 = indexToX(evt.endT)}
+      {#if evt.kind === 'info'}
+        <line
+          class="event-marker"
+          x1={x0}
+          x2={x0}
+          y1={0}
+          y2={totalHeight}
+          stroke={tone.color1}
+          stroke-width={evt.id === selectedEventId ? 2 : 1.25}
+          stroke-dasharray="4 4"
+          vector-effect="non-scaling-stroke"
+        />
+        <rect
+          class="event-band marker-hit"
+          x={x0 - 4}
+          y={0}
+          width={8}
+          height={totalHeight}
+          fill="transparent"
+          role="button"
+          tabindex="0"
+          aria-label={evt.label}
+          onclick={() => onSelectEvent?.(evt.id === selectedEventId ? undefined : evt.id)}
+          onkeydown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') onSelectEvent?.(evt.id === selectedEventId ? undefined : evt.id);
+          }}
+        />
+      {:else}
       <rect
         class="event-band"
         class:selected={evt.id === selectedEventId}
@@ -364,7 +402,7 @@
         y={0}
         width={Math.max(2, x1 - x0)}
         height={totalHeight}
-        fill={tone.color2 ? `url(#tw-mixed-${evt.id})` : tone.color1}
+        fill={tone.color2 ? `url(#tw-mixed-${evt.id})` : tone.striped ? `url(#tw-striped-${evt.id})` : tone.color1}
         opacity={evt.id === selectedEventId ? 0.28 : 0.14}
         role="button"
         tabindex="0"
@@ -381,6 +419,13 @@
             <rect x="5" width="5" height="10" fill={tone.color2} />
           </pattern>
         </defs>
+      {:else if tone.striped}
+        <defs>
+          <!-- Single-colour horizontal stripes: a pattern, not just a colour, so "limited by the device" never reads as thermal red. -->
+          <pattern id={`tw-striped-${evt.id}`} width="8" height="8" patternUnits="userSpaceOnUse">
+            <rect width="8" height="4" fill={tone.color1} />
+          </pattern>
+        </defs>
       {/if}
       <rect
         class="event-border"
@@ -392,6 +437,7 @@
         stroke={evt.id === selectedEventId ? tone.color1 : 'transparent'}
         stroke-width="1.5"
       />
+      {/if}
     {/each}
 
     {#if shownRange}

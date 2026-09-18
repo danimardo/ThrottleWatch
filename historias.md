@@ -26,7 +26,7 @@ El público principal es una persona usuaria de Windows sin conocimientos especi
 
 **Criterios de aceptación:**
 
-- `Ahora` muestra una conclusión principal, CPU, temperatura, carga, reloj efectivo o sustituto, potencia disponible y frescura.
+- `Ahora` muestra una conclusión principal, CPU, temperatura, carga, frecuencia activa (la velocidad real mientras trabaja) frente a la garantizada, potencia y frescura.
 - Una franja fija sobre la conclusión indica el procesador y su topología, si el equipo va a corriente o a batería, si el colector está conectado y hace cuánto llegó la última muestra; con datos de más de cinco segundos avisa de que están obsoletos.
 - El estado usa texto, icono y color; un sensor ausente dice `No disponible`.
 - Las CPU híbridas distinguen grupos P, E y LP.
@@ -38,37 +38,39 @@ El público principal es una persona usuaria de Windows sin conocimientos especi
 
 ## HU-02 — Saber qué limita el rendimiento (P1)
 
-**Necesidad:** una frecuencia baja puede deberse a calor, potencia, batería, perfil energético o reposo; una etiqueta simplista puede provocar una intervención innecesaria.
+**Necesidad:** una frecuencia baja puede deberse a calor, potencia, batería, perfil energético, al propio fabricante del portátil o simplemente a que terminó el turbo inicial; una etiqueta simplista puede provocar una intervención innecesaria o, al revés, disuadir de una que sí ayudaría.
 
-**Historia:** Como usuario, quiero que ThrottleWatch distinga limitación térmica, eléctrica, mixta y falta de evidencia, para actuar sobre la causa correcta.
+**Historia:** Como usuario, quiero que ThrottleWatch distinga limitación térmica, de potencia, del propio equipo, mixta y falta de evidencia, y que me diga si lo que ocurre es normal o un problema, para actuar sobre la causa correcta.
 
 **Criterios de aceptación:**
 
-- Una señal térmica directa persistente permite hablar de limitación confirmada.
-- Una correlación sin señal directa se comunica como evidencia compatible, no confirmación.
+- «Confirmada» exige que el propio procesador declare que está limitando por temperatura; una señal de «PROCHOT» sin ese motivo no cuenta como calor, porque puede venir del cargador, la batería o la placa.
+- Sin esas señales, la aplicación mira **qué se queda clavado en su tope**: si es la temperatura, el límite es térmico; si es la potencia con la CPU fresca, es de potencia. Eso se comunica como «compatible», nunca como «confirmado».
+- La bajada de velocidad que ocurre cuando termina el turbo de los primeros segundos o minutos es normal y se muestra como tal, no como un problema térmico.
+- Si el fabricante del portátil va bajando la potencia porque el equipo se calienta por fuera, la aplicación lo dice y **sí** recomienda mejorar la ventilación, aunque la CPU no esté al límite.
+- Llegar al límite de temperatura no es un problema si el procesador sigue por encima de la frecuencia que el fabricante garantiza: se muestra como «dentro de especificación». Solo por debajo de esa frecuencia se trata como problema y puede generar un aviso.
 - Una limitación de potencia con margen térmico no recomienda primero mejorar la refrigeración.
-- Cada diagnóstico muestra evidencias, ausencias, alternativas, intervalo y confianza.
-- Si no puede atribuir causa, explica qué información falta.
-- «Confirmada» exige una señal directa del procesador; si el equipo no la expone, la aplicación nunca dice «confirmada» y la cobertura avisa de ese techo desde el principio.
-- La confianza (baja, media, alta) se calcula con reglas escritas y tiene techos conocidos: sin señal directa, con reloj estimado o con cobertura parcial nunca pasa de «media».
-- Con el equipo a batería o con un plan de energía restrictivo, el diagnóstico lo tiene en cuenta como causa alternativa.
+- En un juego que usa pocos núcleos, la aplicación evalúa esos núcleos y no descarta el análisis porque la carga total sea baja.
+- Cada diagnóstico muestra evidencias, ausencias, alternativas, intervalo y confianza; si no puede atribuir causa, explica qué información falta.
+- La aplicación dice desde el principio qué nivel de detalle alcanza en este equipo (completo, con potencia o básico) y qué gana instalando el acceso avanzado.
+- Con el equipo a batería, con un plan de energía restrictivo o con modos de eficiencia de Windows, el diagnóstico lo tiene en cuenta como causa alternativa.
 
-## HU-03 — Estimar el rendimiento disponible (P1)
+## HU-03 — Saber si enfriar mejor merece la pena (P1)
 
-**Necesidad:** el usuario quiere cuantificar el efecto del calor, pero compararlo con el turbo anunciado produciría cifras falsas.
+**Necesidad:** el usuario quiere saber si una base refrigerada, una limpieza o una pasta térmica nueva le devolverían rendimiento, pero una cifra mal calculada puede engañarle en cualquiera de los dos sentidos.
 
-**Historia:** Como usuario, quiero una estimación prudente del rendimiento disponible y potencialmente recuperable, para valorar si mejorar la refrigeración merece la pena.
+**Historia:** Como usuario, quiero una estimación prudente de cuánto ganaría con mejor refrigeración y, si hago una prueba, el rendimiento que mi equipo sostiene medido de verdad, para decidir si merece la pena actuar.
 
 **Criterios de aceptación:**
 
-- Solo existe porcentaje con un baseline local comparable.
-- La estimación usa rango y confianza, no falsa precisión decimal.
-- Las CPU híbridas se calculan por grupos activos.
-- Sin baseline se muestran evidencia y duración, pero no un porcentaje.
-- El tiempo en throttling nunca equivale a porcentaje de rendimiento perdido.
-- Con reloj estimado o sustituto el porcentaje existe, pero con confianza como máximo «media» y el método a la vista.
-- El usuario puede marcar una sesión completada como su referencia («Usar como referencia») y retirar esa marca; la referencia de una prueba guiada tiene prioridad sobre la marcada a mano, y esta sobre la aprendida.
-- Una referencia aprendida caduca a los treinta días o al cambiar la CPU, la versión o el contexto energético.
+- La estimación se basa en cuánta potencia le queda al procesador por usar cuando el calor lo frena; solo existe cuando el equipo permite leer su límite de potencia.
+- Se presenta como un tramo claro («apenas mejoraría», «mejora moderada», «mejora notable») y un rango redondeado de 5 en 5, nunca con decimales.
+- Si el límite es de potencia, la aplicación dice que la refrigeración apenas influye.
+- Sin los datos necesarios no hay cifra: se explica qué falta.
+- En el diagnóstico guiado, la aplicación **mide** el trabajo que hace el procesador con su propia carga de prueba y muestra cuánto rinde al final frente al principio, y a qué se debe la diferencia (fin del turbo, potencia, temperatura o el equipo).
+- Las comparaciones «antes/después» se hacen entre dos diagnósticos guiados iguales (misma duración, misma alimentación), y solo esos pueden marcarse como referencia.
+- El tiempo en throttling nunca equivale a porcentaje de rendimiento perdido, y el turbo anunciado en la caja nunca se usa como referencia.
+- Las CPU híbridas se calculan con los núcleos que están trabajando, por grupos.
 
 ## HU-04 — Ejecutar un diagnóstico guiado seguro (P2)
 
@@ -77,11 +79,11 @@ El público principal es una persona usuaria de Windows sin conocimientos especi
 **Criterios de aceptación:**
 
 - Antes de empezar se explica, en una lista, qué carga se aplicará, cuánto durará, qué sensores se usarán, cuándo se detendrá sola y que no es un benchmark.
-- Las fases son: comprobación, reposo opcional (se puede omitir), calentamiento, carga sostenida, recuperación y resultado; cada una muestra tiempo restante, temperatura, límite y margen.
-- La duración se elige en Ajustes entre corta, estándar y larga.
+- Las fases son: comprobación, reposo opcional (se puede omitir), calentamiento, carga sostenida, recuperación y resultado; cada una muestra tiempo restante, temperatura, límite, margen, velocidad frente a la garantizada y el trabajo medido en vivo.
+- La duración se elige en Ajustes entre corta (3 min de carga), estándar (4 min) y larga (6 min); siempre es lo bastante larga para medir después de que termine el turbo inicial.
 - `Detener ahora` está siempre visible, tiene atajo de teclado y también aparece en una barra fija en cualquier otra pantalla mientras la prueba dure; `Esc` no la detiene.
 - Cancelar cesa la carga y conserva datos parciales como incompletos.
-- La prueba se detiene sola al perder el sensor crítico, al llegar al límite de seguridad o si el generador de carga deja de responder; los límites se ven en Ajustes pero no se pueden subir.
+- Llegar al límite de temperatura no detiene la prueba: el procesador se protege solo y eso es justo lo que se quiere observar. La prueba se detiene sola si la temperatura supera ese límite (el procesador no se está protegiendo), si la velocidad se hunde por debajo de la mitad de la garantizada estando al límite (refrigeración gravemente insuficiente), si se pierde el sensor crítico o si el generador de carga deja de responder; los límites se ven en Ajustes pero no se pueden cambiar.
 - Ocultar la ventana o suspender el equipo cancela la prueba y el resultado lo explica.
 - En batería advierte de posibles límites de potencia; si el usuario lo prefiere, puede exigir corriente para empezar. Al terminar, puede avisar con una notificación si están activadas.
 - Al terminar ofrece usar el resultado como referencia.
@@ -132,7 +134,7 @@ El público principal es una persona usuaria de Windows sin conocimientos especi
 **Criterios de aceptación:**
 
 - Hay cinco diapositivas: bienvenida, señales, conclusiones, privacidad/preferencias y detección.
-- *Thermal throttling*, TjMax y baseline incluyen explicaciones sencillas.
+- *Thermal throttling*, el límite de temperatura (TjMax) y la frecuencia garantizada (frecuencia base) incluyen explicaciones sencillas.
 - Puede omitirse sin confirmación desde las cuatro primeras diapositivas, reanudarse y repetirse desde Ayuda.
 - La quinta diapositiva inicia detección pasiva sin UAC.
 - La cobertura parcial permite continuar. El acceso avanzado tiene cinco situaciones claras: no hace falta, disponible, instalable, bloqueado por el sistema o error; solo «instalable» ofrece instalar o reparar, y siempre con un gesto explícito.
@@ -213,7 +215,7 @@ El público principal es una persona usuaria de Windows sin conocimientos especi
 
 **Criterios de aceptación:**
 
-- `Eliminar todos mis datos` borra sesiones, muestras, eventos, informes y baselines tras confirmar.
+- `Eliminar todos mis datos` borra sesiones, muestras, eventos, informes y referencias tras confirmar.
 - Conserva idioma, tema, ajustes, onboarding y geometría.
 - `Restablecer ThrottleWatch` tiene advertencia distinta, borra datos y preferencias, desregistra el inicio y elimina descargas pendientes.
 - El siguiente arranque tras restablecer equivale a una instalación nueva.

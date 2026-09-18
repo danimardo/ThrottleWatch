@@ -64,7 +64,7 @@
     };
     const clock: AnalysisTrack = {
       kind: 'clock',
-      label: 'Reloj efectivo',
+      label: 'Frecuencia activa',
       unit: ' GHz',
       tone: 'accent',
       min: 0.8,
@@ -105,33 +105,52 @@
   const tracks = buildTracks();
 
   const events: AnalysisEvent[] = [
-    { id: 'ev-thermal', kind: 'thermal', startT: 20, endT: 35, label: 'Pico térmico' },
-    { id: 'ev-electrical', kind: 'electrical', startT: 60, endT: 68, label: 'Pico de potencia' },
-    { id: 'ev-mixed', kind: 'mixed', startT: 90, endT: 100, label: 'Térmico + eléctrico combinado' }
+    { id: 'ev-turbo', kind: 'info', startT: 12, endT: 12, label: 'Fin del turbo de potencia (esperado)' },
+    { id: 'ev-thermal', kind: 'thermal', startT: 20, endT: 35, label: 'Limitación térmica confirmada' },
+    { id: 'ev-electrical', kind: 'electrical', startT: 60, endT: 68, label: 'Limitación por potencia' },
+    { id: 'ev-mixed', kind: 'mixed', startT: 90, endT: 100, label: 'Térmica y potencia a la vez' },
+    { id: 'ev-platform', kind: 'platform', startT: 106, endT: 118, label: 'Limitada por el equipo (el fabricante bajó la potencia)' }
   ];
 
   const EVENT_EVIDENCE: Record<string, AnalysisEvidence> = {
-    'ev-thermal': {
-      title: 'Pico térmico (muestras 20–35)',
-      description: 'La temperatura subió por encima del umbral mientras el reloj efectivo bajó de forma sostenida — patrón consistente con throttling térmico.',
+    'ev-turbo': {
+      title: 'Fin del turbo de potencia (muestra 12)',
+      description: 'La potencia bajó de 64 W a 45 W en 2 s con la carga constante y 18 °C de margen: terminó la ventana de turbo (PL2 → PL1). Es el comportamiento previsto del procesador, no una limitación.',
       items: [
-        { label: 'Temp. máxima', value: '86°C' },
-        { label: 'Reloj mínimo', value: '1.8 GHz' },
-        { label: 'Duración', value: '15 muestras' }
+        { label: 'Potencia', value: '64 → 45 W' },
+        { label: 'Margen térmico', value: '18 °C' }
+      ]
+    },
+    'ev-thermal': {
+      title: 'Limitación térmica confirmada (muestras 20–35)',
+      description: 'El procesador declaró la razón THERMAL en el 73 % de las muestras, con la potencia por debajo de su límite. La frecuencia activa quedó por debajo de la base: throttling real, no boost oportunista.',
+      items: [
+        { label: 'Razón THERMAL', value: '73 % de las muestras' },
+        { label: 'Frecuencia activa', value: '1,8 GHz (base 2,6 GHz)' },
+        { label: 'Potencia', value: '31 W de 45 W' },
+        { label: 'Enfriar mejor', value: '+10–20 % (notable)' }
       ]
     },
     'ev-electrical': {
-      title: 'Pico de potencia (muestras 60–68)',
-      description: 'La potencia superó el límite del paquete sin un aumento correspondiente de temperatura — patrón consistente con un límite eléctrico, no térmico.',
+      title: 'Limitación por potencia (muestras 60–68)',
+      description: 'La potencia se mantuvo plana en su límite (45 W) con 14 °C de margen térmico: la refrigeración apenas influiría.',
       items: [
-        { label: 'Potencia máxima', value: '46 W' },
-        { label: 'Duración', value: '8 muestras' }
+        { label: 'Razón PL1', value: '88 % de las muestras' },
+        { label: 'Margen térmico', value: '14 °C' }
       ]
     },
     'ev-mixed': {
-      title: 'Evento combinado (muestras 90–100)',
-      description: 'Se observan indicios térmicos y eléctricos superpuestos en esta ventana — no se puede atribuir el throttling a una sola causa con la evidencia disponible.',
+      title: 'Térmica y potencia a la vez (muestras 90–100)',
+      description: 'Las razones THERMAL y PL1 aparecen a la vez en esta ventana; no se fuerza una causa única.',
       items: [{ label: 'Duración', value: '10 muestras' }]
+    },
+    'ev-platform': {
+      title: 'Limitada por el equipo (muestras 106–118)',
+      description: 'El límite de potencia efectivo bajó de 45 W a 28 W sin cambio de plan ni de alimentación y con la CPU a 74 °C: el fabricante reduce la potencia por el calor del chasis. Mejorar la ventilación del equipo sí ayudaría.',
+      items: [
+        { label: 'Límite de potencia', value: '45 → 28 W' },
+        { label: 'Temperatura CPU', value: '74 °C (margen 26 °C)' }
+      ]
     }
   };
 

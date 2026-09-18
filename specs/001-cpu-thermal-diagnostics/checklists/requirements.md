@@ -58,6 +58,17 @@
 - [x] Componentes de diseño pendientes registrados como T118–T129 y en `design/README.md`.
 - [ ] Pendiente: ejecutar `/speckit.analyze` tras estos cambios para confirmar coherencia entre documentos.
 
+## Revisión del motor (2026-09-18)
+
+- [x] Ninguna regla confunde el fin del turbo con limitación térmica (ventana de turbo, FR-077).
+- [x] La causa se atribuye por mesetas o razones directas, nunca solo por una caída de frecuencia (FR-078).
+- [x] La gestión térmica del fabricante tiene clase propia y no desaconseja ventilar (FR-079).
+- [x] La gravedad se mide frente a la frecuencia garantizada (FR-080).
+- [x] Ninguna cifra de rendimiento sin método físico explícito o medición guiada (FR-013, constitución III).
+- [x] La prueba guiada puede observar la limitación térmica (FR-085).
+- [x] Los criterios de acierto tienen verdad de referencia objetiva (corpus etiquetado, `research.md` § 15).
+- [ ] Pendiente: puerta de viabilidad del nivel A (T019a) antes de la fase 3.
+
 ## Notas
 
 - El nombre definitivo es `ThrottleWatch`.

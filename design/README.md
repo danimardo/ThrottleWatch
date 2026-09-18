@@ -107,7 +107,7 @@ examples/
                                        with a real gap, a reduced-quality run,
                                        and thermal/electrical/mixed events
   ReportScreen.example.svelte         the full ReportScreen, a demo panel toggling
-                                       every notice/baseline/causal-chain state,
+                                       every notice/impact-method/causal-chain state,
                                        the provisional notice and the re-evaluated block
   ShellPieces.example.svelte          the batch-12 pieces: global banners under
                                        TitleBar, ContextStrip, CoverageMatrix, the four
@@ -218,7 +218,7 @@ prioritizes a selected event's evidence, then a selected range's, then
 an idle hint). **Batch 11** is the "Informe" screen: `ReportScreen`, a
 narrative report — resultado en una frase, qué se observó, impacto
 estimado, evidencias, causas alternativas, qué no puede concluirse,
-recomendaciones, baseline utilizado, comparación antes/después — where
+recomendaciones, método del impacto, comparación antes/después — where
 every section with no content is omitted entirely rather than rendered
 as an empty stub, and the optional causal-chain block reuses
 `CausalRail` under that component's own "only with real evidence"
@@ -298,9 +298,11 @@ framework, no font download (see "Typography" below).
   one ambiguous sentence.
 - A missing value is stated explicitly ("No disponible" / "Not
   available") — never replaced with `0`, never a hidden row.
-- A performance percentage **only** exists with a valid local baseline.
+- There is no "available performance %". The only figures are the
+  cooling potential from the power-headroom method (level-A equipment)
+  and the measured guided-test result.
   `StatusHero`'s `performance` prop enforces this: omit it and the
-  component renders the "no baseline" fallback text instead of letting
+  component renders the "no cuantificable" fallback text instead of letting
   you fabricate a number.
 - Everything ships bilingual ES/EN from day one. **This package
   contains no user-facing copy** — every string is a prop the
@@ -612,9 +614,9 @@ native app):
 - **ReportScreen** — a diagnosis told as a narrative rather than a
   dashboard: resultado en una frase, qué se observó, impacto estimado,
   evidencias, causas alternativas, qué no puede concluirse,
-  recomendaciones, baseline utilizado, comparación antes/después. Any
+  recomendaciones, método del impacto, comparación antes/después. Any
   section with empty/undefined content is omitted entirely, not
-  rendered as a stub; `impactValue` follows the same "no baseline, no
+  rendered as a stub; `impactValue` follows the same "no method, no
   fabricated number" rule as `StatusHero.performance`; the optional
   causal-chain block reuses `CausalRail` under that component's own
   "only with real evidence" rule. The before/after comparison table's
@@ -666,7 +668,8 @@ native app):
   call-to-action. `compact` drops the label below 700px.
 - **StatusHero** — the one prominent conclusion on "Ahora": ring +
   classification tag + optional performance block. Enforces the
-  no-baseline-no-percentage rule in code.
+  no-method-no-figure rule in code, and paints `severity: 'boost'`
+  limitations in the warm tone (within specification).
 - **StatWidget** — one signal's tile (temperature, load, clock,
   power), grouped by the consumer in an auto-fit grid.
 - **StatusChip** — a pill for one of the 7 `diagnostic_report.classification`

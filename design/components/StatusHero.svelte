@@ -8,14 +8,22 @@
    * inside this component) — that mapping lives in
    * lib/classification.ts and is not configurable here.
    *
-   * The performance block is the one place in this system where a
-   * safety rule is enforced in code rather than left to the consumer's
-   * discipline: if you do not pass `performance`, this component
-   * renders "Aún sin referencia comparable" (or your `noBaselineText`
-   * override) instead of silently omitting the block or letting
-   * someone compute a number without a baseline. See the product
-   * constitution: a performance percentage only exists with a valid
-   * local baseline.
+   * The side block shows the **cooling potential** ("Enfriar mejor:
+   * +5–10 %") since the 2026-09-18 engine review — never an "available
+   * performance" percentage. It is the one place in this system where
+   * a safety rule is enforced in code rather than left to the
+   * consumer's discipline: if you do not pass `performance`, this
+   * component renders your `noPotentialText` (e.g. "No cuantificable en
+   * este equipo") instead of letting someone fabricate a number. Only
+   * the host's power-headroom method (spec FR-013) may fill it. The
+   * bar is optional: omit `percent` for a potential range, where a
+   * progress bar would be meaningless.
+   *
+   * `severity` (spec FR-080): a limitation with the active clock at or
+   * above the base clock (`boost`) is within specification and is
+   * painted with status-warm instead of status-thermal; `below_base`
+   * keeps the classification colour. It only changes thermal-family
+   * colours, never a different classification's.
    *
    * Layout is self-contained: it uses a CSS container query on its own
    * width (not the window's) to switch from a row to a stacked column
@@ -27,12 +35,12 @@
   import { CLASSIFICATION_META, type Classification } from '../lib/classification';
 
   interface PerformanceInfo {
-    /** e.g. "Rendimiento disponible" / "Available performance" */
+    /** e.g. "Enfriar mejor" / "Better cooling" */
     label: string;
     /** e.g. "78–84 %" — the range as already-formatted text */
     rangeText: string;
-    /** 0–100, drives the bar fill. Use the midpoint of the range, or the conservative bound. */
-    percent: number;
+    /** 0–100, drives an optional bar. Omit for a cooling-potential range. */
+    percent?: number;
   }
 
   interface Props {
@@ -47,10 +55,12 @@
     classificationLabel: string;
     /** The evidence/confidence line under the tag, e.g. "4 °C hasta el límite · confianza alta · observado 3 min 42 s". */
     evidenceLine: string;
-    /** Omit or pass null/undefined when there is no valid local baseline. */
+    /** Cooling potential from the power-headroom method; omit or pass null/undefined otherwise. */
     performance?: PerformanceInfo | null;
-    /** Override the no-baseline fallback string (defaults to the Spanish copy). */
-    noBaselineText?: string;
+    /** Fallback when there is no quantified potential (defaults to the Spanish copy). */
+    noPotentialText?: string;
+    /** `boost` = limited above the base clock (within spec) → warm tone; `below_base` = real throttling. */
+    severity?: 'boost' | 'below_base';
   }
 
   let {
@@ -61,7 +71,8 @@
     classificationLabel,
     evidenceLine,
     performance = null,
-    noBaselineText = 'Aún sin referencia comparable'
+    noPotentialText = 'No cuantificable en este equipo',
+    severity
   }: Props = $props();
 
   let meta = $derived(CLASSIFICATION_META[classification]);
@@ -69,7 +80,8 @@
   const R = 55;
   const C = 2 * Math.PI * R;
   let dashoffset = $derived(C * (1 - Math.max(0, Math.min(100, ringPercent)) / 100));
-  let ringColor = $derived(meta.neutralBg ? 'var(--text-primary)' : `var(--${meta.token})`);
+  let effectiveToken = $derived(severity === 'boost' && meta.token === 'status-thermal' ? 'status-warm' : meta.token);
+  let ringColor = $derived(meta.neutralBg ? 'var(--text-primary)' : `var(--${effectiveToken})`);
 </script>
 
 <div class="hero">
@@ -107,8 +119,8 @@
       {#key classification}
       <span
         class="status-tag tag tw-pop"
-        style:color={meta.neutralBg ? 'var(--text-primary)' : `var(--${meta.token})`}
-        style:background={meta.neutralBg ? 'var(--surface-raised)' : `color-mix(in srgb, var(--${meta.token}) ${meta.bgOpacity * 100}%, transparent)`}
+        style:color={meta.neutralBg ? 'var(--text-primary)' : `var(--${effectiveToken})`}
+        style:background={meta.neutralBg ? 'var(--surface-raised)' : `color-mix(in srgb, var(--${effectiveToken}) ${meta.bgOpacity * 100}%, transparent)`}
       >
         <span class="icon"><StatusIcon kind={meta.icon} /></span>
         {classificationLabel}
@@ -121,11 +133,13 @@
       {#if performance}
         <span class="label" style:color="var(--text-secondary)">{performance.label}</span>
         <div class="value-lg" style:color="var(--accent-blue)">{performance.rangeText}</div>
-        <div class="perf-bar">
-          <ProgressBar percent={performance.percent} tone="accent" label={performance.label} />
-        </div>
+        {#if performance.percent !== undefined}
+          <div class="perf-bar">
+            <ProgressBar percent={performance.percent} tone="accent" label={performance.label} />
+          </div>
+        {/if}
       {:else}
-        <span class="body" style:color="var(--text-tertiary)">{noBaselineText}</span>
+        <span class="body" style:color="var(--text-tertiary)">{noPotentialText}</span>
       {/if}
     </div>
   </div>

@@ -38,7 +38,7 @@
     { value: 'blocked', label: 'Bloqueado por batería' }
   ];
 
-  let phase: DiagnosticPhase = $state('warming');
+  let phase: DiagnosticPhase = $state('steadyLoad');
   let batteryState: BatteryState = $state('ok');
   let lastAction = $state('(ninguna todavía)');
 
@@ -57,27 +57,27 @@
       return { temperatureLabel: '52°', limitLabel: 'TjMax 100°', progressPercent: 40, remainingLabel: 'Quedan 36 s' };
     }
     if (phase === 'warming') {
-      return { temperatureLabel: '68°', temperatureFootnote: 'Subiendo', limitLabel: 'TjMax 100°', limitFootnote: 'Directo', headroomLabel: '32°', headroomFootnote: 'Margen', progressPercent: 35, remainingLabel: 'Quedan 58 s' };
+      return { temperatureLabel: '68°', temperatureFootnote: 'Subiendo', limitLabel: '100°', limitFootnote: 'TjMax − TCC offset', headroomLabel: '32°', headroomFootnote: 'Margen', progressPercent: 35, remainingLabel: 'Quedan 58 s' };
     }
     if (phase === 'steadyLoad') {
-      return { temperatureLabel: '91°', temperatureFootnote: 'Estable', limitLabel: 'TjMax 100°', limitFootnote: 'Directo', headroomLabel: '9°', headroomFootnote: 'Margen', progressPercent: 55, remainingLabel: 'Quedan 1 min 21 s' };
+      return { temperatureLabel: '100°', temperatureFootnote: 'En el límite (meseta)', limitLabel: '100°', limitFootnote: 'TjMax − TCC offset', headroomLabel: '0°', headroomFootnote: 'Margen', progressPercent: 55, remainingLabel: 'Quedan 1 min 48 s' };
     }
     if (phase === 'recovery') {
-      return { temperatureLabel: '74°', temperatureFootnote: 'Bajando', limitLabel: 'TjMax 100°', limitFootnote: 'Directo', headroomLabel: '26°', headroomFootnote: 'Margen', progressPercent: 70, remainingLabel: 'Quedan 36 s' };
+      return { temperatureLabel: '74°', temperatureFootnote: 'Bajando', limitLabel: '100°', limitFootnote: 'TjMax − TCC offset', headroomLabel: '26°', headroomFootnote: 'Margen', progressPercent: 70, remainingLabel: 'Quedan 36 s' };
     }
     return undefined;
   });
 
   let phaseTitle = $derived.by(() => {
     if (phase === 'warming') return 'Calentamiento';
-    if (phase === 'steadyLoad') return 'Carga estable';
+    if (phase === 'steadyLoad') return 'Carga sostenida';
     if (phase === 'recovery') return 'Recuperación';
     return undefined;
   });
 
   let phaseDescription = $derived.by(() => {
     if (phase === 'warming') return 'Aplicando una carga creciente para observar cómo responde la temperatura.';
-    if (phase === 'steadyLoad') return 'Manteniendo una carga constante para ver si el reloj efectivo se estabiliza.';
+    if (phase === 'steadyLoad') return 'Carga constante tras el fin del turbo. Frecuencia activa 2,1 GHz (base 2,6 GHz) · rendimiento medido 1.184 op/s (inicial 1.520). Llegar al límite de temperatura no detiene la prueba: el procesador se protege solo.';
     if (phase === 'recovery') return 'Retirando la carga para medir cuánto tarda la temperatura en volver a un rango normal.';
     return undefined;
   });
@@ -119,9 +119,9 @@
       whatWillHappenTitle="Qué va a pasar"
       whatWillHappen={[
         { label: 'Carga', value: 'Todos los núcleos, progresiva, sin instrucciones AVX extremas' },
-        { label: 'Duración', value: 'Unos 8 minutos (estándar): reposo 1 min · calentamiento 1,5 min · carga 3 min · recuperación 2 min' },
-        { label: 'Sensores', value: 'Temperatura de paquete, reloj efectivo derivado, potencia, bandera térmica' },
-        { label: 'Se detiene sola si', value: 'Margen ≤ 1 °C, temperatura ≥ 100 °C, sensor perdido 3 s o generador sin respuesta 5 s' }
+        { label: 'Duración', value: 'Unos 9 minutos (estándar): reposo 1 min · calentamiento 1,5 min · carga 4 min · recuperación 2 min' },
+        { label: 'Sensores', value: 'Temperatura de paquete, frecuencia activa frente a base, potencia y razones de limitación (si hay acceso avanzado)' },
+        { label: 'Se detiene sola si', value: 'La temperatura supera el límite en más de 2 °C, la frecuencia cae por debajo de la mitad de la base estando al límite, se pierde el sensor 3 s o el generador no responde 5 s. Llegar al límite no la detiene.' }
       ]}
       introDisclaimer="No es un benchmark homologado: sirve para comparar este equipo consigo mismo."
       startLabel="Iniciar diagnóstico"
@@ -153,7 +153,7 @@
       cancelledTitle="Diagnóstico cancelado"
       cancelledDescription="Se detuvo antes de completar todas las fases. No se generó ningún informe."
       safetyStopTitle="Parada de seguridad"
-      safetyStopDescription="La temperatura superó el límite seguro antes de completar el diagnóstico. Se detuvo automáticamente para proteger el equipo."
+      safetyStopDescription="La temperatura superó el límite del procesador en más de 2 °C: su control térmico no estaba actuando. Se detuvo la carga para proteger el equipo."
       sensorLostTitle="Se perdió la señal de un sensor"
       sensorLostDescription="No se pudo seguir leyendo la temperatura de la CPU durante unos segundos."
       sensorRetryLabel="Reintentar lectura"
@@ -165,12 +165,12 @@
       result={{
         classification: 'thermal_probable',
         classificationLabel: 'Limitación térmica probable',
-        summarySentence: 'Tu CPU redujo su velocidad por calor durante la fase de carga estable.',
-        evidenceLine: '9° hasta el límite · confianza media · observado 6 min 10 s'
+        summarySentence: 'Tu CPU sostuvo el 78 % del rendimiento inicial de la carga de prueba: 14 puntos por el fin del turbo (esperado) y 8 por temperatura.',
+        evidenceLine: 'Medido por el generador de carga · enfriar mejor: +10–20 % · confianza media (sin razones directas)'
       }}
       useAsReferenceLabel="Usar como referencia"
       onUseAsReference={() => (lastAction = 'usar como referencia')}
-      referenceNote="La prueba se completó con margen suficiente; servirá para estimar el rendimiento disponible."
+      referenceNote="Servirá para comparar «antes/después» con otra prueba igual (misma duración y alimentación)."
       onClose={() => (lastAction = 'cerrar diagnóstico')}
       closeLabel="Cerrar"
       onRestart={() => (lastAction = 'repetir diagnóstico')}

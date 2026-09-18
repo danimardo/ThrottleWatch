@@ -96,7 +96,7 @@ Incluye CPU, grupos y descriptores de sensores. Los IDs originales se tratan com
         "scope_ref": null,
         "unit": "celsius",
         "quality": "direct",
-        "metadata": {"tjmax_c": 110.0}
+        "metadata": {"tjmax_c": 100.0, "tcc_offset_c": 5.0, "thermal_limit_c": 95.0}
       }
     ]
   }
@@ -107,9 +107,24 @@ Incluye CPU, grupos y descriptores de sensores. Los IDs originales se tratan com
 
 Los grupos `p`, `e`, `lp_e` los clasifica el sidecar con `GetLogicalProcessorInformationEx` y CPUID (hoja 0x1A en Intel); si no puede, emite `kind: "unknown"` y Rust trata la CPU como homogénea con aviso de cobertura.
 
-Sensores de bandera (`thermal_flag`, `power_flag`, `current_flag`): si `LibreHardwareMonitorLib` no los expone, el sidecar intenta leerlos del MSR de estado térmico/eléctrico (`IA32_THERM_STATUS`, `IA32_PACKAGE_THERM_STATUS`, `MSR_CORE_PERF_LIMIT_REASONS` en Intel; equivalentes SMU en AMD) a través del acceso de bajo nivel disponible, con `quality: "direct"`. Si no hay acceso, los descriptores no se emiten y Rust limita la confianza máxima a `thermal_probable`.
+Razones de limitación (nivel A, requieren acceso de bajo nivel). En Intel el sidecar lee `MSR_CORE_PERF_LIMIT_REASONS` (0x64F) y emite descriptores booleanos separados, **nunca agregados en una sola «bandera térmica»**:
 
-El sidecar **no** emite reloj efectivo derivado: Rust lo calcula con el contador `\Processor Information(*)\% Processor Performance` y lo registra como descriptor propio de origen `host` con `quality: "derived"`.
+| Descriptor | Bits de origen (Intel) | Uso en el motor |
+|---|---|---|
+| `thermal_flag` | `THERMAL` (y `RATL`) | única fuente de `thermal_confirmed` |
+| `prochot_flag` | `PROCHOT` | `platform_limited · external_prochot` si aparece sin `THERMAL` |
+| `power_flag` | `PL1`, `PL2`, `EDP_OTHER` | `power_limited` |
+| `current_flag` | `VR_TDC`, `VR_THERM_ALERT` | `power_limited` (corriente) |
+
+Se usan los **bits de registro** (los 16 bits altos del MSR), que el sidecar limpia tras cada lectura; así `true` significa «ocurrió desde la muestra anterior» (`metadata.flag_semantics = "log_since_last_sample"`). Si la escritura de limpieza no está permitida por el proveedor de acceso, se emiten los bits instantáneos con `flag_semantics = "instantaneous"` y Rust reduce la confianza un nivel.
+
+Límites (nivel A): el sidecar emite `power_limit` (W) con `metadata.limit_kind` `pl1`/`pl2` y `metadata.tau_s`, leídos de `MSR_PKG_POWER_LIMIT` (0x610) y, si el acceso lo permite, del registro MMIO equivalente; el valor emitido es el **efectivo** (el menor de ambos). En el descriptor de temperatura emite `metadata.tjmax_c`, `tcc_offset_c` y `thermal_limit_c` de `MSR_TEMPERATURE_TARGET` (0x1A2). Un cambio de `power_limit` durante la sesión llega como nueva muestra, no como nuevo catálogo.
+
+AMD: no existe un registro documentado equivalente a 0x64F en procesadores de consumo. El sidecar solo emite `thermal_flag`/`power_flag`/`current_flag` a partir de la tabla PM del SMU cuando la versión de la tabla está en la lista permitida y versionada del normalizador (límite y valor actual de THM, PPT, TDC y EDC; «activo» = valor ≥ 99 % del límite). Fuera de la lista no se emiten y el equipo queda como máximo en nivel B. `thermal_limit_c` se toma de la tabla `thermal-limits-v1` por familia.
+
+Sin acceso de bajo nivel no se emite ningún descriptor de este apartado y Rust fija el nivel de cobertura en B o C.
+
+El sidecar **no** emite `active_clock` ni `base_clock`: Rust los calcula por procesador lógico con los contadores `\Processor Information(*)\% Processor Performance` y `\Processor Information(*)\Processor Frequency`, y los registra como descriptores propios de origen `host` con `quality: "derived"`. `active_clock` es la frecuencia mientras el procesador ejecuta; no incluye el reposo.
 
 `capabilities` se reemite tras un `start` con un `detail` distinto al anterior, tras una reanudación del sistema y tras cada reinicio del proceso. Rust compara el catálogo nuevo con el vigente por `source_id` y marca como `unsupported` los sensores que desaparecen.
 
@@ -161,7 +176,7 @@ Cada valor contiene exactamente uno de `number` o `boolean` cuando `status=ok`; 
 - `stop`: detiene muestreo y confirma con `stopped`.
 - `shutdown`: cierre ordenado; el padre puede terminar el proceso tras timeout.
 
-No existe comando para leer archivos, ejecutar procesos, modificar MSR, controlar ventiladores o cambiar potencia.
+No existe comando para leer archivos, ejecutar procesos, modificar MSR, controlar ventiladores o cambiar potencia. La única escritura interna del sidecar en registros es la limpieza de los bits de registro de `MSR_CORE_PERF_LIMIT_REASONS` (constitución, principio VIII), sobre una lista cerrada y sin comando que la exponga.
 
 ## Errores
 

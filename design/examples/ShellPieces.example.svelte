@@ -51,7 +51,7 @@
 
   // what's new
   let cards: WhatsNewCard[] = $state([
-    { id: 'n1', title: 'El acceso avanzado ahora se instala por separado', body: 'ThrottleWatch ya no pide permisos de administrador al abrirse. Si quieres banderas térmicas directas, instálalo desde Ajustes → Sensores.', actionLabel: 'Ir a Ajustes', onAction: () => (lastAction = 'ir a Ajustes desde novedades') },
+    { id: 'n1', title: 'El acceso avanzado ahora se instala por separado', body: 'ThrottleWatch ya no pide permisos de administrador al abrirse. Instálalo desde Ajustes → Sensores para confirmar la causa y estimar cuánto ayudaría enfriar mejor.', actionLabel: 'Ir a Ajustes', onAction: () => (lastAction = 'ir a Ajustes desde novedades') },
     { id: 'n2', title: 'Nuevo aviso: prueba guiada terminada', body: 'Puedes recibir una notificación cuando un diagnóstico acabe con la ventana en la bandeja. Está apagado de fábrica.' }
   ]);
 
@@ -67,7 +67,7 @@
   const ACCESS_NOTES: Record<AdvancedAccessState, string> = {
     not_needed: 'No hace falta acceso avanzado en este equipo.',
     available: 'Acceso avanzado disponible.',
-    installable: 'Sin acceso avanzado: no hay bandera térmica directa y la confianza máxima será «probable».',
+    installable: 'Recomendado: el acceso avanzado sube este equipo al nivel A (confirmar la causa y estimar cuánto ayudaría enfriar mejor).',
     denied: 'El acceso avanzado está bloqueado por una directiva del sistema o por el antivirus.',
     error: 'No se pudo comprobar el acceso avanzado.'
   };
@@ -76,16 +76,17 @@
     { id: 'temperature', label: 'Temperatura', available: true, quality: 'direct', qualityLabel: 'Directo', sourceLabel: 'CPU Package' },
     { id: 'headroom', label: 'Margen térmico', available: true, quality: 'derived', qualityLabel: 'Derivado', sourceLabel: 'TjMax 100 °C − paquete' },
     { id: 'load', label: 'Carga', available: true, quality: 'direct', qualityLabel: 'Directo', sourceLabel: 'CPU Total' },
-    { id: 'clock', label: 'Reloj efectivo', available: true, quality: 'derived', qualityLabel: 'Derivado', sourceLabel: '% Processor Performance × base' },
+    { id: 'clock', label: 'Frecuencia activa', available: true, quality: 'derived', qualityLabel: 'Derivado', sourceLabel: '% Processor Performance × base' },
+    { id: 'base', label: 'Frecuencia base', available: true, quality: 'derived', qualityLabel: 'Derivado', sourceLabel: 'Processor Frequency' },
     { id: 'power', label: 'Potencia', available: true, quality: 'substitute', qualityLabel: 'Sustituto', sourceLabel: 'Estimación por carga', reasonLabel: '' },
-    { id: 'thermal_flag', label: 'Bandera térmica', available: accessState === 'available', quality: 'direct', qualityLabel: 'Directo', sourceLabel: accessState === 'available' ? 'IA32_THERM_STATUS' : undefined, reasonLabel: 'Requiere acceso avanzado.' },
-    { id: 'power_flag', label: 'Bandera eléctrica', available: accessState === 'available', quality: 'direct', qualityLabel: 'Directo', sourceLabel: accessState === 'available' ? 'MSR_CORE_PERF_LIMIT_REASONS' : undefined, reasonLabel: 'Requiere acceso avanzado.' }
+    { id: 'thermal_flag', label: 'Razón térmica', available: accessState === 'available', quality: 'direct', qualityLabel: 'Directo', sourceLabel: accessState === 'available' ? 'IA32_THERM_STATUS' : undefined, reasonLabel: 'Requiere acceso avanzado.' },
+    { id: 'power_flag', label: 'Razón de potencia', available: accessState === 'available', quality: 'direct', qualityLabel: 'Directo', sourceLabel: accessState === 'available' ? 'MSR_CORE_PERF_LIMIT_REASONS' : undefined, reasonLabel: 'Requiere acceso avanzado.' }
   ]);
 
   let includedFields = $derived.by(() =>
     exportFormat === 'csv'
       ? ['timestamp_utc', 'monotonic_ms', 'sensor_id', 'metric', 'scope', 'value', 'status', 'quality', 'cpu.vendor', 'cpu.display_name', 'cpu.topology', 'versions']
-      : ['classification', 'confidence_band', 'evidence', 'alternative_causes', 'events', 'baseline (sin id de equipo)', 'ruleset_version', 'cpu.vendor', 'cpu.display_name', 'cpu.topology']
+      : ['classification', 'confidence_band', 'evidence', 'alternative_causes', 'events', 'cooling_potential', 'coverage_tier', 'ruleset_version', 'cpu.vendor', 'cpu.display_name', 'cpu.topology']
   );
   let excludedFields = $derived.by(() =>
     exportAnonymize
@@ -220,8 +221,8 @@
         availableLabel="Sí"
         unavailableLabel="No"
         maxConfidenceLabel={accessState === 'available'
-          ? 'Confianza máxima alcanzable en este equipo: alta'
-          : 'Confianza máxima alcanzable en este equipo: probable (sin bandera térmica directa)'}
+          ? 'Nivel A · completo — confirma la causa y estima el potencial. Confianza máxima alcanzable: alta'
+          : 'Nivel B · con potencia — infiere la causa sin confirmarla. Confianza máxima alcanzable: media'}
         {accessState}
         accessLabel={ACCESS_NOTES[accessState]}
         requestAccessLabel="Instalar acceso avanzado"

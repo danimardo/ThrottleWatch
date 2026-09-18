@@ -46,13 +46,20 @@ No guardar números de serie en esta tabla.
 | `cpu_id` | FK | CPU asociada |
 | `source_id` | text | ID original del colector |
 | `source_name` | text | Nombre original para auditoría |
-| `metric` | enum | `temperature`, `thermal_headroom`, `load`, `effective_clock`, `clock`, `power`, `voltage`, `thermal_flag`, `power_flag`, `current_flag` |
+| `metric` | enum | `temperature`, `thermal_headroom`, `load`, `active_clock`, `base_clock`, `clock`, `power`, `power_limit`, `voltage`, `thermal_flag`, `prochot_flag`, `power_flag`, `current_flag` |
 | `scope` | enum | `package`, `group`, `core`, `thread`, `system` |
 | `scope_ref` | text nullable | Grupo/núcleo/hilo |
 | `unit` | text | Unidad canónica |
 | `quality` | enum | `direct`, `derived`, `substitute`, `unknown` |
 | `is_representative` | boolean | Elegido para el resumen |
-| `metadata_json` | json | TjMax, offset, procedencia u otros datos |
+| `metadata_json` | json | `tjmax_c`, `tcc_offset_c`, `thermal_limit_c` (= TjMax − offset), `tctl_offset_c`, `tau_s`, `limit_kind` (`pl1`/`pl2`), procedencia |
+
+Semántica de las métricas del motor:
+
+- `active_clock`: frecuencia **mientras el procesador lógico ejecuta** (`% Processor Performance` × `Processor Frequency`), calidad `derived`. No es el «effective clock» de HWiNFO, que incluye el reposo.
+- `base_clock`: frecuencia base (garantizada) por procesador lógico, de `Processor Frequency`; en híbridos difiere entre P y E.
+- `power_limit`: límite de potencia **efectivo** (el menor entre el registro MSR y el de MMIO cuando ambos existen), con `limit_kind`. Un cambio de valor durante la sesión es evidencia de gestión térmica del fabricante.
+- `thermal_flag`, `prochot_flag`, `power_flag` (`PL1`/`PL2`/`EDP`), `current_flag` (VR TDC, EDC/TDC en AMD): **bits de registro**, leídos y limpiados en cada muestra; `true` significa «ocurrió desde la muestra anterior».
 
 ### `capability_snapshot`
 
@@ -85,7 +92,8 @@ Estado del acceso avanzado que la UI recibe ya traducido desde `hello_ack.low_le
 | `protocol_version` | integer | Contrato IPC |
 | `ruleset_version` | text | Reglas usadas |
 | `incomplete_reason` | text nullable | Motivo de cancelación/fallo |
-| `is_reference` | boolean | Marcada por el usuario como referencia (origina un `baseline` `user_marked`) |
+| `is_reference` | boolean | Solo en sesiones `guided` completadas: marcada por el usuario como referencia para comparaciones «antes/después» |
+| `coverage_tier` | enum | `A`, `B`, `C` — nivel de cobertura del equipo durante la sesión |
 | `split_reason` | enum nullable | `start`, `gap`, `resume`, `collector_restart`, `max_duration` — por qué empezó esta sesión pasiva |
 
 **Límites de una sesión pasiva** (FR-067): comienza al iniciar el muestreo; se cierra y abre otra tras un hueco > 60 s (suspensión, reinicio del sidecar, pausa) o al alcanzar 24 h continuas. Su `diagnostic_report` se congela al cerrarla; mientras está `running`, el diagnóstico mostrado se calcula en memoria y no se persiste. Con `history.retention = session`, todas las sesiones pasivas se eliminan al salir de la aplicación.
@@ -110,7 +118,7 @@ Cabecera de una muestra coincidente:
 
 Clave primaria compuesta: (`session_id`, `sequence`).
 
-El contexto energético se captura en Rust mediante `GetSystemPowerStatus` y `PowerGetActiveScheme` y se refresca ante `WM_POWERBROADCAST`; el sidecar no lo conoce. Un cambio de `power_source` o de `power_scheme_hash` dentro de una sesión no la parte, pero invalida la comparabilidad con baselines de otro contexto.
+El contexto energético se captura en Rust mediante `GetSystemPowerStatus` y `PowerGetActiveScheme` y se refresca ante `WM_POWERBROADCAST`; el sidecar no lo conoce. Un cambio de `power_source` o de `power_scheme_hash` dentro de una sesión no la parte, pero una sesión guiada solo es comparable con otra del mismo contexto energético.
 
 ### `sample_value`
 
@@ -145,27 +153,26 @@ Cada punto agregado conserva tiempo inicial/final, primer/último valor válido,
 
 El backend limita normalmente la respuesta a 2.000–3.000 puntos por pista y 10.000–12.000 totales. Una consulta de zoom solicita otro `analysis_window` con intervalo menor o resolución superior; no modifica ni duplica las muestras persistidas.
 
-### `baseline`
+### `guided_result`
+
+Resultado medido de un diagnóstico guiado; sustituye a la antigua entidad `baseline` (los baselines aprendidos se eliminaron en la revisión del motor del 2026-09-18).
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `id` | text PK | Referencia |
+| `session_id` | FK PK | Sesión guiada completada |
 | `cpu_id` | FK | CPU exacta |
-| `source` | enum | `guided`, `learned`, `user_marked` |
-| `group_id` | FK | Grupo de núcleos |
-| `load_bucket_min/max` | real | Intervalo comparable |
-| `power_context_hash` | text | Contexto normalizado |
-| `clock_metric` | enum | effective o sustituto |
-| `median_clock_mhz` | real | Centro de referencia |
-| `dispersion_mhz` | real | MAD/variación robusta |
-| `sample_count` | integer | Evidencia acumulada |
-| `thermal_headroom_min` | real nullable | Calidad térmica de la referencia |
-| `created_at/valid_until` | datetime nullable | Vigencia; `learned` caduca a los 30 días |
-| `normalizer_version` | text | Compatibilidad |
-| `validity` | enum | `candidate`, `valid`, `stale`, `invalid` |
-| `session_id` | FK nullable | Sesión de origen para `guided` y `user_marked` |
+| `duration_profile` | enum | `short`, `standard`, `long` |
+| `power_context_hash` | text | Contexto energético normalizado |
+| `generator_version` | text | Versión del generador de carga; solo se comparan resultados de la misma versión |
+| `active_threads` | integer | Hilos del generador |
+| `throughput_initial` | real | Operaciones/s, mediana de los primeros 20 s de carga |
+| `throughput_sustained` | real | Operaciones/s, mediana de los últimos 120 s de la carga sostenida |
+| `sustained_ratio` | real | `throughput_sustained / throughput_initial` |
+| `loss_breakdown_json` | json | Ocupación por causa en la fase sostenida: `turbo_end`, `power`, `thermal`, `platform`, `none` |
+| `active_clock_sustained_mhz` | json | Por grupo |
+| `base_clock_mhz` | json | Por grupo |
 
-Criterios de un baseline `learned` (ruleset v1): ventanas de ≥ 120 s con carga ≥ 70 % y variación ≤ 15 pp, margen térmico ≥ 15 °C y sin bandera eléctrica; pasa de `candidate` a `valid` con ≥ 3 ventanas. Se invalida al cambiar `cpu_device.fingerprint_version`, `normalizer_version` o `power_context_hash`. Prioridad de selección: `guided` > `user_marked` > `learned`. Retirar la marca de referencia de una sesión invalida su baseline `user_marked`. Un baseline importado nunca se usa para la CPU local.
+Dos resultados son comparables («antes/después») si coinciden `cpu_id`, `duration_profile`, `power_context_hash` y `generator_version`.
 
 ### `limit_event`
 
@@ -173,15 +180,17 @@ Criterios de un baseline `learned` (ruleset v1): ventanas de ≥ 120 s con carga
 |---|---|---|
 | `id` | text PK | Evento |
 | `session_id` | FK | Sesión |
-| `kind` | enum | `thermal`, `power`, `current`, `mixed`, `unknown` |
-| `certainty` | enum | `observed`, `inferred` |
+| `kind` | enum | `thermal`, `power`, `current`, `platform`, `mixed`, `turbo_end`, `unknown` |
+| `platform_kind` | enum nullable | `chassis_thermal`, `external_prochot` (solo con `kind = platform`) |
+| `certainty` | enum | `observed` (razones directas, nivel A), `inferred` (mesetas, niveles B/C) |
+| `limit_severity` | enum nullable | `boost`, `below_base` |
 | `start/end_sequence` | integer | Ventana |
 | `severity` | enum | `info`, `warning`, `critical` |
 | `confidence` | real | 0..1 interno; la UI lo convierte en categorías |
 | `evidence_json` | json | Códigos y métricas, no prosa localizada |
 | `ruleset_version` | text | Reglas |
 
-**Mapeo a `AnalysisChart.events[].kind`**: `thermal` → `thermal`; `power` y `current` → `electrical`; `mixed` → `mixed`; `unknown` → no se dibuja como banda, solo aparece en la lista de eventos del panel de evidencias.
+**Mapeo a `AnalysisChart.events[].kind`**: `thermal` → `thermal`; `power` y `current` → `electrical`; `platform` → `platform`; `mixed` → `mixed`; `turbo_end` → marcador informativo (`info`), nunca banda de limitación; `unknown` → no se dibuja como banda, solo aparece en la lista de eventos del panel de evidencias.
 
 ### `diagnostic_report`
 
@@ -189,18 +198,23 @@ Criterios de un baseline `learned` (ruleset v1): ventanas de ≥ 120 s con carga
 |---|---|---|
 | `id` | text PK | Informe |
 | `session_id` | FK | Sesión |
-| `classification` | enum | Clasificación principal |
+| `classification` | enum | `normal`, `hot_unproven`, `thermal_probable`, `thermal_confirmed`, `power_limited`, `platform_limited`, `mixed_limit`, `indeterminate` |
+| `platform_kind` | enum nullable | `chassis_thermal`, `external_prochot` |
+| `limit_severity` | enum nullable | `boost`, `below_base` |
+| `coverage_tier` | enum | `A`, `B`, `C` |
 | `confidence_band` | enum | `low`, `medium`, `high` |
-| `available_perf_low/high` | real nullable | Rango 0..1 |
-| `estimated_loss_low/high` | real nullable | Rango 0..1 |
-| `baseline_id` | FK nullable | Obligatorio si hay porcentaje |
+| `cooling_potential_band` | enum nullable | `negligible` (< 3 %), `moderate` (3–10 %), `notable` (> 10 %), `likely_notable` (cualitativo, sin cifra) |
+| `cooling_potential_low/high` | real nullable | Rango 0..1 redondeado hacia fuera a múltiplos de 0,05 |
+| `cooling_potential_method` | enum nullable | `power_headroom` |
+| `power_limit_used_w` / `power_measured_w` | real nullable | Entradas del método |
+| `guided_session_id` | FK nullable | Si el informe es de un diagnóstico guiado (su `guided_result`) |
 | `thermal_time_ratio` | real nullable | Tiempo, explícitamente no pérdida |
 | `primary_evidence_json` | json | Evidencias |
 | `alternative_causes_json` | json | Factores de confusión |
 | `recommendations_json` | json | Códigos localizables |
 | `created_at` | datetime | Momento de congelación |
 
-Restricción: los cuatro campos de rendimiento son todos `NULL` o existe `baseline_id` válido.
+Restricciones: `cooling_potential_low/high` solo existen con `cooling_potential_method = power_headroom`, `power_limit_used_w` y `power_measured_w` no nulos y `coverage_tier = A`; `likely_notable` solo con `limit_severity = below_base`; `platform_kind` solo con `platform_limited`.
 
 ### `user_preferences`
 
@@ -222,7 +236,7 @@ Clave/valor tipado con versión de esquema. Las claves conocidas son:
 | `lifecycle.close_action` | `unset`, `exit`, `tray` | `unset` | `unset` provoca la pregunta de primera X; elegir `tray` activa `tray.monitoring_enabled` |
 | `startup.enabled` | boolean | `false` | registro reversible de inicio con Windows |
 | `startup.mode` | `window`, `tray` | `window` | `tray` exige monitorización de bandeja |
-| `guided.duration` | `short`, `standard`, `long` | `standard` | 90 s / 180 s / 300 s de carga sostenida |
+| `guided.duration` | `short`, `standard`, `long` | `standard` | 180 s / 240 s / 360 s de carga sostenida (los últimos 120 s siempre fuera de la ventana de turbo) |
 | `guided.require_ac` | boolean | `false` | con `true` la prueba no arranca en batería; con `false` solo advierte |
 | `guided.notify_on_finish` | boolean | `false` | depende de `notifications.enabled` |
 | `privacy.anonymize_exports` | boolean | `true` | puede cambiarse por exportación; solo afecta a ficheros, nunca hay envío por red |
@@ -279,11 +293,10 @@ erDiagram
     MONITORING_SESSION ||--o{ SAMPLE_FRAME : records
     SAMPLE_FRAME ||--o{ SAMPLE_VALUE : contains
     SENSOR_DESCRIPTOR ||--o{ SAMPLE_VALUE : describes
-    CPU_DEVICE ||--o{ BASELINE : owns
-    CORE_GROUP ||--o{ BASELINE : scopes
+    MONITORING_SESSION ||--o| GUIDED_RESULT : measures
     MONITORING_SESSION ||--o{ LIMIT_EVENT : detects
     MONITORING_SESSION ||--o| DIAGNOSTIC_REPORT : produces
-    BASELINE o|--o{ DIAGNOSTIC_REPORT : supports
+    GUIDED_RESULT o|--o{ DIAGNOSTIC_REPORT : compares
     USER_PREFERENCES ||--|| ONBOARDING_STATE : configures
     USER_PREFERENCES ||--|| WINDOW_STATE : configures
     USER_PREFERENCES ||--|| UPDATE_STATE : configures
@@ -310,7 +323,7 @@ stateDiagram-v2
 
 - Índice `sample_frame(session_id, monotonic_ms)`.
 - Índice `limit_event(session_id, start_sequence)`.
-- Índice `baseline(cpu_id, group_id, validity, load_bucket_min)`.
+- Índice `guided_result(cpu_id, duration_profile, power_context_hash, generator_version)`.
 - Un frame por segundo supone 604.800 frames en siete días continuos.
 - Los valores por núcleo pueden multiplicar el volumen; se conservarán solo cuando el usuario active detalle o durante sesiones, y se agregarán para vista histórica.
 - `onboarding_state`, `window_state` y `update_state` tienen una sola fila lógica y volumen constante.

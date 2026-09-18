@@ -80,8 +80,8 @@ an evidence panel showing `selectedEventEvidence` >
 
 Batch 11 is the "Informe" screen: `ReportScreen`, a narrative report
 (resultado en una frase, qué se observó, impacto estimado, evidencias,
-causas alternativas, qué no puede concluirse, recomendaciones, baseline
-utilizado, comparación antes/después) rather than a dashboard. Every
+causas alternativas, qué no puede concluirse, recomendaciones, método
+del impacto, comparación antes/después) rather than a dashboard. Every
 section is omitted entirely (not padded with a stub heading) when its
 content prop is empty/undefined; the optional `causalChain` prop maps
 straight to `CausalRail` and follows that component's own "only with a
@@ -104,11 +104,14 @@ genuinely new requirement, not a gap in this inventory.
 
 ## 0.5 Non-negotiable rules (violating these breaks the product's own constitution)
 
-1. **No invented performance percentage.** A `%` of available
-   performance only exists with a valid local baseline. `StatusHero`'s
-   `performance` prop is optional for exactly this reason — if you
-   don't have a baseline, omit it (or pass `null`); do not compute or
-   guess a number to fill the slot.
+1. **No invented performance figure.** Since the 2026-09-18 engine
+   review there is no "available performance %" at all. The only
+   figures are (a) the **cooling potential** from the host's
+   power-headroom method (`+10–20 %`, level-A equipment only, spec
+   FR-013) and (b) the **measured** guided-test result. `StatusHero`'s
+   `performance` prop is optional for exactly this reason — without
+   one of those two sources, omit it (or pass `null`); never compute a
+   clock ratio or guess a number to fill the slot.
 2. **No copy lives in this package.** Every visible string is a prop —
    and so is every *accessible* string: `aria-label`, `title`, `alt`,
    placeholder text, and any other text exposed only to assistive tech
@@ -191,7 +194,8 @@ genuinely new requirement, not a gap in this inventory.
     the chart by connecting the segments.
 15. **`ReportScreen` never fabricates `impactValue`.** Same rule as
     `StatusHero.performance` (rule 1) applied to the Informe screen:
-    when there's no valid baseline (or confidence is too low), omit
+    when no method applies (power limit unknown, no guided result) or
+    confidence is too low, omit
     `impactValue` and supply `impactUnavailableTitle`/
     `impactUnavailableReason` instead — never compute a placeholder
     percentage to fill the slot.
@@ -275,6 +279,16 @@ genuinely new requirement, not a gap in this inventory.
     text. In-app navigation and actions use `<button>`, never `<a
     href>`; see tokens.css's own comment above the type-style rules
     for the full rationale.
+28. **Nine classifications and a severity, from the engine only.**
+    `platform_limited` ("limitada por el equipo": manufacturer
+    thermal management lowering the power limit, or an external
+    PROCHOT) has its own `device` icon and `status-warm` colour; never
+    render it as thermal red or as power purple. A limitation's
+    severity (`boost` / `below_base`) comes from the host; `boost` is
+    within specification and must never be styled or worded as a
+    problem. In `AnalysisChart`, `platform` events are warm striped
+    bands and `info` events (e.g. the end of the power-turbo window)
+    are thin dashed markers — never bands, never red.
 
 ## 1. Install
 
@@ -526,8 +540,9 @@ Collapses to stacked cards below 480px of its own container width.
 | `classification` | `Classification` | yes | one of the 7 values, see §3 |
 | `classificationLabel` | `string` | yes | already-translated tag text |
 | `evidenceLine` | `string` | yes | e.g. `"4 °C hasta el límite · confianza alta · observado 3 min 42 s"` |
-| `performance` | `{ label, rangeText, percent } \| null` | no | **omit/null when there is no valid baseline** — do not fabricate |
-| `noBaselineText` | `string` | no | override the fallback shown when `performance` is absent |
+| `performance` | `{ label, rangeText, percent? } \| null` | no | cooling potential ("Enfriar mejor", "+10–20 %"); **omit/null without the power-headroom method** — do not fabricate. Omit `percent` for a range (no bar) |
+| `severity` | `'boost' \| 'below_base'` | no | `boost` paints thermal-family classifications in `status-warm` (within spec); `below_base` keeps their colour |
+| `noPotentialText` | `string` | no | override the fallback shown when `performance` is absent |
 
 Row layout above a 900px *component* width, column below — automatic
 via CSS container query, not a prop.
@@ -746,7 +761,7 @@ it does not scroll itself.
 | `exportDisabledReason` | `string` | no | |
 | `deleteLabel` | `string` | no | omit to hide the delete icon button entirely |
 | `onRequestDelete` | `() => void` | no | fires immediately on click — this card has no confirmation of its own; `SessionsScreen` owns the one shared confirm `Dialog` |
-| `isReference` / `referenceLabel` | `boolean` / `string` | no | "Referencia" tag when the session backs a `user_marked` baseline |
+| `isReference` / `referenceLabel` | `boolean` / `string` | no | "Referencia" tag on a guided session marked for before/after comparisons (only guided sessions can be references) |
 | `referenceActionLabel` / `onToggleReference` | `string` / `() => void` | no | star toggle, rendered only for `completed` |
 
 ### SessionsScreen
@@ -1013,9 +1028,9 @@ Narrative sections — see rule 16 for the "omit, don't pad" contract.
 | `alternativeCausesTitle` / `alternativeCauses` | `string` / `string[]` | yes / no | |
 | `cannotConcludeTitle` / `cannotConclude` | `string` / `string[]` | yes / no | |
 | `recommendationsTitle` / `recommendations` | `string` / `string[]` | yes / no | rendered as a numbered list |
-| `baselineTitle` | `string` | yes | |
-| `baselineDescription` | `string` | no | shown when a baseline exists |
-| `baselineMissingText` | `string` | no | shown instead when it doesn't — this section always renders (never omitted), it just has two possible bodies |
+| `methodTitle` | `string` | yes | |
+| `methodDescription` | `string` | no | how the impact was obtained: power-headroom inputs (PL1, measured power) or the guided test; shown when a method applies |
+| `methodMissingText` | `string` | no | shown instead when no method applies (e.g. power limit unknown) — this section always renders (never omitted), it just has two possible bodies |
 | `comparisonTitle` / `comparisonMetrics` | `string` / `ReportComparisonMetric[]` (`{ label, beforeValue, afterValue }`) | yes / no | before/after table; omitted when `comparisonMetrics` is empty |
 | `comparisonBeforeLabel` / `comparisonAfterLabel` | `string` | yes (whenever `comparisonMetrics` is non-empty) | the table's own two column headers — no copy lives in this package (rule 2) |
 | `exportActions` | `Snippet` | no | compose with `Button` (e.g. "Exportar PDF", "Copiar resumen") |
@@ -1132,7 +1147,7 @@ actual two-color diagonal stripe pattern (not a single blended color).
 `examples/ReportScreen.example.svelte` (batch 11) was screenshotted for
 the full narrative with a causal chain (dark+light), the loading state,
 both the session-incomplete and reduced-confidence banners stacked
-together with the impact-unavailable state (no baseline), the
+together with the impact-unavailable state (no method), the
 `normal` classification with the causal chain hidden (confirming it's
 omitted, not rendered empty), the `mixed_limit` classification's
 neutral chip, an export-action button click, and a 420px compact width

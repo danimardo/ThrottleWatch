@@ -36,9 +36,12 @@ Y lo hace sin inventarse nada: cuando la evidencia no alcanza para confirmar alg
 
 | Lo que casi todas hacen | Lo que hace ThrottleWatch |
 |---|---|
-| Temperatura alta ⇒ "estás sufriendo throttling" | Una temperatura alta **no demuestra** pérdida de rendimiento por sí sola; hace falta ver el reloj efectivo caer de forma sostenida |
+| Temperatura alta ⇒ "estás sufriendo throttling" | Una temperatura alta **no demuestra** pérdida de rendimiento; se mira **qué se queda clavado en su tope** (temperatura o potencia) y, si el equipo lo permite, el **motivo que declara el propio procesador** |
+| La frecuencia baja al minuto de empezar ⇒ "se está calentando" | Eso suele ser el **fin del turbo de potencia**, previsto por el fabricante; ThrottleWatch lo marca como normal |
+| Llegar a 95–100 °C ⇒ "problema" | En muchas CPU modernas es el comportamiento de diseño. El problema es bajar de la **frecuencia garantizada**, y así se distingue |
+| Potencia limitada ⇒ "no es cosa de temperatura" | Muchos portátiles bajan la potencia porque **se calienta el chasis**; ThrottleWatch lo detecta y sí recomienda ventilar mejor |
 | "% de tiempo en throttling" presentado como "% de rendimiento perdido" | Tiempo y rendimiento perdido **no son lo mismo**, y ThrottleWatch nunca confunde uno con otro |
-| Compara tu frecuencia con el turbo máximo anunciado en la caja | El turbo de caja es para ráfagas de un núcleo; ThrottleWatch compara con **una referencia real de tu propio equipo** |
+| Compara tu frecuencia con el turbo máximo anunciado en la caja | El potencial se calcula con **la potencia que le queda por usar a tu procesador**, y en la prueba guiada el rendimiento se **mide** |
 | Una sola cifra de "salud", sin decir de dónde sale | Cada conclusión distingue **observación → indicio → confirmación**, con las evidencias a un clic |
 | CPU híbridas (P/E/LP) tratadas como un bloque homogéneo | Los núcleos de rendimiento, eficiencia y bajo consumo se **miden y muestran por separado** |
 
@@ -46,7 +49,7 @@ Y lo hace sin inventarse nada: cuando la evidencia no alcanza para confirmar alg
 
 ### `Ahora` — tu estado en menos de cinco segundos
 
-Un vistazo y ya sabes si todo va bien, si hace calor sin consecuencias demostradas, si el límite es térmico, eléctrico o mixto, o si faltan datos para saberlo. Temperatura, carga, reloj efectivo y potencia, con su procedencia y calidad — nunca un valor ausente disfrazado de `0`.
+Un vistazo y ya sabes si todo va bien, si hace calor sin consecuencias demostradas, si el límite es térmico, de potencia, del propio equipo o mixto — y si es **normal** (por encima de la frecuencia garantizada) o **un problema** (por debajo). Cuando el equipo lo permite, también cuánto ganarías enfriando mejor. Temperatura, carga, frecuencia activa y potencia, con su procedencia y calidad — nunca un valor ausente disfrazado de `0`.
 
 <img src="docs/screenshots/02-ahora-dark.png" alt="Pantalla Ahora, tema oscuro" width="800" />
 
@@ -56,7 +59,7 @@ Tema claro incluido de fábrica, con el mismo material de vidrio adaptado al fon
 
 ### `Análisis` — la secuencia completa, con eventos y evidencia
 
-Cuatro series sincronizadas (temperatura, reloj, carga, potencia) con un único cursor. Los eventos térmicos, eléctricos y mixtos se marcan sobre el propio gráfico y, al seleccionarlos, abren el porqué: qué se observó, durante cuánto tiempo y con qué evidencia concreta.
+Cuatro series sincronizadas (temperatura, frecuencia activa, carga, potencia) con un único cursor. Las limitaciones térmicas, de potencia, del equipo y mixtas se marcan sobre el propio gráfico —y el fin del turbo, como simple marcador informativo— y, al seleccionarlas, abren el porqué: qué se observó, durante cuánto tiempo y con qué evidencia concreta.
 
 <img src="docs/screenshots/04-analisis.png" alt="Pantalla Análisis con eventos y panel de evidencia" width="800" />
 
@@ -68,19 +71,19 @@ Los procesadores híbridos modernos mezclan núcleos de rendimiento, eficiencia 
 
 ### `Sesiones` — tu historial, tuyo y solo tuyo
 
-Monitorización continua, diagnósticos guiados y sesiones importadas, cada una con su clasificación, su estado y la posibilidad de marcarla como referencia para futuras comparaciones.
+Monitorización continua, diagnósticos guiados y sesiones importadas, cada una con su clasificación y su estado. Los diagnósticos guiados pueden marcarse como referencia para comparar «antes/después» de limpiar el equipo o cambiar la pasta térmica.
 
 <img src="docs/screenshots/06-sesiones.png" alt="Lista de sesiones" width="800" />
 
 ### `Diagnóstico guiado` — una prueba controlada, cuando la quieras
 
-Una carga progresiva, voluntaria y cancelable en cualquier momento, con parada automática por seguridad si algo va mal. Nunca se lanza sola, y nunca toca voltajes, potencia, ventiladores ni BIOS.
+Una carga progresiva, voluntaria y cancelable en cualquier momento, que **mide el trabajo real** que hace tu procesador y te dice cuánto rinde al final frente al principio, y por qué (fin del turbo, potencia, temperatura o el equipo). Llegar al límite de temperatura no la detiene —el procesador se protege solo—, pero sí se para si ese control fallara. Nunca se lanza sola, y nunca toca voltajes, potencia, ventiladores ni BIOS.
 
 <img src="docs/screenshots/07-guiado.png" alt="Diagnóstico guiado en curso" width="800" />
 
 ### `Informe` — la conclusión, explicada como a una persona
 
-No un dashboard más: una narrativa. Qué se observó, qué impacto puede estimarse (solo si hay una referencia válida — nunca un porcentaje inventado), qué evidencias lo sostienen y qué no puede concluirse todavía.
+No un dashboard más: una narrativa. Qué se observó, cuánto ayudaría enfriar mejor (con el método y los datos usados a la vista, y solo cuando se puede calcular — nunca un porcentaje inventado), qué evidencias lo sostienen y qué no puede concluirse todavía.
 
 <img src="docs/screenshots/09-informe.png" alt="Informe narrativo de la sesión" width="800" />
 
@@ -101,6 +104,7 @@ De ventana ancha de escritorio a una franja estrecha con navegación inferior �
 - ❌ No modifica voltajes, potencia, frecuencias, ventiladores ni BIOS — **solo observa y explica**.
 - ❌ No convierte "tiempo en throttling" en "porcentaje de rendimiento perdido".
 - ❌ No usa el turbo anunciado en caja como referencia de rendimiento sostenido.
+- ❌ No trata como problema lo que es comportamiento de diseño (fin del turbo, boost hasta el límite térmico por encima de la frecuencia garantizada).
 - ❌ No muestra un `0` cuando un sensor no está disponible: dice explícitamente "No disponible".
 - ❌ No envía **nada** por red salvo que actives voluntariamente el buscador de actualizaciones — y ni así envía identificadores.
 - ❌ No necesita permisos de administrador para el uso diario.
@@ -112,6 +116,18 @@ De ventana ancha de escritorio a una franja estrecha con navegación inferior �
 - **Degradación elegante.** Ningún sensor se da por garantizado: si tu hardware no expone algo, la aplicación lo dice y sigue funcionando con lo que sí tiene.
 - **Accesible de verdad.** Navegación completa por teclado, contraste AA, modo de movimiento reducido, lector de pantalla, español e inglés desde el primer día.
 - **Se siente nativa, no una web.** Sin subrayados al pasar el ratón, sin cursores de mano en botones, con el acabado de vidrio propio de una aplicación de escritorio moderna — nunca una página disfrazada de programa.
+
+## Qué puede saber en tu equipo
+
+No todos los equipos dejan leer lo mismo, y ThrottleWatch te dice desde el principio hasta dónde llega en el tuyo:
+
+| Nivel | Qué lee | Qué puede decirte |
+|---|---|---|
+| **A · completo** (con el acceso avanzado instalado, recomendado) | Además de lo básico, el motivo por el que el procesador se limita, sus límites de potencia y su límite térmico real | Confirma la causa, distingue calor de la CPU, límite de potencia y gestión del fabricante, y estima cuánto ayudaría enfriar mejor |
+| **B · con potencia** | Temperatura, frecuencia, carga por núcleo y potencia | Infiere la causa con confianza media, sin confirmarla ni dar cifras |
+| **C · básico** | Temperatura, frecuencia y carga | Solo detecta el caso claro (temperatura en el límite y frecuencia bajo la garantizada) |
+
+En Intel, el nivel A depende de poder leer ciertos registros del procesador; en AMD de consumo esa información no está documentada y el techo habitual es el nivel B. La viabilidad del nivel A sin pedir permisos de administrador en cada arranque es lo primero que se valida antes de implementar (véase [`plan.md`](specs/001-cpu-thermal-diagnostics/plan.md), fase 0).
 
 ## Cómo está construido
 
@@ -125,7 +141,7 @@ flowchart LR
 ```
 
 - **Interfaz**: Tauri 2 + Svelte 5 + TypeScript estricto, sin ejecutarse con privilegios elevados.
-- **Motor**: Rust puro, determinista y con pruebas basadas en trazas — el mismo conjunto de muestras siempre produce el mismo diagnóstico.
+- **Motor**: Rust puro y determinista. Clasifica por niveles de cobertura, ignora la ventana de turbo, atribuye la causa por la magnitud que se estabiliza en su tope y mide la gravedad frente a la frecuencia garantizada. Se valida con trazas reales etiquetadas con los motivos que declara el propio procesador, y con copias degradadas para medir cuánto se equivoca en equipos que no los exponen.
 - **Sensores**: un sidecar .NET que integra [`LibreHardwareMonitorLib`](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) (MPL-2.0), aislado del proceso visual y hablando un protocolo IPC cerrado y versionado.
 - **Datos**: SQLite local, retención configurable, exportación CSV/JSON anonimizable.
 - **Gráficos**: un componente SVG propio (`AnalysisChart`), sin dependencias de terceros, pensado para huecos reales, calidad de dato y accesibilidad por teclado.
@@ -169,9 +185,9 @@ npm run dev
 
 | Fase | Contenido |
 |---|---|
-| 0 — Riesgos | Validar acceso a sensores sin privilegios, protocolo IPC, presupuesto de rendimiento del gráfico |
+| 0 — Riesgos y viabilidad | **Puerta de viabilidad**: ¿se alcanza el nivel A sin pedir administrador en cada arranque? Corpus de trazas etiquetadas, protocolo IPC, presupuesto del gráfico |
 | 1 — Vertical slice pasivo | Onboarding, descubrimiento de CPU, cuatro métricas en vivo, primera sesión guardada |
-| 2 — Diagnóstico y visualización | Motor de clasificación completo, baseline, gráficos sincronizados, mapa de núcleos, informe |
+| 2 — Diagnóstico y visualización | Motor por niveles de cobertura, ventana de turbo, gravedad frente a la frecuencia garantizada, potencial con mejor refrigeración, gráficos sincronizados, mapa de núcleos, informe |
 | 3 — Operación de escritorio | Bandeja, ajustes, exportación/importación, recuperación del colector, actualizaciones firmadas |
 | 4 — Prueba guiada y endurecimiento | Carga guiada, matriz de hardware real, accesibilidad, rendimiento, empaquetado |
 

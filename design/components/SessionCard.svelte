@@ -34,7 +34,7 @@
     classificationLabel?: string;
     /** 'imported' sessions get a small secondary tag next to the classification chip (or alone, if there's no classification yet). */
     importedLabel?: string;
-    /** True when this session backs a `user_marked` baseline; renders the `referenceLabel` tag. */
+    /** True when this guided session is marked as the before/after reference; renders the `referenceLabel` tag. */
     isReference?: boolean;
     referenceLabel?: string;
     /** "Usar como referencia" / "Retirar referencia" — the host picks the wording from `isReference`. Only meaningful for `completed`. */

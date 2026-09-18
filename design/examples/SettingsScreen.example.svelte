@@ -86,8 +86,8 @@
 
   const ACCESS_NOTES: Record<AdvancedAccessState, string> = {
     not_needed: 'No hace falta acceso avanzado en este equipo.',
-    available: 'Acceso avanzado disponible: banderas térmicas y eléctricas directas.',
-    installable: 'Sin acceso avanzado: no hay bandera térmica directa y la confianza máxima será «probable».',
+    available: 'Acceso avanzado disponible: razones de limitación, límites de potencia y TCC offset.',
+    installable: 'Recomendado: el acceso avanzado sube este equipo al nivel A (confirmar la causa y estimar cuánto ayudaría enfriar mejor).',
     denied: 'El acceso avanzado está bloqueado por una directiva del sistema o por el antivirus.',
     error: 'No se pudo comprobar el acceso avanzado.'
   };
@@ -96,10 +96,11 @@
     { id: 'temperature', label: 'Temperatura', available: true, quality: 'direct', qualityLabel: 'Directo', sourceLabel: 'CPU Package' },
     { id: 'headroom', label: 'Margen térmico', available: true, quality: 'derived', qualityLabel: 'Derivado', sourceLabel: 'TjMax 100 °C − paquete' },
     { id: 'load', label: 'Carga', available: true, quality: 'direct', qualityLabel: 'Directo', sourceLabel: 'CPU Total' },
-    { id: 'clock', label: 'Reloj efectivo', available: true, quality: 'derived', qualityLabel: 'Derivado', sourceLabel: '% Processor Performance × base' },
+    { id: 'clock', label: 'Frecuencia activa', available: true, quality: 'derived', qualityLabel: 'Derivado', sourceLabel: '% Processor Performance × base' },
+    { id: 'base', label: 'Frecuencia base', available: true, quality: 'derived', qualityLabel: 'Derivado', sourceLabel: 'Processor Frequency' },
     { id: 'power', label: 'Potencia', available: sensorStatus === 'complete', quality: 'direct', qualityLabel: 'Directo', sourceLabel: sensorStatus === 'complete' ? 'CPU Package Power' : undefined, reasonLabel: 'El sensor de potencia no está expuesto por la placa base.' },
-    { id: 'thermal_flag', label: 'Bandera térmica', available: advancedAccess === 'available', quality: 'direct', qualityLabel: 'Directo', sourceLabel: advancedAccess === 'available' ? 'IA32_THERM_STATUS' : undefined, reasonLabel: 'Requiere acceso avanzado.' },
-    { id: 'power_flag', label: 'Bandera eléctrica', available: advancedAccess === 'available', quality: 'direct', qualityLabel: 'Directo', sourceLabel: advancedAccess === 'available' ? 'MSR_CORE_PERF_LIMIT_REASONS' : undefined, reasonLabel: 'Requiere acceso avanzado.' }
+    { id: 'thermal_flag', label: 'Razón térmica', available: advancedAccess === 'available', quality: 'direct', qualityLabel: 'Directo', sourceLabel: advancedAccess === 'available' ? 'IA32_THERM_STATUS' : undefined, reasonLabel: 'Requiere acceso avanzado.' },
+    { id: 'power_flag', label: 'Razón de potencia', available: advancedAccess === 'available', quality: 'direct', qualityLabel: 'Directo', sourceLabel: advancedAccess === 'available' ? 'MSR_CORE_PERF_LIMIT_REASONS' : undefined, reasonLabel: 'Requiere acceso avanzado.' }
   ]);
 
   function simulateCheckUpdate() {
@@ -148,8 +149,8 @@
     availableLabel="Sí"
     unavailableLabel="No"
     maxConfidenceLabel={advancedAccess === 'available'
-      ? 'Confianza máxima alcanzable en este equipo: alta'
-      : 'Confianza máxima alcanzable en este equipo: probable (sin bandera térmica directa)'}
+      ? 'Nivel A · completo — confirma la causa y estima el potencial. Confianza máxima alcanzable: alta'
+      : 'Nivel B · con potencia — infiere la causa sin confirmarla. Confianza máxima alcanzable: media'}
     accessState={advancedAccess}
     accessLabel={ACCESS_NOTES[advancedAccess]}
     requestAccessLabel="Instalar acceso avanzado"
@@ -458,7 +459,7 @@ almacenamiento: 38 MB · retención: ${dataRetention} · perfil: ${monitoringMod
         coverageTitle: sensorStatus === 'complete' ? 'Cobertura completa' : 'Cobertura parcial',
         coverageDescription:
           sensorStatus === 'complete'
-            ? 'Temperatura, carga, reloj, potencia y banderas disponibles.'
+            ? 'Nivel A: temperatura, frecuencia activa y base, potencia, límites y razones de limitación.'
             : 'No se encontró el sensor de potencia; el diagnóstico eléctrico será indeterminado.',
         advancedAccess,
         advancedAccessNote: ACCESS_NOTES[advancedAccess],
@@ -504,12 +505,12 @@ almacenamiento: 38 MB · retención: ${dataRetention} · perfil: ${monitoringMod
         notifyDisabledReason: 'Requiere activar las notificaciones.',
         safetyLimitsTitle: 'Límites de seguridad (no configurables)',
         safetyLimits: [
-          { label: 'Parada por margen', value: '≤ 1 °C hasta el límite' },
-          { label: 'Parada por temperatura', value: '≥ 100 °C' },
+          { label: 'Temperatura por encima del límite', value: '> límite + 2 °C durante 3 s' },
+          { label: 'Refrigeración gravemente insuficiente', value: 'en el límite con < 50 % de la frecuencia base durante 10 s' },
           { label: 'Sensor crítico perdido', value: '3 muestras seguidas' },
           { label: 'Generador sin respuesta', value: '5 s' }
         ],
-        safetyLimitsNote: 'La prueba nunca modifica voltajes, potencia, ventiladores ni BIOS.'
+        safetyLimitsNote: 'Llegar al límite de temperatura no detiene la prueba: el procesador se protege solo y es lo que se mide. La prueba nunca modifica voltajes, potencia, ventiladores ni BIOS.'
       }}
       updates={{
         title: 'Actualizaciones',

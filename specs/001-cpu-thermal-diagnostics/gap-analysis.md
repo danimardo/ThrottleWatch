@@ -231,3 +231,45 @@ Decisión del propietario: vidrio en todas las superficies con opacidad alta (le
 
 Decisión del propietario: la aplicación no debe leerse como una página web dentro de la ventana. Se añade NFR-015 y se documenta en `ux-visual-spec.md` § «Interacción nativa, no de página web»: sin subrayado en hover/foco, sin cursor de mano salvo en la superficie de `AnalysisChart`, navegación mediante `<button>` y no `<a href>`. Se corrigieron en `design/` tres cursores de mano heredados de convención web (`LicensesScreen`, el disclosure «Avanzado» de `SettingsScreen`, y varios botones del `mockup`) a `cursor: default`; la única excepción que queda es la superficie interactiva del gráfico. Reglas añadidas: `tokens.css` (comentario normativo) y `AGENTS.md` regla 27.
 
+---
+
+## 12. Revisión del motor de diagnóstico (2026-09-18)
+
+**Pregunta del propietario:** ¿la lógica para decidir, inferir o confirmar pérdida de rendimiento por temperatura es correcta o solo una estimación pobre? ¿Mejorar o descartar la aplicación?
+
+**Diagnóstico de la versión anterior.** El marco (evidencia antes que afirmación, razones directas, no usar el turbo de caja, grupos P/E/LP) era correcto; las reglas concretas no:
+
+| # | Fallo | Efecto |
+|---|---|---|
+| 12.1 | La regla «probable» (calor seguido de caída de reloj ≥ 8 %) reproduce la firma del fin del turbo PL2 → PL1 | Falsos positivos térmicos en casi cualquier Intel sin driver |
+| 12.2 | La gestión térmica del fabricante (DTT/DPTF, STAPM) aparece como límite de potencia | Recomendación errónea de «no mejorar la refrigeración» en portátiles |
+| 12.3 | Sin frecuencia base, el boost de diseño hasta el límite térmico (Zen 4, Raptor Lake) se veía como problema | Alarmas sin sentido en sobremesa |
+| 12.4 | Sin TCC offset, el margen al límite era falso en muchos portátiles | Reglas que no saltan |
+| 12.5 | Un único «bit térmico» mezclaba `THERMAL` y `PROCHOT` | «Confirmada» por señales externas (batería, cargador) |
+| 12.6 | Detección de caídas en vez de estados; carga total ≥ 70 % | Equipos que ya empiezan calientes y juegos de pocos núcleos quedaban fuera |
+| 12.7 | Muestreo del bit instantáneo a 1 Hz | Pérdida de episodios intermitentes |
+| 12.8 | Porcentaje por razón de relojes frente a baselines aprendidos | Mezcla de turbo, tipo de carga y referencias sesgadas; rango con falsa precisión |
+| 12.9 | La prueba guiada se detenía con margen ≤ 1 °C | No podía observar la limitación térmica que pretendía medir |
+
+**Decisión: mejorar, no descartar**, con una puerta de viabilidad explícita.
+
+| Cambio | Dónde |
+|---|---|
+| Niveles de cobertura A/B/C con techo de confianza | `spec.md` (Parámetros, FR-070, FR-082), `research.md` § 6 |
+| Razones directas separadas (`THERMAL`, `PROCHOT`, potencia, corriente) con bits de registro | FR-069, FR-084, `ipc-protocol.md` |
+| Límite térmico efectivo (TjMax − TCC offset) | FR-076 |
+| Ventana de turbo excluida y evento `turbo_end` | FR-077 |
+| Atribución por mesetas (lo que se queda clavado en su tope) | FR-078 |
+| Clase `platform_limited` (chasis / PROCHOT externo) | FR-009, FR-079 |
+| Gravedad `boost` / `below_base` frente a la frecuencia base; alertas solo en `below_base` | FR-009, FR-080 |
+| Carga evaluada en núcleos activos | FR-081 |
+| Potencial por techo de potencia `(PL1/P)^(1/3) − 1`, en tramos | FR-013, FR-015, `research.md` § 5 |
+| Rendimiento **medido** por el generador en la prueba guiada; referencias solo guiadas | FR-072, FR-083, `data-model.md` (`guided_result`) |
+| Parada de seguridad corregida | FR-085 |
+| Validación con corpus etiquetado por razones directas y copias degradadas | SC-003–005, SC-016–018, `research.md` § 15 |
+| Constitución 1.2.0 (principios III y VIII, puerta 4) | `.specify/memory/constitution.md` |
+| Puerta de viabilidad: nivel A sin UAC recurrente | `plan.md` fase 0, T019a |
+| Sistema de diseño: `platform_limited`, icono `device`, `severity` en `StatusHero`, eventos `platform`/`info`, props `method*` | `design/` (T132, T133) |
+
+**Límites que siguen existiendo.** En AMD de consumo no hay razones de limitación documentadas: el techo realista es el nivel B salvo versiones de la tabla PM incluidas en la lista permitida. La relación cúbica potencia-frecuencia es de primer orden; el rango `[0,5·g, 1,0·g]` y la medición guiada la acotan. Si la puerta de viabilidad falla (nivel A inalcanzable sin UAC en cada arranque ni servicio aceptable), el producto se reposiciona como explicador prudente y se decide explícitamente si continuar.
+

@@ -28,7 +28,7 @@
 
   export interface CoverageRow {
     id: string;
-    /** e.g. "Temperatura", "Reloj efectivo" */
+    /** e.g. "Temperatura", "Frecuencia activa" */
     label: string;
     available: boolean;
     quality?: CoverageQuality;

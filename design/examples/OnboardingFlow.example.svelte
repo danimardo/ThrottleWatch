@@ -18,7 +18,7 @@
   const ACCESS_NOTES: Record<AdvancedAccessState, string> = {
     not_needed: 'No hace falta acceso avanzado en este equipo.',
     available: 'Acceso avanzado disponible.',
-    installable: 'Sin acceso avanzado: la bandera térmica directa no está disponible y la confianza máxima será «probable».',
+    installable: 'Recomendado: el acceso avanzado sube este equipo al nivel A (confirmar la causa y estimar cuánto ayudaría enfriar mejor).',
     denied: 'El acceso avanzado está bloqueado por una directiva del sistema o por el antivirus.',
     error: 'No se pudo comprobar el acceso avanzado.'
   };
@@ -43,11 +43,11 @@
   ] = $derived.by(() => [
     {
       title: 'Entiende si el calor está limitando tu CPU',
-      body: 'ThrottleWatch observa temperatura, carga y reloj efectivo para saber cuándo el calor frena tu procesador — nunca cambia nada por ti.'
+      body: 'ThrottleWatch observa temperatura, carga y frecuencia activa para saber cuándo el calor frena tu procesador — nunca cambia nada por ti.'
     },
     {
       title: 'Qué observa',
-      body: 'Cuatro señales en paralelo: temperatura, carga, reloj efectivo y potencia, cada una con su propio margen de confianza.'
+      body: 'Cuatro señales en paralelo: temperatura, carga, frecuencia activa y potencia, cada una con su propio margen de confianza.'
     },
     {
       title: 'Qué puede concluir',

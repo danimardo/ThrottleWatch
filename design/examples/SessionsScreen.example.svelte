@@ -93,6 +93,20 @@
       deleteLabel: 'Eliminar'
     },
     {
+      id: 's7',
+      status: 'completed',
+      typeLabel: 'Monitorización continua',
+      dateLabel: '12 sept 2026, 16:05',
+      durationLabel: '2 h 10 min',
+      classification: 'platform_limited',
+      classificationLabel: 'Limitada por el equipo',
+      openLabel: 'Abrir',
+      onOpen: () => (lastAction = 'abrir sesión (s7)'),
+      exportLabel: 'Exportar',
+      onExport: () => (lastAction = 'exportar s7'),
+      deleteLabel: 'Eliminar'
+    },
+    {
       id: 's6',
       status: 'imported',
       typeLabel: 'Sesión importada',

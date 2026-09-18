@@ -40,8 +40,8 @@ Los tokens son efímeros y nacen de un diálogo local. `delete_monitoring_data` 
 
 ## Telemetría en vivo y cobertura
 
-- `get_live_snapshot() -> LiveSnapshot`: último estado agregado (clasificación en vivo, temperatura representativa, carga, reloj, potencia, contexto energético, frescura, estado del colector). Sirve para el primer render; después la UI se suscribe al evento.
-- `get_coverage() -> CoverageMatrix`: por magnitud (`temperature`, `thermal_headroom`, `load`, `effective_clock`, `power`, `thermal_flag`, `power_flag`): disponible, calidad, sensor de origen, motivo de ausencia (`message_key`) y **confianza máxima alcanzable** global. Incluye `low_level_access` ya traducido a la UI (`not_needed | available | installable | denied | error`).
+- `get_live_snapshot() -> LiveSnapshot`: último estado agregado (clasificación en vivo con `platform_kind`, `limit_severity` y si está dentro de la ventana de turbo; temperatura representativa y límite térmico efectivo; carga y núcleos activos; frecuencia activa y base por grupo; potencia y límite de potencia efectivo; potencial con mejor refrigeración si procede; contexto energético, frescura, estado del colector y nivel de cobertura). Sirve para el primer render; después la UI se suscribe al evento.
+- `get_coverage() -> CoverageMatrix`: por magnitud (`temperature`, `thermal_headroom`, `load`, `active_clock`, `base_clock`, `power`, `power_limit`, `thermal_flag`, `prochot_flag`, `power_flag`, `current_flag`): disponible, calidad, sensor de origen, motivo de ausencia (`message_key`), el **nivel de cobertura** (`A`/`B`/`C`) con lo que permite concluir y la **confianza máxima alcanzable**. Incluye `low_level_access` ya traducido a la UI (`not_needed | available | installable | denied | error`).
 - `recheck_coverage() -> CoverageMatrix`: repite el descubrimiento sin reiniciar la sesión.
 - `request_low_level_access() -> void`: abre el flujo explícito de instalación/reparación (UAC). Solo válido en estado `installable`; en otro estado devuelve `coverage.access_not_installable`.
 - `get_core_detail() -> CoreDetail`: último frame por núcleo/grupo en memoria para la pantalla CPU y su tabla avanzada.
@@ -59,9 +59,9 @@ Eventos:
 - `list_sessions({ cursor?, limit }) -> SessionPage`: sesiones `passive`, `guided` e `imported` con estado ya mapeado a la UI (`active | completed | cancelled | incomplete | imported`), clasificación del informe si existe y `is_reference`. Las `replay` no se listan.
 - `get_session({ session_id }) -> SessionDetail`: cabecera, contexto energético inicial/final, informe congelado (o provisional si está activa) y eventos.
 - `delete_session({ session_id, confirmation_token }) -> void`: no permitido sobre la sesión activa.
-- `get_report({ session_id }) -> DiagnosticReportView`: informe con textos como `message_key` + parámetros; la UI compone la prosa.
+- `get_report({ session_id }) -> DiagnosticReportView`: informe con textos como `message_key` + parámetros; la UI compone la prosa. Incluye `cooling_potential` (`band`, `low`, `high`, `method` y sus entradas) y, en sesiones guiadas, `guided_result` (rendimiento sostenido/inicial y desglose por causa) y la comparación «antes/después» si existe una referencia comparable.
 - `reevaluate_report({ session_id }) -> DiagnosticReportView`: solo para `imported`; devuelve una segunda evaluación con el ruleset actual sin sobrescribir la original.
-- `set_session_reference({ session_id, is_reference }) -> BaselineSummary | null`: crea o retira el baseline `user_marked`; requiere sesión `completed`.
+- `set_session_reference({ session_id, is_reference }) -> void`: marca o desmarca un diagnóstico guiado completado como referencia para comparaciones «antes/después»; devuelve `guided.reference_not_guided` si la sesión no es guiada.
 
 Eventos:
 
@@ -88,7 +88,7 @@ Eventos:
 
 Eventos:
 
-- `guided:phase { phase: "preflight" | "ready" | "rest" | "warming" | "steady_load" | "recovery" | "cancelling" | "cancelled" | "safety_stop" | "sensor_lost" | "error" | "result", elapsed_ms, remaining_ms?, reading?: { temperature, limit, headroom }, reason_key? }`.
+- `guided:phase { phase: "preflight" | "ready" | "rest" | "warming" | "steady_load" | "recovery" | "cancelling" | "cancelled" | "safety_stop" | "sensor_lost" | "error" | "result", elapsed_ms, remaining_ms?, reading?: { temperature, limit, headroom, active_clock, base_clock, throughput_ops_s }, reason_key? }`. `throughput_ops_s` es el trabajo medido por el generador.
 - `guided:finished { session_id }`.
 
 Ocultar la ventana o una suspensión del sistema provocan `stop_guided` implícito con motivo `guided.window_hidden` / `guided.system_suspend`.

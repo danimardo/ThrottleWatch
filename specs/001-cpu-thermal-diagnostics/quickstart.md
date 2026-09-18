@@ -82,7 +82,7 @@ El primer incremento aceptable hace únicamente esto:
 6. Reproduce la misma sesión desde fixture.
 7. En un perfil limpio muestra el onboarding bilingüe antes del panel; permite omitirlo sin bloquear la detección.
 
-No incorporar aún un porcentaje de pérdida. Se añade después de implementar baseline, comparación y reglas de confianza.
+No incorporar aún ninguna cifra de potencial. Se añade después de implementar el nivel de cobertura, la ventana de turbo, las mesetas y el método de techo de potencia.
 
 ## 6. Datos de prueba
 
@@ -100,9 +100,18 @@ Todas las pruebas automatizadas deben poder ejecutarse sin sensor real mediante 
 - `collector-disconnect`
 - `suspend-resume-gap`
 - `no-thermal-flag` (equipo sin bandera directa: techo `thermal_probable`)
-- `derived-clock-only` (reloj efectivo derivado por contador)
+- `derived-clock-only` (frecuencia activa derivada por contador, sin acceso avanzado)
 - `battery-power-plan-change` (cambio de contexto energético a mitad de sesión)
 - `virtualized-no-sensors`
+- `intel-pl2-tau-drop` (fin de turbo con margen: nunca térmica)
+- `laptop-dptf-chassis` (PL1 dinámico por temperatura de chasis)
+- `intel-external-prochot` (PROCHOT sin THERMAL)
+- `zen4-thermal-by-design` (límite térmico con frecuencia sobre la base: gravedad `boost`)
+- `intel-below-base-throttle` (THERMAL con frecuencia bajo la base)
+- `already-hot-start` (empieza en el límite; sin caída previa)
+- `game-few-cores` (pocos núcleos activos, carga total baja)
+- `ecoqos-efficiency` (frecuencia baja sin meseta ni razón: indeterminada)
+- `guided-standard-intel` (sesión guiada con `throughput_ops_s`)
 
 Los fixtures que procedan de máquinas reales deben anonimizarse y documentar consentimiento/origen. Las trazas sintéticas deben marcarse como tales.
 
@@ -124,7 +133,8 @@ Además:
 
 - validar `contracts/telemetry.schema.json`;
 - reproducir corpus Intel, AMD y degradado;
-- comprobar que ningún informe cuantificado carece de baseline;
+- comprobar que ninguna cifra de potencial carece de método y entradas, y que ninguna traza de fin de turbo se clasifica como térmica;
+- ejecutar el corpus etiquetado y sus copias degradadas (SC-003 a SC-005, SC-016 a SC-018);
 - medir consumo pasivo durante una hora antes de una release candidata;
 - inspeccionar tema claro/oscuro y escalas 100/125/150/200 %.
 - recorrer cada pantalla en español e inglés y en anchos compacto, medio y expandido, incluidos carga, vacío, degradado y error cuando sean aplicables;

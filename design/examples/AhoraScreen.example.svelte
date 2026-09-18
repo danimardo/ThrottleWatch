@@ -131,13 +131,14 @@
         classification="thermal_confirmed"
         classificationLabel="LIMITACIÓN TÉRMICA CONFIRMADA"
         evidenceLine="4 °C hasta el límite · confianza alta · observado 3 min 42 s"
-        performance={{ label: 'Rendimiento disponible', rangeText: '78–84 %', percent: 81 }}
+        performance={{ label: 'Enfriar mejor', rangeText: '+10–20 %' }}
+        severity="below_base"
       />
 
       <div class="stat-grid">
         <StatWidget enterIndex={0} icon={flameIcon} tone="thermal" label="Temperatura" value="98" unit="°C" footnote="Margen −4 °C · directo" />
         <StatWidget enterIndex={1} icon={loadIcon} tone="accent" label="Carga" value="92" unit="%" footnote="P 95 % · E 88 %" />
-        <StatWidget enterIndex={2} icon={clockIcon} tone="warm" label="Reloj efectivo" value="4.1" unit="GHz" footnote="P 4.1 · E 3.2 · ▼ caída sostenida" />
+        <StatWidget enterIndex={2} icon={clockIcon} tone="warm" label="Frecuencia activa" value="2.1" unit="GHz" footnote="Base 2,6 GHz · P 2,1 · E 1,8" />
         <StatWidget enterIndex={3} icon={boltIcon} tone="accent" label="Potencia" value="142" unit="W" footnote="Sin límite eléctrico activo" />
       </div>
 
@@ -146,7 +147,7 @@
           nodes={[
             { id: 'load', label: 'CARGA', value: '92 %', tone: 'accent', icon: loadIcon },
             { id: 'temp', label: 'TEMPERATURA', value: 'Límite', tone: 'thermal', icon: flameIcon },
-            { id: 'clock', label: 'RELOJ', value: '4.1 GHz ↓', tone: 'thermal', icon: clockIcon },
+            { id: 'clock', label: 'FRECUENCIA', value: '2,1 < base 2,6', tone: 'thermal', icon: clockIcon },
             { id: 'perf', label: 'RENDIMIENTO', value: 'Menor', tone: 'thermal', icon: perfDownIcon }
           ] satisfies CausalNode[]}
         />

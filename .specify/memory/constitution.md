@@ -16,7 +16,7 @@ Ningún sensor concreto se considerará universal. El sistema DEBE descubrir cap
 
 ### III. Causalidad prudente y factores de confusión
 
-El motor DEBE considerar temperatura, carga, reloj efectivo, potencia, límites de potencia/corriente, plan energético, alimentación y tiempo. Antes de recomendar mejor refrigeración, DEBE evaluar causas alternativas. Las estimaciones de rendimiento DEBEN comparar estados equivalentes del mismo equipo y expresarse como rango cuando la incertidumbre sea material.
+El motor DEBE considerar temperatura, carga, frecuencia activa y frecuencia base, potencia, límites de potencia/corriente y sus cambios, plan energético, alimentación y tiempo, incluida la ventana de turbo tras cada inicio de carga. Antes de recomendar mejor refrigeración, DEBE evaluar causas alternativas, incluida la gestión térmica del fabricante. Toda cifra de rendimiento DEBE proceder de una medición directa comparable (misma carga, mismo equipo, mismo contexto) o de un modelo físico explícito y versionado con sus entradas visibles, y DEBE expresarse como rango o tramo cuando la incertidumbre sea material. Una comparación de relojes con una referencia aprendida no es una estimación de rendimiento válida.
 
 **Motivo:** una frecuencia baja puede deberse a reposo, PL1/PPT, modo silencioso, batería o firmware, no al calor.
 
@@ -46,7 +46,7 @@ El motor de diagnóstico DEBE ser determinista para una configuración y una tra
 
 ### VIII. Seguridad térmica y control del usuario
 
-Cualquier carga guiada DEBE ser voluntaria, explicar qué hará, permitir cancelación inmediata y detenerse ante los límites de seguridad configurados, pérdida del sensor crítico o fallo del auxiliar. El programa NO DEBE modificar voltajes, límites de potencia, curvas de ventilador, BIOS ni frecuencias.
+Cualquier carga guiada DEBE ser voluntaria, explicar qué hará, permitir cancelación inmediata y detenerse ante los límites de seguridad configurados, pérdida del sensor crítico o fallo del auxiliar. El programa NO DEBE modificar voltajes, límites de potencia, curvas de ventilador, BIOS ni frecuencias. La única escritura permitida en registros del procesador es la limpieza de bits de registro de estado (por ejemplo, los de razones de limitación), que no altera el funcionamiento; DEBE estar limitada a una lista cerrada de registros y bits en el componente privilegiado.
 
 **Motivo:** la herramienta diagnostica; no toma control del hardware.
 
@@ -68,7 +68,7 @@ Una característica no se considera terminada si incumple cualquiera de estas pu
 1. Requisitos y escenarios de aceptación enlazados a pruebas.
 2. Contratos compatibles o migración documentada.
 3. Pruebas unitarias y de integración relevantes superadas.
-4. Verificación con al menos una traza Intel, una AMD y una degradada/sin sensores.
+4. Verificación con al menos una traza Intel, una AMD y una degradada/sin sensores; para el motor de diagnóstico, además, el corpus etiquetado con razones directas y sus copias degradadas.
 5. Accesibilidad básica: teclado, foco visible, contraste y modo de movimiento reducido.
 6. Consumo en reposo y crecimiento de almacenamiento dentro de los presupuestos definidos.
 7. Mensajes de diagnóstico revisados para no presentar inferencias como hechos.
@@ -82,7 +82,8 @@ Esta constitución prevalece sobre decisiones locales de implementación. Toda e
 ### Historial de enmiendas
 
 - **1.1.0 (2026-09-17):** se incorpora el sistema de diseño aprobado como fuente canónica y se añade la matriz obligatoria de verificación visual y funcional.
+- **1.2.0 (2026-09-18):** revisión del motor de diagnóstico: el principio III exige que las cifras de rendimiento procedan de una medición comparable o de un modelo físico explícito y considera la ventana de turbo y la gestión térmica del fabricante; el principio VIII acota la única escritura permitida en registros (limpieza de bits de estado); la puerta 4 incluye el corpus etiquetado. Documentos afectados: `spec.md`, `plan.md`, `research.md`, `data-model.md`, contratos, `ux-visual-spec.md`, `tasks.md`.
 
-**Versión**: 1.1.0  
+**Versión**: 1.2.0  
 **Ratificada**: 2026-09-17  
-**Última modificación**: 2026-09-17
+**Última modificación**: 2026-09-18

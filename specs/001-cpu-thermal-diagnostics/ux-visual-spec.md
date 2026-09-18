@@ -53,10 +53,10 @@ Mientras exista una prueba guiada activa, en **todos** los anchos y pantallas ap
 El onboarding ocupa el contenido bajo la barra de título propia y consta exactamente de cinco diapositivas. Siempre muestra progreso (`1 de 5`), `Atrás`, `Siguiente` y `Omitir`; la última sustituye `Siguiente` por `Abrir Ahora`. La última diapositiva alcanzada se guarda al avanzar y se recupera tras un cierre inesperado.
 
 1. **Bienvenida:** “Entiende si el calor está limitando tu CPU”, con una explicación de que ThrottleWatch observa y diagnostica, pero no modifica el equipo.
-2. **Qué observa:** temperatura, carga, reloj efectivo y potencia mediante cuatro visuales simples. Los términos técnicos tienen una aclaración breve accesible por teclado; por ejemplo, *thermal throttling* es “la reducción automática de velocidad para evitar demasiado calor”.
-3. **Qué puede concluir:** diferencia entre temperatura alta, limitación térmica, límite de potencia y datos insuficientes. Introduce TjMax y baseline sin asumir conocimientos previos y evita prometer un porcentaje cuando no hay comparación válida.
+2. **Qué observa:** temperatura, carga, frecuencia activa y potencia mediante cuatro visuales simples. Los términos técnicos tienen una aclaración breve accesible por teclado; por ejemplo, *thermal throttling* es “la reducción automática de velocidad para evitar demasiado calor”.
+3. **Qué puede concluir:** diferencia entre temperatura alta, limitación térmica, límite de potencia y datos insuficientes. Introduce el límite térmico (TjMax) y la frecuencia base («la velocidad que el fabricante garantiza») sin asumir conocimientos previos, explica que llegar al límite térmico puede ser normal si la frecuencia sigue por encima de la base, y evita prometer un porcentaje.
 4. **Privacidad y decisiones:** funcionamiento local, ausencia de telemetría, historial de siete días, notificaciones apagadas y posibilidad de cambiar idioma, tema y segundo plano desde Ajustes.
-5. **Este equipo:** comienza automáticamente la detección pasiva, muestra CPU, estado del colector y cobertura disponible. Si falta acceso avanzado, explica el beneficio y ofrece una acción explícita para instalar o reparar; nunca abre UAC por entrar en la diapositiva. `Abrir Ahora` es la acción principal y `Ejecutar diagnóstico guiado` la secundaria.
+5. **Este equipo:** comienza automáticamente la detección pasiva, muestra CPU, estado del colector y **nivel de cobertura** (A, B o C) con lo que permite concluir. Si el equipo no está en nivel A, explica en una frase qué se gana con el acceso avanzado («confirmar la causa y estimar cuánto ayudaría enfriar mejor»), lo presenta como recomendado y ofrece una acción explícita para instalarlo; nunca abre UAC por entrar en la diapositiva. `Abrir Ahora` es la acción principal y `Ejecutar diagnóstico guiado` la secundaria.
 
 Omitir está disponible en las cuatro primeras diapositivas, no pide confirmación y conduce a `Ahora`; si aún no comenzó la detección, se inicia allí. Completar u omitir marca la versión actual como resuelta. Las novedades de una versión posterior usan tarjetas breves independientes y no repiten el recorrido completo. El recorrido completo puede abrirse otra vez desde `Ajustes → Acerca de y ayuda` sin alterar la marca de finalización.
 
@@ -95,17 +95,28 @@ Cuando el colector está desconectado o la cobertura es insuficiente, el hero pa
 
 Componente central con tres capas:
 
-1. **Anillo térmico**: temperatura actual respecto al límite conocido; si no se conoce, escala explícitamente aproximada.
-2. **Estado textual**: `Normal`, `Temperatura alta`, `Limitación térmica`, `Límite de potencia`, `Causa mixta` o `Datos insuficientes`.
-3. **Rendimiento disponible**: solo si existe baseline; muestra rango y confianza. Si no existe, enseña “Aún sin referencia comparable”.
+1. **Anillo térmico**: temperatura actual respecto al **límite térmico efectivo** (TjMax − TCC offset); si no se conoce, escala explícitamente aproximada.
+2. **Estado textual** con su gravedad cuando hay limitación:
+
+| Clasificación | Gravedad `boost` (≥ frecuencia base) | Gravedad `below_base` |
+|---|---|---|
+| térmica confirmada / probable | «Limitada por temperatura · dentro de especificación» (tono `warm`) | «Throttling térmico · por debajo de la frecuencia garantizada» (tono `thermal`) |
+| potencia | «Limitada por potencia · dentro de especificación» | «Limitada por potencia · por debajo de la frecuencia garantizada» |
+| equipo · chasis | «Limitada por el calor del equipo (el fabricante reduce la potencia)» | ídem, tono `thermal` |
+| equipo · señal externa | «Limitada por una señal externa (alimentación o batería)» | ídem |
+| mixta | «Temperatura y potencia a la vez» | ídem, tono `thermal` |
+
+Sin limitación: `Normal`, `Temperatura alta (sin pérdida demostrada)`, `Datos insuficientes`. Durante la ventana de turbo se añade la nota «turbo inicial en curso».
+
+3. **Potencial con mejor refrigeración** (sustituye a «rendimiento disponible»): solo en nivel A y con limitación térmica, mixta o de chasis. Muestra el tramo y el rango redondeado a múltiplos de 5 %: «Enfriar mejor: +5–10 % (mejora moderada)». Sin límite de potencia conocido: «No cuantificable en este equipo» y, si la gravedad es `below_base`, «probablemente notable». En limitación de potencia: «La refrigeración apenas influye».
 
 Ejemplo:
 
 ```text
-LIMITACIÓN TÉRMICA CONFIRMADA
-98 °C · 4 °C hasta el límite
-Rendimiento disponible estimado: 78–84 %
-Confianza alta · observado durante 3 min 42 s
+THROTTLING TÉRMICO · POR DEBAJO DE LA FRECUENCIA GARANTIZADA
+98 °C · límite 100 °C · frecuencia activa 2,1 GHz (base 2,6 GHz)
+Enfriar mejor: +10–20 % (mejora notable)
+Confianza alta · nivel A · observado durante 3 min 42 s
 ```
 
 ### Tarjetas de señal
@@ -113,8 +124,8 @@ Confianza alta · observado durante 3 min 42 s
 Cuatro tarjetas en escritorio, dos columnas en ancho medio:
 
 - Temperatura y margen.
-- Carga total y distribución.
-- Reloj efectivo por grupo.
+- Carga y núcleos activos (P/E/LP).
+- Frecuencia activa por grupo frente a su frecuencia base.
 - Potencia del paquete y estado de límite.
 
 Cada tarjeta contiene valor, mini-tendencia de 60 s, unidad, calidad y acceso al detalle. Una tarjeta sin sensor conserva su espacio y explica la ausencia.
@@ -124,14 +135,22 @@ Cada tarjeta contiene valor, mini-tendencia de 60 s, unidad, calidad y acceso al
 Un carril horizontal muestra, cuando existe evidencia:
 
 ```text
-Carga sostenida → temperatura alcanzó el límite → reloj efectivo cayó → rendimiento estimado menor
+Carga sostenida → temperatura en el límite → potencia por debajo de su límite → frecuencia por debajo de la base
 ```
 
-Si el diagnóstico es eléctrico, el carril cambia:
+Si el diagnóstico es de potencia:
 
 ```text
-Carga sostenida → potencia quedó limitada → reloj efectivo se estabilizó bajo → temperatura con margen
+Carga sostenida → potencia en su límite → temperatura con margen → frecuencia estable
 ```
+
+Si es del equipo (chasis):
+
+```text
+Carga sostenida → el fabricante bajó el límite de potencia → CPU con margen → frecuencia menor
+```
+
+El fin del turbo nunca aparece como eslabón de una limitación; se muestra como marcador informativo en `Análisis`.
 
 No mostrar el carril si los datos no sostienen la secuencia.
 
@@ -142,9 +161,9 @@ No mostrar el carril si los datos no sostienen la secuencia.
 Cuatro pistas verticales que comparten eje temporal y cursor:
 
 1. Temperatura + línea de límite/margen.
-2. Reloj efectivo por grupo P/E/LP o total homogéneo.
+2. Frecuencia activa por grupo P/E/LP o total homogéneo, con la frecuencia base como línea de referencia.
 3. Carga por grupo y total.
-4. Potencia + límites térmico/eléctrico como bandas de evento.
+4. Potencia con el límite de potencia efectivo como línea (si se conoce) + bandas de evento térmicas, eléctricas, del equipo y mixtas; el fin del turbo, como marcador informativo.
 
 Interacciones:
 
@@ -165,7 +184,7 @@ Para el rango activo:
 - Señales a favor.
 - Señales que faltan.
 - Causas alternativas detectadas.
-- Baseline usado y por qué es comparable.
+- Nivel de cobertura, gravedad y, si hay potencial, sus entradas (límite de potencia usado, potencia medida, método).
 - Regla/versiones del motor.
 
 ## Pantalla “CPU”
@@ -178,7 +197,7 @@ Cuadrícula por grupos y núcleos:
 - Relleno por temperatura o reloj, seleccionable.
 - Borde/forma distingue P, E y LP; no solo color.
 - Etiqueta corta (`P2`, `E6`) y valor actual.
-- Tooltip accesible con temperatura, carga, reloj efectivo y throttling observado.
+- Tooltip accesible con temperatura, carga, frecuencia activa frente a base y razones de limitación observadas.
 
 ### Tabla avanzada
 
@@ -196,9 +215,10 @@ Esta tabla es secundaria y virtualizada; no aparece en el inicio.
 
 Tabla de magnitudes × estado, reutilizada en `Ahora` (panel) y en `Ajustes → Sensores y cobertura` (embebida):
 
-- Filas: temperatura, margen térmico, carga, reloj efectivo, potencia, bandera térmica, bandera eléctrica.
+- Filas: temperatura, límite térmico efectivo, carga por núcleo, frecuencia activa, frecuencia base, potencia, límite de potencia, razón térmica, PROCHOT, razón de potencia, razón de corriente.
 - Columnas: disponible (icono + texto), calidad (`directo` / `derivado` / `sustituto`), sensor de origen, motivo de ausencia.
-- Pie: «Confianza máxima alcanzable en este equipo: alta / probable / baja» y estado del acceso avanzado (`not_needed | available | installable | denied | error`) con «Instalar/Reparar acceso avanzado» solo en `installable`.
+- Cabecera: **nivel de cobertura** (A completo / B con potencia / C básico) con una frase de lo que permite concluir; en B y C, el acceso avanzado se presenta como recomendado para llegar al nivel A.
+- Pie: «Confianza máxima alcanzable en este equipo: alta / media / baja» y estado del acceso avanzado (`not_needed | available | installable | denied | error`) con «Instalar/Reparar acceso avanzado» solo en `installable`.
 - Acciones: «Volver a comprobar» y «Copiar resumen técnico».
 
 ## Pantalla “Informe”
@@ -207,7 +227,7 @@ Orden narrativo:
 
 1. Resultado en una frase.
 2. Qué se observó.
-3. Qué impacto puede estimarse.
+3. Qué impacto puede estimarse: potencial con mejor refrigeración (tramo y rango, con método y entradas) o, en sesiones guiadas, el rendimiento medido de la carga de prueba desglosado por causa. Nunca una cifra sin método.
 4. Por qué se atribuye a temperatura/potencia/mezcla.
 5. Qué no puede concluirse.
 6. Recomendaciones ordenadas por coste y probabilidad.
@@ -215,7 +235,7 @@ Orden narrativo:
 
 Recomendaciones térmicas posibles, nunca automáticas sin evidencia: revisar obstrucciones, base/superficie, perfil de ventilación, mantenimiento profesional, comparar con una nueva sesión. La aplicación no prescribe cambios peligrosos.
 
-Acciones del informe: `Exportar` (abre `ExportDialog` con alcance «informe»), `Usar como referencia` / `Retirar referencia` (solo sesiones completadas; con confirmación) y, en sesiones importadas, `Re-evaluar con reglas actuales`, que muestra la evaluación nueva junto a la original sin sustituirla. Un informe de sesión activa se marca «Provisional · sesión en curso».
+Acciones del informe: `Exportar` (abre `ExportDialog` con alcance «informe»), `Usar como referencia` / `Retirar referencia` (solo diagnósticos guiados completados; con confirmación) y, en sesiones importadas, `Re-evaluar con reglas actuales`, que muestra la evaluación nueva junto a la original sin sustituirla. Un informe de sesión activa se marca «Provisional · sesión en curso».
 
 ## Diagnóstico guiado
 
@@ -225,10 +245,11 @@ Pantalla de foco con:
 - estado de sensores y alimentación (en batería: advertencia; con `guided.require_ac` activo: bloqueo explicado);
 - botón principal `Iniciar diagnóstico`;
 - seis pasos: Comprobación · Reposo (opcional, con «Omitir reposo») · Calentamiento · Carga sostenida · Recuperación · Resultado;
-- progreso por fase con tiempo restante, temperatura grande, límite y margen visibles;
+- progreso por fase con tiempo restante, temperatura grande, límite efectivo y margen, frecuencia activa frente a base y el rendimiento medido en vivo (operaciones/s);
+- alcanzar el límite térmico no detiene la prueba; la interfaz lo explica («tu procesador se protege solo; es lo que queremos medir»);
 - botón `Detener ahora` permanente, con atajo `Ctrl+Shift+X`; `Esc` no detiene;
 - animación calmada, no gamificada;
-- final con informe y comparación, y acción «Usar como referencia» preseleccionada si la prueba se completó con margen suficiente.
+- final con informe: rendimiento sostenido / inicial de la carga de prueba, desglose por causa (fin del turbo, potencia, temperatura, equipo), potencial con mejor refrigeración si hay nivel A, comparación con la referencia si existe, y acción «Usar como referencia».
 
 Ocultar la ventana (bandeja) o una suspensión cancelan la prueba y lo explican en el resultado.
 
@@ -245,7 +266,7 @@ Cada sección puede tener un bloque «Avanzado» plegado por defecto (estado no 
 - **Bandeja y notificaciones:** monitorización en segundo plano; avisos apagados por defecto; `Probar notificación`. Avanzado: periodo de silencio (inicio/fin) y explicación de la persistencia mínima y el enfriamiento (solo lectura).
 - **Datos y privacidad:** retención `Solo esta sesión`, `1 día`, `7 días` o `30 días`; espacio usado (base de datos, registros, sesiones, muestra más antigua); `Anonimizar exportaciones` (por defecto activo; solo afecta a ficheros); `Exportar…` (abre `ExportDialog` para la sesión activa o la última); `Eliminar todos mis datos`. No existe ninguna opción de envío de datos.
 - **Sensores y cobertura:** `CoverageMatrix` embebida con estado del colector, «Volver a comprobar» y acción explícita de instalar/reparar acceso avanzado solo en estado `installable`.
-- **Diagnóstico:** duración `Corta` / `Estándar` / `Larga`; `Exigir alimentación conectada` (apagado); `Avisar al terminar` (apagado; requiere notificaciones). Límites de seguridad (temperatura de parada, margen mínimo, tiempo máximo) visibles y en solo lectura, sin controles de voltaje, potencia o ventiladores.
+- **Diagnóstico:** duración de la carga sostenida `Corta` (3 min) / `Estándar` (4 min) / `Larga` (6 min); `Exigir alimentación conectada` (apagado); `Avisar al terminar` (apagado; requiere notificaciones). Límites de seguridad visibles y en solo lectura (temperatura por encima del límite efectivo + 2 °C, frecuencia activa < 50 % de la base en el límite durante 10 s, sensor crítico perdido, generador sin respuesta; alcanzar el límite térmico no detiene la prueba), sin controles de voltaje, potencia o ventiladores.
 - **Actualizaciones:** interruptor apagado por defecto; última comprobación; `Buscar actualizaciones`; versión disponible y notas; `Descargar` (solo en `available`) con progreso; `Instalar` (solo en `verified`, con motivo si está bloqueado). Sin selección de canal.
 - **Acerca de y ayuda:** versión y build; `Repetir introducción`; `Documentación` (empaquetada) y `Documentación en línea` (abre el navegador del sistema, indicado); `Licencias de terceros` (abre `LicensesScreen`); `Resumen técnico` (`TechnicalSummary` con «Copiar»); `Abrir carpeta de registros`. Avanzado: nivel de registro `Normal` / `Depuración`.
 - **Zona de riesgo:** `Restablecer ThrottleWatch`, visual y textualmente distinto de borrar datos.

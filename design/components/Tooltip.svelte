@@ -7,7 +7,7 @@
    * the instant the pointer leaves the trigger, before it can reach
    * the tooltip itself. This component exists specifically to make
    * that requirement satisfiable at all: the CPU topology map's
-   * per-core tooltip (temperature/carga/reloj efectivo/throttling) and
+   * per-core tooltip (temperature/carga/frecuencia activa/throttling) and
    * Análisis's chart tooltips both need it.
    *
    * Shows on pointer hover AND on keyboard focus, and stays open while

@@ -24,7 +24,7 @@ Construir ThrottleWatch, una aplicación de escritorio Windows local y visual qu
 
 | Puerta | Decisión de diseño | Estado |
 |---|---|---|
-| Evidencia antes que afirmación | Clasificación + confianza + evidencias; porcentaje solo con baseline | Cumple |
+| Evidencia antes que afirmación | Clasificación por niveles de cobertura + confianza con techo + evidencias; cifras solo por techo de potencia o medición guiada | Cumple |
 | Degradación elegante | Modelo de capacidades y valores `null` con calidad | Cumple |
 | Causalidad prudente | Motor térmico y motor eléctrico independientes; admite causa mixta | Cumple |
 | Privilegio mínimo | UI sin elevar; instalación del acceso de bajo nivel separada | Cumple |
@@ -66,7 +66,7 @@ flowchart TD
 - Expone comandos de lectura, sesión, exportación, configuración, ciclo de vida y actualización.
 - Centraliza las API de ventana; ningún componente de pantalla llama directamente a Tauri.
 - Lee el contexto energético (fuente, plan, batería) mediante Win32 y lo adjunta a cada frame; escucha `WM_POWERBROADCAST` para detectar suspensión/reanudación y cambios de alimentación.
-- Deriva el reloj efectivo a partir del contador PDH `\Processor Information(*)\% Processor Performance` cuando el sidecar no aporta un reloj efectivo directo, y lo registra como descriptor de origen `host` con calidad `derived`.
+- Calcula la frecuencia activa y la frecuencia base por procesador lógico con los contadores PDH `% Processor Performance` y `Processor Frequency`, y las registra como descriptores de origen `host` con calidad `derived`.
 - Gestiona los límites de sesión pasiva (inicio, hueco > 60 s, 24 h) y congela informes.
 - Aplica la instancia única, la bandeja (icono de cinco estados y menú), las notificaciones y sus reglas de persistencia/enfriamiento.
 - Resuelve la geometría antes de mostrar la ventana y valida que quede dentro de monitores activos.
@@ -99,7 +99,7 @@ flowchart TD
 4. Rust valida, marca calidad/lag, almacena en búfer y publica un snapshot agregado a la UI.
 5. Cada ventana temporal actualiza eventos y diagnóstico.
 6. Las muestras se escriben por lotes; la UI nunca espera a disco.
-7. Al finalizar una sesión se congela un informe con versión de reglas y baseline.
+7. Al finalizar una sesión se congela un informe con versión de reglas, nivel de cobertura y, si es guiada, su resultado medido.
 
 ### Resolución temporal para análisis
 
@@ -113,39 +113,32 @@ flowchart TD
 
 ## Motor de diagnóstico
 
-### Entradas mínimas
+Revisado el 2026-09-18 (véase `gap-analysis.md` § 12). Los valores concretos están en `spec.md` § «Parámetros iniciales»; aquí se describe la estructura.
 
-- carga total y, si existe, por grupo/núcleo;
-- temperatura representativa y/o margen a límite;
-- reloj efectivo preferente; reloj activo como sustituto marcado;
-- potencia y banderas térmicas/eléctricas cuando existan;
-- contexto: alimentación, plan energético, perfil OEM conocido y fase de sesión.
+### Entradas
 
-### Ventanas
+- Por procesador lógico: utilidad, frecuencia activa (`% Processor Performance` × `Processor Frequency`) y frecuencia base (`Processor Frequency`), leídas por Rust vía PDH.
+- Temperatura representativa y **límite térmico efectivo** (TjMax − TCC offset, o tabla por familia en AMD).
+- Potencia de paquete; en nivel A, límite de potencia efectivo (PL1/PL2/Tau) y razones de limitación como bits de registro.
+- Contexto: alimentación, plan energético, fase de sesión y marca de ventana de turbo.
 
-- **Instantánea**: 1–3 s, solo para visualización.
-- **Corta**: 30 s, detección de eventos persistentes.
-- **Estable**: 60–120 s, comparación y cuantificación.
-- **Baseline**: observaciones equivalentes del mismo equipo, versión y perfil.
+### Etapas
 
-### Jerarquía de evidencia
+1. **Nivel de cobertura** (A/B/C) a partir del catálogo de capacidades; fija qué reglas pueden aplicarse y el techo de confianza.
+2. **Núcleos activos**: utilidad ≥ 80 %; la carga sostenida y la frecuencia activa se calculan solo sobre ellos, por grupo P/E/LP.
+3. **Ventana de turbo**: detecta inicios de carga y excluye `max(Tau, 60 s)`; emite `turbo_end` al ver el escalón de potencia.
+4. **Rasgos de la ventana estable** (60 s, deslizante cada 10 s): ocupación de cada razón, meseta térmica, meseta de potencia, tendencia del límite o del nivel de meseta de potencia a lo largo de la sesión, razón frecuencia activa / base.
+5. **Clasificación** por la tabla ordenada de `spec.md` (primera regla que se cumple), con subtipo de equipo y gravedad `boost`/`below_base`.
+6. **Confianza**: puntuación de solidez con techo por nivel.
+7. **Potencial** (solo nivel A y clases térmicas, mixta o chasis): método «techo de potencia» `g = (PL1 / P)^(1/3) − 1`, acotado por la frecuencia observada en la ventana de turbo, expresado como `[0,5·g, 1,0·g]` y redondeado a tramos.
+8. **Eventos**: fusión de ventanas consecutivas de la misma clase en `limit_event` con evidencias como códigos.
 
-1. **Directa**: bandera térmica fiable o margen agotado bajo carga.
-2. **Correlacionada**: temperatura próxima al límite seguida de caída sostenida de reloj efectivo con carga estable.
-3. **Contextual**: potencia, plan energético, batería y banderas de límite que apoyan o contradicen la hipótesis.
-4. **Insuficiente**: temperatura aislada, carga variable o sensores de calidad baja.
+### Por qué así
 
-### Estimación local
-
-Para cada grupo activo `g`:
-
-```text
-ratio_g = mediana(reloj_efectivo_actual_g) / mediana(reloj_efectivo_baseline_g)
-peso_g  = núcleos_lógicos_g × carga_media_g
-ratio_total = suma(ratio_g × peso_g) / suma(peso_g)
-```
-
-Solo se comparan ventanas con diferencia de carga dentro de la tolerancia, mismo origen de reloj, mismo perfil energético y cobertura suficiente. El resultado se limita a un rango y su incertidumbre incorpora variación, antigüedad del baseline y sensores ausentes. Esta métrica se denomina **rendimiento disponible estimado**, no rendimiento absoluto ni puntuación de benchmark.
+- **Mesetas en vez de caídas**: la limitación es un *estado* (una magnitud clavada en su tope), no un cambio. Así se detecta también el equipo que ya empieza caliente o que se degrada poco a poco, y no se confunde el fin del turbo con calor.
+- **Frecuencia base como umbral de gravedad**: es la única frecuencia que el fabricante garantiza; por encima, la limitación térmica es el funcionamiento previsto del boost.
+- **Techo de potencia en vez de baseline**: responde directamente a «¿cuánto ganaría enfriando mejor?» con una relación física, sin depender del tipo de carga ni de la calidad de una referencia aprendida.
+- **Medición directa en la prueba guiada**: el generador cuenta trabajo; es la única cifra de rendimiento que no es una inferencia.
 
 ### Clasificaciones
 
@@ -154,10 +147,13 @@ Solo se comparan ventanas con diferencia de carga dentro de la tolerancia, mismo
 - `thermal_probable`
 - `thermal_confirmed`
 - `power_limited`
+- `platform_limited` (subtipos `chassis_thermal`, `external_prochot`)
 - `mixed_limit`
 - `indeterminate`
 
-Las reglas concretas y umbrales se almacenan en configuración versionada, no dispersos por la UI.
+Atributo transversal: `limit_severity` = `boost` | `below_base`.
+
+Las reglas, umbrales y la tabla `thermal-limits-v1` se almacenan en configuración versionada, no dispersos por la UI.
 
 ## Prueba guiada
 
@@ -166,11 +162,13 @@ Fases (valores en `spec.md` § Parámetros iniciales):
 1. Comprobación de sensores y contexto (≤ 30 s).
 2. Reposo opcional para estabilizar (60 s, omitible).
 3. Calentamiento progresivo (90 s).
-4. Carga sostenida con muestreo de diagnóstico (90/180/300 s según `guided.duration`).
+4. Carga sostenida con muestreo de diagnóstico (180/240/360 s según `guided.duration`); se analizan los últimos 120 s, siempre fuera de la ventana de turbo.
 5. Recuperación (120 s).
-6. Resultado e informe, con oferta de marcar como referencia.
+6. Resultado e informe, con rendimiento medido y oferta de marcar como referencia.
 
-Parada automática: margen ≤ 1 °C o temperatura ≥ 100 °C, 3 muestras consecutivas sin sensor crítico, o 5 s sin latido del generador. Ocultar la ventana o suspender el equipo cancela la prueba.
+El generador cuenta operaciones completadas por hilo y segundo (bucle de trabajo fijo y versionado, sin instrucciones AVX-512 y con AVX2 solo en un perfil documentado) y lo publica en cada muestra. Ese contador es la medida de rendimiento de la prueba.
+
+Parada automática (FR-085): temperatura > límite efectivo + 2 °C durante 3 muestras, temperatura en el límite con frecuencia activa < 50 % de la base durante 10 s, 3 muestras consecutivas sin sensor crítico o 5 s sin latido del generador. Alcanzar el límite térmico no detiene la prueba: es lo que se mide y el propio procesador se protege. Ocultar la ventana o suspender el equipo cancela la prueba.
 
 El generador de carga debe estar aislado del hilo de sensores, permitir cancelación inmediata, tener watchdog y detenerse ante pérdida del sensor crítico, proceso padre ausente o umbral de seguridad. Antes de implementar carga propia se realizará un spike para decidir entre carga integrada y guía sobre una carga externa reproducible.
 
@@ -179,7 +177,7 @@ El generador de carga debe estar aislado del hilo de sensores, permitir cancelac
 - SQLite en el directorio de datos de aplicación, WAL y `busy_timeout`.
 - Escritura de muestras en lotes pequeños transaccionales.
 - Datos brutos según retención del usuario; por defecto siete días.
-- Informes y baselines se conservan hasta borrado explícito.
+- Informes y resultados guiados se conservan hasta borrado explícito.
 - Mantenimiento en segundo plano con límite de tiempo; nunca durante la fase estable de una prueba.
 - Exportación desde una instantánea transaccional para evitar ficheros incoherentes.
 - Preferencias tipadas, onboarding, geometría y actualización en tablas versionadas de volumen constante.
@@ -234,9 +232,10 @@ El generador de carga debe estar aislado del hilo de sensores, permitir cancelac
 
 - Normalización de sensores y unidades.
 - Agregación por topología.
-- Reglas de clasificación y confianza.
-- Selección/invalidación de baseline.
-- Cálculo de rango y anonimización.
+- Reglas de clasificación y confianza: una prueba por fila de la tabla y por orden de precedencia.
+- Detección de ventana de turbo, mesetas, núcleos activos y gravedad frente a la frecuencia base.
+- Potencial por techo de potencia (acotación, tramos, redondeo hacia fuera) y ausencia de cifra sin PL1.
+- Comparabilidad de resultados guiados y anonimización.
 
 ### Contrato
 
@@ -247,12 +246,13 @@ El generador de carga debe estar aislado del hilo de sensores, permitir cancelac
 ### Integración
 
 - Sidecar falso que reproduce trazas Intel, AMD, legado, híbrido y degradado.
+- **Validación del motor con corpus etiquetado** (`research.md` § 15): trazas de nivel A etiquetadas con los bits de razón como verdad de referencia, y sus copias degradadas a B y C para medir SC-003, SC-004, SC-005 y SC-016 a SC-018 en CI.
 - Caída/reinicio del sidecar, lag, secuencias perdidas y reanudación del sistema.
 - SQLite: migraciones, retención, disco lleno simulado y exportación consistente.
 
 ### UI y accesibilidad
 
-- Estados vacío, normal, caliente, térmico, potencia, mixto y desconectado.
+- Estados vacío, normal, caliente, térmico (`boost` y `below_base`), potencia, equipo (chasis y señal externa), mixto, fin de turbo y desconectado; niveles de cobertura A/B/C.
 - Onboarding completo, omitido, reanudado y novedades versionadas.
 - Matriz de locale, igualdad de catálogos y expansión de texto español/inglés.
 - Tema sistema/claro/oscuro, cambio de Windows en caliente y movimiento reducido.
@@ -316,10 +316,19 @@ tests/
 
 ### Fase 0 — Riesgos y spikes
 
+**Puerta de viabilidad del producto.** Antes de la fase 1 se decide si el nivel A es alcanzable en condiciones aceptables para un usuario corriente:
+
+1. Con el proveedor de acceso de bajo nivel instalado una vez (PawnIO o equivalente firmado), ¿puede el sidecar leer `0x64F`, `0x1A2`, `0x610` y limpiar los bits de registro **sin pedir UAC en cada arranque**?
+2. ¿Qué porcentaje de la matriz de hardware objetivo alcanza nivel A (Intel) y nivel B (con potencia) sin acceso?
+3. En AMD, ¿qué versiones de la tabla PM del SMU se pueden incluir en la lista permitida?
+
+Resultados posibles: **(a)** nivel A sin UAC recurrente → se continúa con el plan completo. **(b)** Nivel A solo con un servicio privilegiado → se continúa si el servicio supera la revisión de amenazas exigida por la constitución (principio IV); si no, (c). **(c)** Nivel A inalcanzable → el producto se reposiciona como explicador prudente (niveles B/C), se retiran la clasificación confirmada y el potencial cuantificado de la propuesta de valor y se decide explícitamente si continuar. La decisión se registra en un ADR.
+
 - Confirmar sensores expuestos en Intel/AMD y comportamiento sin privilegios.
 - Probar empaquetado del sidecar en x64 y validar firma/controlador.
 - Validar IPC, latencia y reinicio.
-- Determinar si el reloj efectivo está disponible de forma suficiente o requiere sustitutos.
+- Verificar que `% Processor Performance` y `Processor Frequency` son fiables por procesador lógico en Intel híbrido y AMD (comparando con APERF/MPERF leídos por el sidecar cuando haya acceso), incluidos equipos con EcoQoS y modos de eficiencia.
+- Grabar el corpus etiquetado inicial (véase `research.md` § 15) en al menos un Intel híbrido, un Intel anterior, un portátil con gestión térmica del fabricante y un AMD Zen 4.
 - Validar en el hardware objetivo el presupuesto del `AnalysisChart` SVG con 4 pistas, 3.000 puntos por pista y eventos superpuestos; conservar el benchmark reproducible.
 - Medir en WebView2 el coste del material de vidrio (`backdrop-filter` en tarjetas y chrome, fondo ambiental animado) en reposo y con el gráfico actualizándose; fijar el umbral de degradación automática a `reduced` (propuesta: < 50 fps sostenidos durante 3 s o > 1 % de CPU en reposo atribuible a composición) y leer `UISettings.AdvancedEffectsEnabled` para el modo `system`.
 - Decidir estrategia segura de carga guiada.
@@ -332,7 +341,7 @@ Resolver idioma/tema → recorrer u omitir onboarding → descubrir CPU → emit
 
 ### Fase 2 — Diagnóstico y visualización
 
-Normalización completa, eventos, baselines, clasificación, gráficos sincronizados, mapa de núcleos e informe.
+Normalización completa, ventana de turbo, mesetas, eventos, clasificación con gravedad, potencial por techo de potencia, gráficos sincronizados, mapa de núcleos e informe.
 
 ### Fase 3 — Operación de escritorio
 
@@ -348,11 +357,13 @@ Carga segura si el spike la aprueba, matriz de hardware, accesibilidad, rendimie
 |---|---|---|
 | Sidecar .NET además de Rust | LibreHardwareMonitorLib es .NET y evita reimplementar familias de CPU | Portar acceso MSR/SMU a Rust aumenta riesgo y reduce cobertura |
 | Tres niveles de evidencia | Los sensores difieren y la causalidad no siempre es directa | Un umbral de temperatura produciría falsos positivos |
-| Baseline local versionado | No existe una frecuencia universal sostenible por modelo/equipo | Tabla global no captura firmware, chasis ni perfil energético |
+| Resultado guiado medido como única referencia | Carga idéntica por construcción; permite comparar «antes/después» con rendimiento real | Tabla global o baselines aprendidos: no capturan firmware, chasis ni tipo de carga |
 | Barra de título propia | Identidad visual coherente y comportamiento aprobado por el usuario | La decoración nativa no permite la experiencia solicitada |
 | Actualizador firmado opcional | Entrega correcciones sin renunciar a control ni funcionamiento offline | Una actualización silenciosa viola privacidad y consentimiento |
 | Gráfico SVG propio | Cumple huecos, calidad, eventos y teclado con una API Svelte controlada y sin dependencia de gráficos | ECharts duplicaría interacción/ARIA y ampliaría tamaño/superficie; reconsiderar solo si el benchmark real incumple el presupuesto |
-| Reloj efectivo derivado por contador PDH en Rust | LibreHardwareMonitorLib no expone reloj efectivo; el contador aproxima la frecuencia real incluyendo C-states sin driver | Usar el reloj por núcleo de LHM sobreestima en reposo y confunde calor con ahorro de energía |
-| Lectura MSR de banderas en el sidecar | Sin bandera directa no existe `thermal_confirmed`; el MSR es la única fuente cuando el driver lo permite | Inferir «confirmada» desde el margen es una inferencia disfrazada de confirmación |
+| Frecuencia activa por contador PDH en Rust | Es la frecuencia mientras el núcleo ejecuta (APERF/MPERF de Windows) y está disponible sin driver; es la métrica correcta para detectar limitación | El reloj nominal de LHM no refleja la frecuencia real; el «effective clock» con reposo mezcla carga y frecuencia |
+| Lectura MSR de razones, límites y TCC offset en el sidecar | Sin razones directas no hay confirmación ni atribución fiable, y sin TCC offset el margen es falso en muchos portátiles | Inferir «confirmada» desde el margen es una inferencia disfrazada de confirmación |
+| Clasificación por mesetas y ventana de turbo | Evita el falso positivo PL2→PL1 y detecta estados, no solo cambios | La regla anterior (caída de reloj tras calor) confundía el fin del turbo con limitación térmica |
+| Potencial por techo de potencia y medición guiada | Fundamento físico o medido, independiente del tipo de carga | Baselines aprendidos: sesgados hacia momentos de poca exigencia y dependientes del tipo de carga |
 | Contexto energético en Rust | El motor necesita batería/plan como factor de confusión y el sidecar no debe conocer Win32 de energía | Emitirlo como sensores mezcla contexto con hardware y amplía el contrato privilegiado |
 | Copia sincronizada del sistema de diseño | Aísla versiones de Svelte entre harness y app manteniendo una única fuente | Importar por ruta relativa acopla versiones; paquete workspace contradice `design/README.md` |

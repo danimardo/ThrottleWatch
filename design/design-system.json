@@ -77,7 +77,7 @@
       "components/AnalysisScreen.svelte (noHistory/loading/ready status, optional stale/partial data banner, evidence panel prioritizing selectedEventEvidence > rangeEvidence > idle hint)"
     ],
     "batch11_reportScreen": [
-      "components/ReportScreen.svelte (narrative report: resultado en una frase, qué se observó, impacto estimado, evidencias, causas alternativas, qué no puede concluirse, recomendaciones, baseline utilizado, comparación antes/después; sections with no content are omitted, never padded)"
+      "components/ReportScreen.svelte (narrative report: resultado en una frase, qué se observó, impacto estimado, evidencias, causas alternativas, qué no puede concluirse, recomendaciones, método del impacto, comparación antes/después; sections with no content are omitted, never padded)"
     ],
     "notYetBuilt": [],
     "batch12_specReview2026_09_18": [
@@ -105,10 +105,17 @@
       "tokens.ts: GLASS, MOTION, applyGlassLevel(), applyMotionLevel(), motionIsReduced()",
       "component motion: StatusHero ring/halo/value swap/tag pop, StatWidget bump + enterIndex, ProgressBar spring + sheen, Button liquid ripple, SegmentedControl/NavigationItem press, BottomBar menu drop, Dialog pop + blurred backdrop, Tooltip/Select pop, AnalysisChart band-in, CausalRail draw, ContextStrip reconnect glow, Onboarding slide pop/rise, staggered entries in CoverageMatrix/WhatsNewCards/SessionsScreen/ReportScreen/SettingsScreen/GuidedDiagnosticScreen",
       "SettingsAppearanceSection: glass* props (system/full/reduced/off)"
+    ],
+    "batch14_engineReview": [
+      "lib/classification.ts: ninth classification platform_limited (status-warm, 'device' icon)",
+      "icons/StatusIcon.svelte: 'device' glyph",
+      "StatusHero: severity ('boost' paints thermal family warm), performance.percent optional (cooling-potential range without a bar)",
+      "AnalysisChart: event kinds 'platform' (warm striped band) and 'info' (dashed marker, e.g. turbo_end)",
+      "ReportScreen: baselineTitle/Description/MissingText renamed methodTitle/methodDescription/methodMissingText"
     ]
   },
   "nonNegotiableRules": [
-    "A performance percentage only exists with a valid local baseline — StatusHero.performance is optional for this reason; never fabricate a value for it.",
+    "There is no 'available performance %': the only figures are the cooling potential from the host's power-headroom method (level A) and the measured guided result — StatusHero.performance is optional for this reason; never fabricate a value for it.",
     "No user-facing copy lives in this package — this includes accessible-only text (aria-label, title, alt, placeholder), not just visible text; every string is a prop supplied by the app's ES/EN catalog. examples/*.example.svelte are the one exception, hardcoding Spanish for demo brevity.",
     "CausalRail has no empty state — do not render it with insufficient evidence, and do not mount it below a 980px shell width.",
     "BottomBar: the 'Ahora' item is always index 0.",
@@ -122,7 +129,7 @@
     "SessionsScreen/GuidedDiagnosticScreen/CpuScreen/AnalysisScreen/ReportScreen have no business logic either — status/phase/groups/rows/tracks/events and every narrative string are host-computed props; the only local state any of them owns is view-only UI state (dialog-open, metric-mode toggle, table filter/sort/scroll).",
     "CpuAdvancedTable's virtualization and AnalysisChart's chart are hand-rolled, not a dependency — this system ships zero runtime dependencies; extend the existing hand-rolled approach rather than adding a virtualization or charting library.",
     "A null sample in AnalysisTrack.points is a real gap, never bridged by interpolation — AnalysisChart breaks the line into separate segments around it.",
-    "ReportScreen never fabricates impactValue — same rule as StatusHero.performance applied to the Informe screen; omit impactValue and supply impactUnavailableTitle/impactUnavailableReason instead when there's no valid baseline.",
+    "ReportScreen never fabricates impactValue — same rule as StatusHero.performance applied to the Informe screen; omit impactValue and supply impactUnavailableTitle/impactUnavailableReason instead when no method applies (power limit unknown, no guided result).",
     "A ReportScreen section with empty/undefined content is omitted entirely, never rendered as a padded stub.",
     "An ARIA role must match real behavior — never assign role/aria-valuenow/aria-valuetext etc. without the interaction to back them up. AnalysisChart's .brush is role=\"slider\" only because arrow keys really move aria-valuenow (see its keyboard model); its outer <svg class=\"plot\"> is role=\"group\", not role=\"img\", because it contains real focusable role=\"button\" event bands.",
     "AnalysisChart is the definitive production chart, not a placeholder for ECharts — see AGENTS.md \"AnalysisChart: SVG vs. ECharts\" for the verified performance envelope and point-budget guidance."
@@ -693,10 +700,16 @@
           "default": null
         },
         {
-          "name": "noBaselineText",
+          "name": "noPotentialText",
           "type": "string",
           "required": false,
           "default": "Aún sin referencia comparable"
+        },
+        {
+          "name": "severity",
+          "type": "'boost' | 'below_base'",
+          "required": false,
+          "notes": "boost = limited above the base clock (within spec) → status-warm for thermal-family classifications"
         }
       ],
       "notes": "Row/column layout switches at 900px of the component's own width via CSS container query, not a prop."
@@ -2119,18 +2132,18 @@
           "notes": "rendered as a numbered list"
         },
         {
-          "name": "baselineTitle",
+          "name": "methodTitle",
           "type": "string",
           "required": true
         },
         {
-          "name": "baselineDescription",
+          "name": "methodDescription",
           "type": "string",
           "required": false,
-          "notes": "shown when a baseline exists"
+          "notes": "how the impact was obtained (power-headroom inputs or guided test)"
         },
         {
-          "name": "baselineMissingText",
+          "name": "methodMissingText",
           "type": "string",
           "required": false,
           "notes": "shown instead when it doesn't; this section always renders"
@@ -2186,7 +2199,7 @@
           "notes": "imported session re-evaluated with the current ruleset, shown next to the original"
         }
       ],
-      "notes": "Presentational — see nonNegotiableRules. A section with empty/undefined content is omitted entirely, never rendered as a stub. impactValue never fabricated without a baseline. comparisonBeforeLabel/comparisonAfterLabel replaced what used to be hardcoded \"Antes\"/\"Después\" column headers."
+      "notes": "Presentational — see nonNegotiableRules. A section with empty/undefined content is omitted entirely, never rendered as a stub. impactValue never fabricated without a method. comparisonBeforeLabel/comparisonAfterLabel replaced what used to be hardcoded \"Antes\"/\"Después\" column headers."
     },
     "CoverageMatrix": {
       "path": "components/CoverageMatrix.svelte",
@@ -2788,7 +2801,7 @@
       "GuidedDiagnosticScreen: all 12 DiagnosticPhase values and all 3 BatteryState values via a Select-driven demo picker",
       "CpuScreen: hybrid P/E/LP topology (dark+light), homogeneous topology, 64-core topology with the table scrolled and re-screenshotted to confirm virtualization actually unmounts/replaces rows (visible range shifted from core 0 to core ~22), hovered core tile (Tooltip open), temperature/clock toggle, table filter+sort — narrow-width (420px) column-truncation bug found and fixed via a horizontal-scroll container + row min-width",
       "AnalysisScreen: idle state both themes, hover cursor + per-track readout including a real gap reading 'sin dato', clicked thermal event band (evidence panel + red band outline), drag-selected range on the brush (evidence panel + reset-zoom action), noHistory and loading states, data-notice Banner (partial), hidden track via legend swatch, 420px compact width; a high-DPI element screenshot of just the <svg> plot confirmed the gap is a real broken segment, the reduced-quality run is dashed, and the 'mixed' event band is a genuine two-color diagonal stripe pattern",
-      "ReportScreen: full narrative with causal chain (dark+light), loading state, session-incomplete + reduced-confidence banners stacked with impact-unavailable (no baseline), 'normal' classification with the causal chain hidden (confirms omission, not empty render), 'mixed_limit' classification's neutral chip, export-action click, 420px compact width"
+      "ReportScreen: full narrative with causal chain (dark+light), loading state, session-incomplete + reduced-confidence banners stacked with impact-unavailable (no method), 'normal' classification with the causal chain hidden (confirms omission, not empty render), 'mixed_limit' classification's neutral chip, export-action click, 420px compact width"
     ],
     "themesChecked": [
       "dark",
