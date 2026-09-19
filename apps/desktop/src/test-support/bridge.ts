@@ -5,7 +5,9 @@ import {
   type LiveSnapshot
 } from '../lib/bridge/schemas';
 
-export function liveSnapshot(overrides: Partial<LiveSnapshot> = {}): LiveSnapshot {
+export function liveSnapshot(
+  overrides: Partial<LiveSnapshot> = {}
+): LiveSnapshot {
   return liveSnapshotSchema.parse({
     captured_at_ms: 1_000,
     freshness: 'fresh',
@@ -24,7 +26,11 @@ export function liveSnapshot(overrides: Partial<LiveSnapshot> = {}): LiveSnapsho
     topology_label: '8 núcleos homogéneos',
     power_label: 'Corriente alterna · Equilibrado',
     collector_state: 'running',
-    coverage: { tier: 'A', confidence_ceiling: 'high', advanced_access: 'not_needed' },
+    coverage: {
+      tier: 'A',
+      confidence_ceiling: 'high',
+      advanced_access: 'not_needed'
+    },
     confidence_label: 'Confianza máxima alcanzable: alta',
     active_cores: 8,
     platform_kind: null,
@@ -35,29 +41,56 @@ export function liveSnapshot(overrides: Partial<LiveSnapshot> = {}): LiveSnapsho
   });
 }
 
-export function coverage(overrides: Partial<CoverageMatrix> = {}): CoverageMatrix {
+export function coverage(
+  overrides: Partial<CoverageMatrix> = {}
+): CoverageMatrix {
   return coverageMatrixSchema.parse({
     tier: 'A',
     confidence_ceiling: 'high',
     advanced_access: 'not_needed',
     conclusion_key: 'coverage.conclusion.a',
     rows: [
-      { id: 'temperature', label: 'Temperatura', available: true, quality: 'direct', quality_label: 'Directa', source_label: 'CPU package' },
-      { id: 'active_clock', label: 'Frecuencia activa', available: true, quality: 'derived', quality_label: 'Derivada', source_label: 'PDH' },
-      { id: 'power', label: 'Potencia', available: true, quality: 'direct', quality_label: 'Directa', source_label: 'CPU package' }
+      {
+        id: 'temperature',
+        label: 'Temperatura',
+        available: true,
+        quality: 'direct',
+        quality_label: 'Directa',
+        source_label: 'CPU package'
+      },
+      {
+        id: 'active_clock',
+        label: 'Frecuencia activa',
+        available: true,
+        quality: 'derived',
+        quality_label: 'Derivada',
+        source_label: 'PDH'
+      },
+      {
+        id: 'power',
+        label: 'Potencia',
+        available: true,
+        quality: 'direct',
+        quality_label: 'Directa',
+        source_label: 'CPU package'
+      }
     ],
     ...overrides
   });
 }
 
-export type FakeBridgeEvent = keyof typeof import('../lib/bridge/schemas').eventSchemas;
+export type FakeBridgeEvent =
+  keyof typeof import('../lib/bridge/schemas').eventSchemas;
 
 export class FakeBridge {
   private readonly listeners = new Map<string, Set<(value: unknown) => void>>();
   private snapshotValue: LiveSnapshot;
   private coverageValue: CoverageMatrix;
 
-  public constructor(snapshotValue = liveSnapshot(), coverageValue = coverage()) {
+  public constructor(
+    snapshotValue = liveSnapshot(),
+    coverageValue = coverage()
+  ) {
     this.snapshotValue = snapshotValue;
     this.coverageValue = coverageValue;
   }
@@ -70,14 +103,22 @@ export class FakeBridge {
     return coverage(this.coverageValue);
   }
 
-  public subscribe(event: FakeBridgeEvent, listener: (value: unknown) => void): () => void {
-    const listeners = this.listeners.get(event) ?? new Set<(value: unknown) => void>();
+  public subscribe(
+    event: FakeBridgeEvent,
+    listener: (value: unknown) => void
+  ): () => void {
+    const listeners =
+      this.listeners.get(event) ?? new Set<(value: unknown) => void>();
     listeners.add(listener);
     this.listeners.set(event, listeners);
-    return () => { listeners.delete(listener); };
+    return () => {
+      listeners.delete(listener);
+    };
   }
 
   public emit(event: FakeBridgeEvent, value: unknown): void {
-    this.listeners.get(event)?.forEach((listener) => { listener(value); });
+    this.listeners.get(event)?.forEach((listener) => {
+      listener(value);
+    });
   }
 }

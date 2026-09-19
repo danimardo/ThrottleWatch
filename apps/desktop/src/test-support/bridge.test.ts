@@ -11,6 +11,8 @@ describe('FakeBridge', () => {
 
   it('validates event payloads at the bridge boundary', () => {
     expect(parseEvent('telemetry:snapshot', liveSnapshot()).ok).toBe(true);
-    expect(parseEvent('collector:state', { state: 'not-a-state' }).ok).toBe(false);
+    expect(parseEvent('collector:state', { state: 'not-a-state' }).ok).toBe(
+      false
+    );
   });
 });
