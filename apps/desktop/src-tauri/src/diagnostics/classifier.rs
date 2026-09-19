@@ -298,26 +298,28 @@ mod tests {
     }
 
     #[test]
-    fn confirms_thermal_reason_at_level_a() {
-        let rules = Ruleset::v1().expect("valid rules");
+    fn confirms_thermal_reason_at_level_a() -> serde_json::Result<()> {
+        let rules = Ruleset::v1()?;
         let samples: Vec<_> = (0..=60).map(|index| sample(index, true, false)).collect();
         let result = diagnose(&samples, coverage(), &rules);
         assert_eq!(result.classification, Classification::ThermalConfirmed);
         assert_eq!(result.severity, Some(Severity::BelowBase));
+        Ok(())
     }
 
     #[test]
-    fn never_emits_mixed_at_level_b() {
-        let rules = Ruleset::v1().expect("valid rules");
+    fn never_emits_mixed_at_level_b() -> serde_json::Result<()> {
+        let rules = Ruleset::v1()?;
         let samples: Vec<_> = (0..=60).map(|index| sample(index, false, true)).collect();
         let level_b = CoverageSignals { power_limit: false, limit_reasons: false, ..coverage() };
         let result = diagnose(&samples, level_b, &rules);
         assert_ne!(result.classification, Classification::MixedLimit);
+        Ok(())
     }
 
     #[test]
-    fn reports_external_prochot_without_calling_it_cpu_thermal() {
-        let rules = Ruleset::v1().expect("valid rules");
+    fn reports_external_prochot_without_calling_it_cpu_thermal() -> serde_json::Result<()> {
+        let rules = Ruleset::v1()?;
         let samples: Vec<_> = (0..=60)
             .map(|index| DiagnosticSample {
                 thermal_flag: false,
@@ -328,18 +330,21 @@ mod tests {
         let result = diagnose(&samples, coverage(), &rules);
         assert_eq!(result.classification, Classification::PlatformLimited);
         assert_eq!(result.platform, Some(super::PlatformSubtype::ExternalProchot));
+        Ok(())
     }
 
     #[test]
-    fn remains_deterministic_for_the_same_trace() {
-        let rules = Ruleset::v1().expect("valid rules");
+    fn remains_deterministic_for_the_same_trace() -> serde_json::Result<()> {
+        let rules = Ruleset::v1()?;
         let samples: Vec<_> = (0..=60).map(|index| sample(index, true, false)).collect();
         assert_eq!(diagnose(&samples, coverage(), &rules), diagnose(&samples, coverage(), &rules));
+        Ok(())
     }
 
     #[test]
-    fn uses_plateaus_only_for_probable_classes_and_keeps_power_separate() {
-        let rules = Ruleset::v1().expect("valid rules");
+    fn uses_plateaus_only_for_probable_classes_and_keeps_power_separate() -> serde_json::Result<()>
+    {
+        let rules = Ruleset::v1()?;
         let thermal_samples: Vec<_> = (0..=60)
             .map(|index| DiagnosticSample { thermal_flag: false, ..sample(index, false, false) })
             .collect();
@@ -357,5 +362,6 @@ mod tests {
             .collect();
         let power = diagnose(&power_samples, level_b, &rules);
         assert_eq!(power.classification, Classification::PowerLimited);
+        Ok(())
     }
 }

@@ -5,7 +5,11 @@ describe('report impact adapter', () => {
   it('only exposes a cooling range when the backend declares power_headroom', () => {
     const view = toReportImpactView({
       classification: 'thermal_confirmed',
-      coolingPotential: { lowPercent: 5, highPercent: 15, method: 'power_headroom' }
+      coolingPotential: {
+        lowPercent: 5,
+        highPercent: 15,
+        method: 'power_headroom'
+      }
     });
     expect(view.coolingPotential?.value).toBe('+5–15 %');
     expect(view.unavailableReason).toBe('');

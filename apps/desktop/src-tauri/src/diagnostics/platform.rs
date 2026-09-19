@@ -83,12 +83,13 @@ mod tests {
     }
 
     #[test]
-    fn distinguishes_external_signal_from_chassis_limit() {
-        let rules = Ruleset::v1().expect("valid rules");
+    fn distinguishes_external_signal_from_chassis_limit() -> serde_json::Result<()> {
+        let rules = Ruleset::v1()?;
         assert_eq!(PlatformKind::ExternalProchot, PlatformKind::ExternalProchot);
         assert!(external_prochot(&window(0.25), &rules));
         assert!(chassis_thermal(Some(100.0), Some(85.0), &window(0.0), &rules));
         assert_eq!(limit_trend(&[100.0, 95.0, 85.0], &rules), LimitTrend::Progressive);
         assert_eq!(limit_trend(&[100.0, 85.0], &rules), LimitTrend::SingleStep);
+        Ok(())
     }
 }

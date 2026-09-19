@@ -289,15 +289,16 @@ mod tests {
     #[test]
     fn keeps_informational_markers_separate_from_limiting_events() {
         let marker = DiagnosticMarker { kind: InformationalMarker::TurboEnd, at_ms: 5_000 };
-        let (events, markers) = fuse_with_markers(&[], &[marker.clone()]);
+        let (events, markers) = fuse_with_markers(&[], std::slice::from_ref(&marker));
         assert!(events.is_empty());
         assert_eq!(markers, vec![marker]);
     }
 
     #[test]
-    fn emits_an_oem_marker_for_a_single_limit_step() {
-        let rules = crate::diagnostics::rules::Ruleset::v1().expect("valid rules");
+    fn emits_an_oem_marker_for_a_single_limit_step() -> serde_json::Result<()> {
+        let rules = crate::diagnostics::rules::Ruleset::v1()?;
         let marker = oem_mode_change_marker(Some(100.0), Some(85.0), &[100.0, 85.0], 5_000, &rules);
         assert_eq!(marker.map(|value| value.kind), Some(InformationalMarker::OemModeChange));
+        Ok(())
     }
 }

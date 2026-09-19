@@ -20,11 +20,17 @@ export interface ReportImpactView {
 
 export interface ReportBackendView {
   classification: Classification;
-  coolingPotential?: { lowPercent: number; highPercent: number; method: 'power_headroom' };
+  coolingPotential?: {
+    lowPercent: number;
+    highPercent: number;
+    method: 'power_headroom';
+  };
   guidedResult?: GuidedObservationView;
 }
 
-export function toReportImpactView(report: ReportBackendView): ReportImpactView {
+export function toReportImpactView(
+  report: ReportBackendView
+): ReportImpactView {
   return {
     coolingPotential: report.coolingPotential
       ? {

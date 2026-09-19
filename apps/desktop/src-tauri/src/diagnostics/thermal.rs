@@ -44,10 +44,11 @@ mod tests {
     }
 
     #[test]
-    fn recognizes_high_temperature_without_confusing_it_with_a_plateau() {
-        let rules = Ruleset::v1().expect("valid rules");
+    fn recognizes_high_temperature_without_confusing_it_with_a_plateau() -> serde_json::Result<()> {
+        let rules = Ruleset::v1()?;
         assert!(temperature_is_high(&window(8.0, 3.0), &rules));
         assert!(!thermal_plateau(&window(3.0, 2.0), &rules));
         assert!(thermal_plateau(&window(3.0, 1.0), &rules));
+        Ok(())
     }
 }

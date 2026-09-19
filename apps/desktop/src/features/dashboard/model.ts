@@ -3,7 +3,8 @@ import type { LiveSnapshot } from '../../lib/bridge/schemas';
 
 export type CoverageTier = 'A' | 'B' | 'C';
 export type Freshness = 'fresh' | 'stale' | 'disconnected';
-export type AdvancedAccess = 'not_needed' | 'available' | 'installable' | 'denied' | 'error';
+export type AdvancedAccess =
+  'not_needed' | 'available' | 'installable' | 'denied' | 'error';
 
 export interface DashboardSnapshot {
   cpuLabel: string;
@@ -23,7 +24,11 @@ export interface DashboardSnapshot {
   coverage: CoverageTier;
   advancedAccess: AdvancedAccess;
   confidenceLabel: string;
-  coolingPotential?: { lowPercent: number; highPercent: number; method: 'power_headroom' };
+  coolingPotential?: {
+    lowPercent: number;
+    highPercent: number;
+    method: 'power_headroom';
+  };
 }
 
 export const DEMO_SNAPSHOT: DashboardSnapshot = {
@@ -47,20 +52,26 @@ export const DEMO_SNAPSHOT: DashboardSnapshot = {
 
 export function formatNumber(value: number | null, digits = 0): string {
   if (value === null || !Number.isFinite(value)) return 'No disponible';
-  return value.toLocaleString('es-ES', { maximumFractionDigits: digits, minimumFractionDigits: digits });
+  return value.toLocaleString('es-ES', {
+    maximumFractionDigits: digits,
+    minimumFractionDigits: digits
+  });
 }
 
 export function marginText(snapshot: DashboardSnapshot): string {
-  if (snapshot.temperatureC === null || snapshot.thermalLimitC === null) return 'Límite térmico no disponible';
+  if (snapshot.temperatureC === null || snapshot.thermalLimitC === null)
+    return 'Límite térmico no disponible';
   return `${formatNumber(snapshot.thermalLimitC - snapshot.temperatureC)} °C hasta el límite`;
 }
 
 export function fromLiveSnapshot(value: LiveSnapshot): DashboardSnapshot {
-  const collectorState = value.collector_state === 'running'
-    ? 'fresh'
-    : value.collector_state === 'degraded' || value.collector_state === 'restarting'
-      ? 'stale'
-      : 'disconnected';
+  const collectorState =
+    value.collector_state === 'running'
+      ? 'fresh'
+      : value.collector_state === 'degraded' ||
+          value.collector_state === 'restarting'
+        ? 'stale'
+        : 'disconnected';
   return {
     cpuLabel: value.cpu_label,
     topologyLabel: value.topology_label,
@@ -80,7 +91,11 @@ export function fromLiveSnapshot(value: LiveSnapshot): DashboardSnapshot {
     advancedAccess: value.coverage.advanced_access,
     confidenceLabel: value.confidence_label,
     coolingPotential: value.cooling_potential
-      ? { lowPercent: value.cooling_potential.low_percent, highPercent: value.cooling_potential.high_percent, method: value.cooling_potential.method }
+      ? {
+          lowPercent: value.cooling_potential.low_percent,
+          highPercent: value.cooling_potential.high_percent,
+          method: value.cooling_potential.method
+        }
       : undefined
   };
 }

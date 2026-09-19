@@ -149,7 +149,7 @@ mod tests {
             thermal_limit_c: Some(95.0),
             package_power_w: Some(60.0),
             power_limit_w: Some(90.0),
-            thermal_flag: index % 5 == 0,
+            thermal_flag: index.is_multiple_of(5),
             prochot_flag: false,
             power_flag: false,
             current_flag: false,
@@ -158,22 +158,24 @@ mod tests {
     }
 
     #[test]
-    fn builds_sliding_sixty_second_windows() {
-        let rules = Ruleset::v1().expect("valid rules");
+    fn builds_sliding_sixty_second_windows() -> serde_json::Result<()> {
+        let rules = Ruleset::v1()?;
         let samples: Vec<_> = (0..=70).map(sample).collect();
         let windows = stable_windows(&samples, &rules);
         assert!(!windows.is_empty());
         assert_eq!(windows[0].sample_count, 60);
         assert!(windows[0].thermal_occupancy > 0.0);
+        Ok(())
     }
 
     #[test]
-    fn detects_active_cores_load_start_turbo_end_and_exclusion_window() {
-        let rules = Ruleset::v1().expect("valid rules");
+    fn detects_active_cores_load_start_turbo_end_and_exclusion_window() -> serde_json::Result<()> {
+        let rules = Ruleset::v1()?;
         assert_eq!(active_processor_count(&[20.0, 80.0, 95.0], rules.active_load_percent), 2);
         assert!(sustained_load_started(20.0, 90.0, &rules));
         assert!(turbo_end(100.0, 80.0, 5_000, &rules));
         assert_eq!(turbo_exclusion_ms(Some(28.0), &rules), 60_000);
         assert_eq!(turbo_exclusion_ms(Some(90.0), &rules), 90_000);
+        Ok(())
     }
 }

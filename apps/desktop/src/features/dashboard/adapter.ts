@@ -25,11 +25,21 @@ const labels: Record<Classification, string> = {
 };
 
 export function toStatusHeroView(snapshot: DashboardSnapshot): StatusHeroView {
-  const ringValue = snapshot.temperatureC === null ? '—' : `${String(Math.round(snapshot.temperatureC))}°`;
-  const ringCaption = snapshot.thermalLimitC === null ? 'Limit unavailable' : `Limit ${String(Math.round(snapshot.thermalLimitC))}°`;
-  const ringPercent = snapshot.temperatureC !== null && snapshot.thermalLimitC !== null
-    ? Math.min(100, Math.max(0, (snapshot.temperatureC / snapshot.thermalLimitC) * 100))
-    : 0;
+  const ringValue =
+    snapshot.temperatureC === null
+      ? '—'
+      : `${String(Math.round(snapshot.temperatureC))}°`;
+  const ringCaption =
+    snapshot.thermalLimitC === null
+      ? 'Limit unavailable'
+      : `Limit ${String(Math.round(snapshot.thermalLimitC))}°`;
+  const ringPercent =
+    snapshot.temperatureC !== null && snapshot.thermalLimitC !== null
+      ? Math.min(
+          100,
+          Math.max(0, (snapshot.temperatureC / snapshot.thermalLimitC) * 100)
+        )
+      : 0;
   const performance = snapshot.coolingPotential
     ? {
         label: 'Cooling potential',

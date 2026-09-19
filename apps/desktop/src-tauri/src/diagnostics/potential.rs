@@ -129,8 +129,8 @@ mod tests {
     }
 
     #[test]
-    fn quantifies_only_level_a_outside_turbo() {
-        let rules = Ruleset::v1().expect("valid rules");
+    fn quantifies_only_level_a_outside_turbo() -> serde_json::Result<()> {
+        let rules = Ruleset::v1()?;
         let result = power_headroom(
             input(),
             Classification::ThermalConfirmed,
@@ -149,11 +149,13 @@ mod tests {
             ),
             PotentialResult::Unavailable
         );
+        Ok(())
     }
 
     #[test]
-    fn gives_only_a_qualitative_low_confidence_result_without_level_a_inputs() {
-        let rules = Ruleset::v1().expect("valid rules");
+    fn gives_only_a_qualitative_low_confidence_result_without_level_a_inputs()
+    -> serde_json::Result<()> {
+        let rules = Ruleset::v1()?;
         let below_base = PowerHeadroomInput { active_clock_mhz: 2_800.0, ..input() };
         assert!(matches!(
             power_headroom(
@@ -165,11 +167,12 @@ mod tests {
             ),
             PotentialResult::Qualitative { .. }
         ));
+        Ok(())
     }
 
     #[test]
-    fn never_serializes_a_band_without_the_declared_method() {
-        let rules = Ruleset::v1().expect("valid rules");
+    fn never_serializes_a_band_without_the_declared_method() -> serde_json::Result<()> {
+        let rules = Ruleset::v1()?;
         let result = power_headroom(
             input(),
             Classification::ThermalConfirmed,
@@ -179,11 +182,12 @@ mod tests {
         );
         assert!(serializable_potential(result).is_some());
         assert!(serializable_potential(PotentialResult::Unavailable).is_none());
+        Ok(())
     }
 
     #[test]
-    fn applies_turbo_and_power_negative_cases_and_outward_rounding() {
-        let rules = Ruleset::v1().expect("valid rules");
+    fn applies_turbo_and_power_negative_cases_and_outward_rounding() -> serde_json::Result<()> {
+        let rules = Ruleset::v1()?;
         let band = power_headroom(
             input(),
             Classification::ThermalConfirmed,
@@ -212,5 +216,6 @@ mod tests {
             ),
             PotentialResult::Unavailable
         );
+        Ok(())
     }
 }

@@ -43,10 +43,11 @@ mod tests {
     }
 
     #[test]
-    fn recognizes_power_plateaus_and_direct_reasons() {
-        let rules = Ruleset::v1().expect("valid rules");
+    fn recognizes_power_plateaus_and_direct_reasons() -> serde_json::Result<()> {
+        let rules = Ruleset::v1()?;
         assert!(power_plateau(&window(), &rules));
         assert!(has_power_reason(&window(), &rules));
         assert!(progressive_limit_drop(Some(100.0), Some(85.0), &rules));
+        Ok(())
     }
 }

@@ -22,7 +22,11 @@ export interface NarrativeView {
 }
 
 const confidenceLabel = (confidence: number): string =>
-  confidence >= 0.75 ? 'confianza alta' : confidence >= 0.45 ? 'confianza media' : 'confianza baja';
+  confidence >= 0.75
+    ? 'confianza alta'
+    : confidence >= 0.45
+      ? 'confianza media'
+      : 'confianza baja';
 
 const toneFor = (classification: Classification, index: number): Tone => {
   if (index === 0) return 'accent';
@@ -33,18 +37,22 @@ const toneFor = (classification: Classification, index: number): Tone => {
 };
 
 export function toNarrativeView(diagnostic: DiagnosticView): NarrativeView {
-  const interval = diagnostic.analyzedFromMs !== undefined && diagnostic.analyzedToMs !== undefined
-    ? `intervalo ${String(Math.round((diagnostic.analyzedToMs - diagnostic.analyzedFromMs) / 1000))} s`
-    : 'intervalo no disponible';
+  const interval =
+    diagnostic.analyzedFromMs !== undefined &&
+    diagnostic.analyzedToMs !== undefined
+      ? `intervalo ${String(Math.round((diagnostic.analyzedToMs - diagnostic.analyzedFromMs) / 1000))} s`
+      : 'intervalo no disponible';
   const evidenceLine = `${confidenceLabel(diagnostic.confidence)} · cobertura ${diagnostic.coverage} · ${interval}`;
-  const causalChain = diagnostic.evidence.length >= 2 && !diagnostic.evidence.includes('turbo_end')
-    ? diagnostic.evidence.slice(0, 4).map((code, index) => ({
-        id: `${code}-${String(index)}`,
-        label: code,
-        value: code,
-        tone: toneFor(diagnostic.classification, index)
-      }))
-    : undefined;
+  const causalChain =
+    diagnostic.evidence.length >= 2 &&
+    !diagnostic.evidence.includes('turbo_end')
+      ? diagnostic.evidence.slice(0, 4).map((code, index) => ({
+          id: `${code}-${String(index)}`,
+          label: code,
+          value: code,
+          tone: toneFor(diagnostic.classification, index)
+        }))
+      : undefined;
   return {
     evidenceLine,
     evidence: diagnostic.evidence,

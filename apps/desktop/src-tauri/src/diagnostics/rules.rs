@@ -88,8 +88,8 @@ mod tests {
     use super::Ruleset;
 
     #[test]
-    fn loads_versioned_ruleset() {
-        let rules = Ruleset::v1().expect("ruleset fixture is valid");
+    fn loads_versioned_ruleset() -> serde_json::Result<()> {
+        let rules = Ruleset::v1()?;
         assert_eq!(rules.version, 1);
         assert!(rules.stable_window_s > 0);
         assert!(rules.parameter_ids.iter().any(|id| id == "thermal.critical_margin_c"));
@@ -173,5 +173,6 @@ mod tests {
         ];
         assert!(required.iter().all(|id| rules.parameter_ids.iter().any(|actual| actual == id)));
         assert!(required.iter().all(|id| rules.parameter(id).is_some()));
+        Ok(())
     }
 }
