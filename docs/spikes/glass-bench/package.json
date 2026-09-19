@@ -1,0 +1,17 @@
+{
+  "name": "throttlewatch-glass-bench",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Banco de medida del spike T019c (docs/spikes/glass-cost.md): monta AnalysisChart del sistema de diseño bajo paneles de vidrio y mide fps. No forma parte de la aplicación.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4179 --strictPort"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "svelte": "5.57.0",
+    "vite": "^8.3.0"
+  }
+}
