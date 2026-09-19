@@ -18,6 +18,9 @@ public static partial class Log
     [LoggerMessage(EventId = 1001, Level = LogLevel.Error, Message = "{Code}: {Message}")]
     public static partial void UnhandledException(this ILogger logger, string Code, string Message, Exception exception);
 
+    [LoggerMessage(EventId = 1002, Level = LogLevel.Warning, Message = "{Code}: hardware {HardwareId} update failed ({ExceptionType})")]
+    public static partial void HardwareUpdateFailed(this ILogger logger, string Code, string HardwareId, string ExceptionType, Exception exception);
+
     public static void AttachUnhandledExceptionHandlers(ILogger logger)
     {
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>

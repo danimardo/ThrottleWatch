@@ -1,4 +1,6 @@
 using LibreHardwareMonitor.Hardware;
+using Microsoft.Extensions.Logging;
+using ThrottleWatch.SensorAgent.Logging;
 
 namespace ThrottleWatch.SensorAgent.Collector;
 
@@ -40,6 +42,8 @@ public sealed class HardwareCollector : ICollectorSession, IDisposable
         IsPsuEnabled = false
     };
 
+    private readonly ILogger logger = Log.Create("sensor-agent.collector");
+    private readonly HashSet<string> failedUpdates = [];
     private bool opened;
     private bool catalogRead;
 
@@ -94,10 +98,18 @@ public sealed class HardwareCollector : ICollectorSession, IDisposable
         var readings = new List<SensorReading>();
         foreach (var hardware in CpuHardware())
         {
-            hardware.Update();
+            // A host without readable sensors (virtualized CI runner, no low-level access)
+            // makes the library throw from inside Update(); the sidecar must keep running
+            // and report the readings as missing instead of dying (T-INT-005).
+            var updated = TryUpdate(hardware);
             foreach (var sensor in hardware.Sensors)
             {
                 var id = $"{hardware.Identifier}/{sensor.Name}";
+                if (!updated)
+                {
+                    readings.Add(new SensorReading(id, null, "missing"));
+                    continue;
+                }
                 var value = sensor.Value;
                 readings.Add(value is { } number && IsPhysicallyValid(sensor.SensorType, number)
                     ? new SensorReading(id, number, "ok")
@@ -132,6 +144,24 @@ public sealed class HardwareCollector : ICollectorSession, IDisposable
             SensorType.Clock => value is >= 0 and <= 100_000,
             _ => true
         };
+    }
+
+    private bool TryUpdate(IHardware hardware)
+    {
+        try
+        {
+            hardware.Update();
+            return true;
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            // Logged once per hardware: the failure repeats on every sample.
+            if (failedUpdates.Add(hardware.Identifier.ToString()))
+            {
+                logger.HardwareUpdateFailed("SENSOR_UPDATE_FAILED", hardware.Identifier.ToString(), exception.GetType().Name, exception);
+            }
+            return false;
+        }
     }
 
     private IEnumerable<IHardware> CpuHardware() => computer.Hardware.Where(hardware => hardware.HardwareType == HardwareType.Cpu);

@@ -49,7 +49,7 @@ public sealed class SensorAgentProcessTests
         }
 
         sample.Select(reading => reading.SensorId).ShouldBe(catalog.Select(descriptor => descriptor.Id));
-        sample.ShouldAllBe(reading => reading.Status == "ok" || reading.Status == "invalid");
+        sample.ShouldAllBe(reading => reading.Status == "ok" || reading.Status == "invalid" || reading.Status == "missing");
 
         var summary = DescribeCatalog(catalog, sample, access, HypervisorPresent);
         TestContext.Current.TestOutputHelper?.WriteLine(summary);
@@ -63,10 +63,11 @@ public sealed class SensorAgentProcessTests
         }
 
         // Virtualized host without sensors: the collector must still open, list whatever the
-        // library exposes and report every physical reading as unavailable instead of throwing.
+        // library exposes and report every physical reading as unavailable instead of throwing
+        // (the library throws from Update() on the CI runner; the collector maps that to "missing").
         var physical = sample.Where(reading => catalog
             .First(descriptor => descriptor.Id == reading.SensorId).Metric is "temperature" or "power" or "voltage");
-        physical.ShouldAllBe(reading => reading.Status == "invalid", summary);
+        physical.ShouldAllBe(reading => reading.Status == "invalid" || reading.Status == "missing", summary);
         access.State.ShouldNotBe("available", summary);
     }
 
