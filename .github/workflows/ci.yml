@@ -34,7 +34,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-      - run: dotnet restore apps/sensor-agent/SensorAgent.csproj --locked-mode
+      - run: dotnet restore apps/sensor-agent/SensorAgent.sln --locked-mode
       - run: dotnet format apps/sensor-agent/SensorAgent.csproj --no-restore --verify-no-changes
       - run: dotnet build apps/sensor-agent/SensorAgent.csproj --no-restore
       - run: dotnet format apps/sensor-agent/Tests/SensorAgent.Tests.csproj --no-restore --verify-no-changes
