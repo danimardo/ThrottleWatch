@@ -1,5 +1,5 @@
 import type { Classification } from '../../design-system/lib/classification';
-import type { DashboardSnapshot } from './model';
+import type { DashboardSnapshot, Translate } from './model';
 
 export interface StatusHeroView {
   ringValue: string;
@@ -13,26 +13,30 @@ export interface StatusHeroView {
   severity?: 'boost' | 'below_base';
 }
 
-const labels: Record<Classification, string> = {
-  normal: 'NO LIMITATION DETECTED',
-  hot_unproven: 'HIGH TEMPERATURE',
-  thermal_probable: 'PROBABLE THERMAL LIMIT',
-  thermal_confirmed: 'CONFIRMED THERMAL LIMIT',
-  power_limited: 'POWER LIMIT',
-  platform_limited: 'EQUIPMENT LIMIT',
-  mixed_limit: 'MIXED LIMIT',
-  indeterminate: 'INSUFFICIENT DATA'
+const labelKeys: Record<Classification, string> = {
+  normal: 'dashboard.noLimit',
+  hot_unproven: 'dashboard.highTemperature',
+  thermal_probable: 'dashboard.probableThermal',
+  thermal_confirmed: 'dashboard.confirmedThermal',
+  power_limited: 'dashboard.powerLimit',
+  platform_limited: 'dashboard.equipmentLimit',
+  mixed_limit: 'dashboard.mixedLimit',
+  indeterminate: 'dashboard.insufficientData'
 };
 
-export function toStatusHeroView(snapshot: DashboardSnapshot): StatusHeroView {
+export function toStatusHeroView(
+  snapshot: DashboardSnapshot,
+  t: Translate,
+  locale = 'es-ES'
+): StatusHeroView {
   const ringValue =
     snapshot.temperatureC === null
       ? '—'
       : `${String(Math.round(snapshot.temperatureC))}°`;
   const ringCaption =
     snapshot.thermalLimitC === null
-      ? 'Limit unavailable'
-      : `Limit ${String(Math.round(snapshot.thermalLimitC))}°`;
+      ? t('dashboard.limitUnavailable')
+      : `${locale === 'es-ES' ? 'Límite' : 'Limit'} ${String(Math.round(snapshot.thermalLimitC))}°`;
   const ringPercent =
     snapshot.temperatureC !== null && snapshot.thermalLimitC !== null
       ? Math.min(
@@ -42,8 +46,8 @@ export function toStatusHeroView(snapshot: DashboardSnapshot): StatusHeroView {
       : 0;
   const performance = snapshot.coolingPotential
     ? {
-        label: 'Cooling potential',
-        rangeText: `+${String(snapshot.coolingPotential.lowPercent)}–${String(snapshot.coolingPotential.highPercent)} %`
+        label: t('dashboard.coolingPotential'),
+        rangeText: `+${String(snapshot.coolingPotential.lowPercent)}–${String(snapshot.coolingPotential.highPercent)} ${t('dashboard.percent')}`
       }
     : null;
   return {
@@ -51,10 +55,10 @@ export function toStatusHeroView(snapshot: DashboardSnapshot): StatusHeroView {
     ringCaption,
     ringPercent,
     classification: snapshot.classification,
-    classificationLabel: labels[snapshot.classification],
+    classificationLabel: t(labelKeys[snapshot.classification]),
     evidenceLine: `${snapshot.confidenceLabel} · ${snapshot.collectorLabel}`,
     performance,
-    noPotentialText: 'Not quantifiable for this equipment',
+    noPotentialText: t('dashboard.notQuantifiable'),
     severity: snapshot.severity
   };
 }

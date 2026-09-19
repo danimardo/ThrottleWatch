@@ -257,6 +257,22 @@ export const commandResponseSchemas = {
   disable_advanced_access: coverageMatrixSchema
 } as const;
 
+const noCommandArgs = z.undefined();
+
+export const commandArgsSchemas = {
+  get_live_snapshot: noCommandArgs,
+  get_coverage: noCommandArgs,
+  recheck_coverage: noCommandArgs,
+  request_low_level_access: z
+    .object({
+      request: z
+        .object({ action: z.enum(['install', 'upgrade', 'repair']) })
+        .strict()
+    })
+    .strict(),
+  disable_advanced_access: noCommandArgs
+} as const;
+
 export const eventSchemas = {
   'telemetry:snapshot': liveSnapshotSchema,
   'collector:state': collectorStateEventSchema,

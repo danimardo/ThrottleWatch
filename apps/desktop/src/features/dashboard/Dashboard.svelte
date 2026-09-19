@@ -16,22 +16,49 @@
     liveSnapshotSchema,
     commandResponseSchemas
   } from '../../lib/bridge/schemas';
+  import { createTranslator } from '../../lib/i18n';
   import { toStatusHeroView } from './adapter';
   import {
-    DEMO_SNAPSHOT,
+    createDemoSnapshot,
     formatNumber,
     fromLiveSnapshot,
     marginText,
     type DashboardSnapshot
   } from './model';
 
+  const { t, locale } = createTranslator(
+    'system',
+    typeof navigator === 'undefined' ? 'en-US' : navigator.language
+  );
+  const numberLocale = locale === 'es' ? 'es-ES' : 'en-US';
+
+  function localizedCollectorLabel(value: string): string {
+    const keys: Record<string, string> = {
+      running: 'dashboard.collectorRunning',
+      degraded: 'dashboard.collectorDegraded',
+      restarting: 'dashboard.collectorRestarting',
+      stopped: 'dashboard.collectorStopped',
+      failed: 'dashboard.collectorFailed'
+    };
+    return keys[value] === undefined ? value : t(keys[value]);
+  }
+
   interface Props {
     snapshot?: DashboardSnapshot;
   }
 
   let { snapshot: incomingSnapshot }: Props = $props();
-  let currentSnapshot = $state<DashboardSnapshot>(DEMO_SNAPSHOT);
-  let hero = $derived(toStatusHeroView(currentSnapshot));
+  let currentSnapshot = $state<DashboardSnapshot>(createDemoSnapshot(t));
+  let hero = $derived(
+    toStatusHeroView(
+      {
+        ...currentSnapshot,
+        collectorLabel: localizedCollectorLabel(currentSnapshot.collectorLabel)
+      },
+      t,
+      numberLocale
+    )
+  );
   let coverageOpen = $state(false);
   let coverageRows = $state<
     Array<{
@@ -45,11 +72,11 @@
     }>
   >([]);
   let advancedAccess = $state<DashboardSnapshot['advancedAccess']>(
-    DEMO_SNAPSHOT.advancedAccess
+    createDemoSnapshot(t).advancedAccess
   );
 
   $effect(() => {
-    currentSnapshot = incomingSnapshot ?? DEMO_SNAPSHOT;
+    currentSnapshot = incomingSnapshot ?? createDemoSnapshot(t);
   });
 
   onMount(() => {
@@ -218,12 +245,12 @@
     topologyLabel={currentSnapshot.topologyLabel}
     powerLabel={currentSnapshot.powerLabel}
     collectorState={currentSnapshot.collectorState}
-    collectorLabel={currentSnapshot.collectorLabel}
-    coverageActionLabel="View coverage"
+    collectorLabel={localizedCollectorLabel(currentSnapshot.collectorLabel)}
+    coverageActionLabel={t('dashboard.viewCoverage')}
     onCoverage={() => (coverageOpen = !coverageOpen)}
   />
   <StatusHero {...hero} />
-  <section class="stats" aria-label="Current signals">
+  <section class="stats" aria-label={t('dashboard.currentSignals')}>
     {#snippet thermometerIcon()}<span aria-hidden="true">°</span>{/snippet}
     {#snippet loadIcon()}<span aria-hidden="true">▾</span>{/snippet}
     {#snippet clockIcon()}<span aria-hidden="true">◷</span>{/snippet}
@@ -231,70 +258,90 @@
     <StatWidget
       icon={thermometerIcon}
       tone={currentSnapshot.temperatureC === null ? 'unknown' : 'thermal'}
-      label="Temperature"
-      value={formatNumber(currentSnapshot.temperatureC)}
+      label={t('dashboard.temperature')}
+      value={formatNumber(
+        currentSnapshot.temperatureC,
+        0,
+        numberLocale,
+        t('dashboard.unavailableShort')
+      )}
       unit={currentSnapshot.temperatureC === null ? undefined : '°C'}
-      footnote={marginText(currentSnapshot)}
+      footnote={marginText(currentSnapshot, t, numberLocale)}
       enterIndex={0}
     />
     <StatWidget
       icon={loadIcon}
       tone="accent"
-      label="Load"
-      value={formatNumber(currentSnapshot.loadPercent)}
+      label={t('dashboard.load')}
+      value={formatNumber(
+        currentSnapshot.loadPercent,
+        0,
+        numberLocale,
+        t('dashboard.unavailableShort')
+      )}
       unit={currentSnapshot.loadPercent === null ? undefined : '%'}
-      footnote="Active processors in sample"
+      footnote={t('dashboard.activeProcessors')}
       enterIndex={1}
     />
     <StatWidget
       icon={clockIcon}
       tone="accent"
-      label="Active clock"
-      value={formatNumber(currentSnapshot.activeClockMhz)}
+      label={t('dashboard.activeClock')}
+      value={formatNumber(
+        currentSnapshot.activeClockMhz,
+        0,
+        numberLocale,
+        t('dashboard.unavailableShort')
+      )}
       unit={currentSnapshot.activeClockMhz === null ? undefined : 'MHz'}
       footnote={currentSnapshot.baseClockMhz === null
-        ? 'Base clock unavailable'
-        : `Base ${formatNumber(currentSnapshot.baseClockMhz)} MHz`}
+        ? t('dashboard.baseClockUnavailable')
+        : `${t('dashboard.base')} ${formatNumber(currentSnapshot.baseClockMhz, 0, numberLocale, t('dashboard.unavailableShort'))} MHz`}
       enterIndex={2}
     />
     <StatWidget
       icon={powerIcon}
       tone={currentSnapshot.powerLimitW !== null ? 'power' : 'unknown'}
-      label="Package power"
-      value={formatNumber(currentSnapshot.packagePowerW)}
+      label={t('dashboard.packagePower')}
+      value={formatNumber(
+        currentSnapshot.packagePowerW,
+        0,
+        numberLocale,
+        t('dashboard.unavailableShort')
+      )}
       unit={currentSnapshot.packagePowerW === null ? undefined : 'W'}
       footnote={currentSnapshot.powerLimitW === null
-        ? 'Power limit unavailable'
-        : `Limit ${formatNumber(currentSnapshot.powerLimitW)} W`}
+        ? t('dashboard.powerLimitUnavailable')
+        : `${t('dashboard.limit')} ${formatNumber(currentSnapshot.powerLimitW, 0, numberLocale, t('dashboard.unavailableShort'))} W`}
       enterIndex={3}
     />
   </section>
   {#if coverageOpen}
-    <section class="coverage" aria-label="Sensor coverage">
+    <section class="coverage" aria-label={t('dashboard.equipmentCoverage')}>
       <CoverageMatrix
-        title="Equipment coverage"
+        title={t('dashboard.equipmentCoverage')}
         rows={coverageRows}
         columnLabels={{
-          magnitude: 'Magnitude',
-          available: 'Available',
-          quality: 'Quality',
-          source: 'Source',
-          reason: 'Reason'
+          magnitude: t('dashboard.magnitude'),
+          available: t('dashboard.available'),
+          quality: t('dashboard.quality'),
+          source: t('dashboard.source'),
+          reason: t('dashboard.reason')
         }}
-        availableLabel="Available"
-        unavailableLabel="Unavailable"
+        availableLabel={t('dashboard.available')}
+        unavailableLabel={t('dashboard.unavailable')}
         maxConfidenceLabel={currentSnapshot.confidenceLabel}
         accessState={advancedAccess}
         accessLabel={advancedAccess === 'not_needed'
-          ? 'Advanced access is not needed.'
-          : 'Advanced access can improve coverage.'}
-        requestAccessLabel="Install advanced access"
+          ? t('dashboard.advancedNotNeeded')
+          : t('dashboard.advancedCanImprove')}
+        requestAccessLabel={t('dashboard.installAdvanced')}
         onRequestAccess={requestAdvancedAccess}
-        accessRetryLabel="Repair advanced access"
+        accessRetryLabel={t('dashboard.repairAdvanced')}
         onAccessRetry={requestAdvancedAccess}
-        disableAccessLabel="Disable advanced access"
+        disableAccessLabel={t('dashboard.disableAdvanced')}
         onDisableAccess={disableAdvancedAccess}
-        recheckLabel="Check again"
+        recheckLabel={t('dashboard.checkAgain')}
         onRecheck={recheckCoverage}
       />
     </section>

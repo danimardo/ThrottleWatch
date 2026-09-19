@@ -11,6 +11,7 @@
     "build": "pnpm --filter @throttlewatch/desktop build",
     "check": "pnpm --filter @throttlewatch/desktop check",
     "check:contracts": "pnpm --filter @throttlewatch/contracts check",
+    "check:catalogs": "node scripts/check-catalogs.mjs",
     "test": "pnpm --filter @throttlewatch/desktop test",
     "test:e2e": "pnpm --filter @throttlewatch/desktop test:e2e",
     "test:unit": "pnpm --filter @throttlewatch/desktop test:unit",

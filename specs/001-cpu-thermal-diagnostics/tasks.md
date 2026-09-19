@@ -104,17 +104,18 @@ Formato: `[ID] [P?] [Historia?] Descripción con ruta`. Las tareas de test indic
 
 **Lote L05 — Shell, puente, catálogos y diseño** (T024–T026, T139, T141, T-COMP-002, T-COMP-003, T-PLAY-005).
 
-- [ ] T-PLAY-005 [P] Crear los perfiles de E2E para ambos proyectos (`fresh-install`, `onboarding-midway`, `ready`, `tray-enabled`, `with-history`, `updates-on`): escenarios de mock para `frontend` y directorios de datos sembrados para `app`, con aislamiento por directorio temporal y proceso.
+- [x] T-PLAY-005 [P] Crear los perfiles de E2E para ambos proyectos (`fresh-install`, `onboarding-midway`, `ready`, `tray-enabled`, `with-history`, `updates-on`): escenarios de mock para `frontend` y directorios de datos sembrados para `app`, con aislamiento por directorio temporal y proceso.
 
-- [ ] T139 Implementar el módulo puente `src/lib/bridge/`: único importador de `@tauri-apps/api`, esquemas Zod por comando y evento con tipos inferidos, resultado discriminado y errores estructurados; prueba de conformidad contra los fixtures de `packages/contracts/` (mismos válidos e inválidos que el JSON Schema). (Constitución IX y XIV)
+- [x] T139 Implementar el módulo puente `src/lib/bridge/`: único importador de `@tauri-apps/api`, esquemas Zod por comando y evento con tipos inferidos, resultado discriminado y errores estructurados; prueba de conformidad contra los fixtures de `packages/contracts/` (mismos válidos e inválidos que el JSON Schema). (Constitución IX y XIV)
 - [x] T141 [P] Implementar `src/lib/logging/` (`createLogger` sobre `loglevel`) y el comando `log_frontend` con validación, límite de 60 eventos por minuto y niveles según `Registro detallado`. (Constitución XVII)
-- [ ] T-COMP-002 [P] Crear `FakeBridge` validado con Zod, escenarios de mock y *builders* de interfaz (`liveSnapshot`, `coverage`, `report`, `session`, `preferences`) en `src/test-support/`.
+- [x] T-COMP-002 [P] Crear `FakeBridge` validado con Zod, escenarios de mock y *builders* de interfaz (`liveSnapshot`, `coverage`, `report`, `session`, `preferences`) en `src/test-support/`.
 - [x] T-COMP-003 [P] Crear utilidades de consulta por catálogo (`t('key')`) para Testing Library y Playwright.
 - [x] T024 [P] Crear `scripts/design-sync` que copie `design/{components,icons,illustrations,lib,tokens,brand}` a `apps/desktop/src/design-system/` y un test de CI que falle si la copia difiere; prohibir por lint la importación de `design/examples/` y `design/harness/`. Integrar `tokens.css` desde la copia para claro/oscuro, modo sistema y movimiento reducido.
-- [ ] T025 Crear shell de navegación y estados globales de colector en `apps/desktop/src/`.
-- [ ] T026 Configurar catálogos completos español/inglés, resolución especial de locales y verificador de igualdad/sin literales.
-- [ ] CHK-L05 Checkpoint: igualdad de la copia de diseño, catálogos, conformidad del puente, registro de la interfaz y navegación del shell (componentes) en verde.
+- [x] T025 Crear shell de navegación y estados globales de colector en `apps/desktop/src/`.
+- [x] T026 Configurar catálogos completos español/inglés, resolución especial de locales y verificador de igualdad/sin literales.
+- [x] CHK-L05 Checkpoint: igualdad de la copia de diseño, catálogos, conformidad del puente, registro de la interfaz y navegación del shell (componentes) en verde.
   Registro 2026-09-19: nivel 0 en verde (véase CHK-L00); `pnpm design:sync`/igualdad de copia no ejecutado por separado. **No cerrado:** pendientes T-PLAY-005, T139, T-COMP-002, T025 y T026; L09 (T030–T035) se marcó terminado antes que este lote, contra el «Orden de lotes».
+  Cierre 2026-09-19: `node scripts/design-sync.mjs --check` (0); `node scripts/check-catalogs.mjs` (0, 61 claves, 0 diferencias); `node scripts/check-traceability.mjs` (0); Prettier (0) y ESLint (0); `svelte-check --fail-on-warnings` (0, 0 errores/0 avisos); TypeScript (0); Vitest unitario (0, 39/39), componentes (0, 1/1); Vite build (0); Playwright `frontend` + `app` (0, 2/2). Revisión manual frente a la constitución: sin imports de `design/examples`, sin permisos de plugin, puente con resultado discriminado y FakeBridge validado en frontera. CHK-L05 cerrado.
 
 **Hito:** handshake, catálogo y muestras sintéticas atraviesan sidecar → Rust → UI → SQLite.
 

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { invokeValidated, listenValidated, validateEnvelope } from './index';
+import {
+  createBridge,
+  invokeValidated,
+  listenValidated,
+  validateEnvelope
+} from './index';
 import { z } from 'zod';
+import { FakeBridge, liveSnapshot } from '../../test-support/bridge';
+import { liveSnapshotSchema } from './schemas';
 
 const validEnvelope = {
   protocol_version: 1,
@@ -50,5 +57,33 @@ describe('bridge outside Tauri', () => {
     );
 
     unlisten();
+  });
+});
+
+describe('injectable bridge transport', () => {
+  it('invokes and validates a fake command response', async () => {
+    const bridge = createBridge(new FakeBridge());
+    const result = await bridge.invokeValidated(
+      'get_live_snapshot',
+      undefined,
+      liveSnapshotSchema
+    );
+
+    expect(result).toEqual({ ok: true, value: liveSnapshot() });
+  });
+
+  it('delivers only schema-valid fake events', async () => {
+    const fake = new FakeBridge();
+    const bridge = createBridge(fake);
+    const values: unknown[] = [];
+    const stop = await bridge.listenValidated('collector:state', (value) =>
+      values.push(value)
+    );
+
+    fake.emit('collector:state', { state: 'running' });
+    fake.emit('collector:state', { state: 'not-a-state' });
+    stop();
+
+    expect(values).toEqual([{ state: 'running' }]);
   });
 });

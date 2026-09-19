@@ -1,7 +1,15 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { z } from 'zod';
-import { eventSchemas, parseIpcEnvelope } from './schemas';
+import { commandArgsSchemas, eventSchemas, parseIpcEnvelope } from './schemas';
+
+export interface BridgeTransport {
+  invoke(command: string, args?: Record<string, unknown>): Promise<unknown>;
+  listen(
+    event: string,
+    handler: (payload: unknown) => void
+  ): Promise<UnlistenFn>;
+}
 
 export type BridgeError = {
   readonly kind: 'validation' | 'backend' | 'transport';
@@ -23,6 +31,31 @@ const TAURI_UNAVAILABLE_ERROR: BridgeError = {
 function hasTauriRuntime(): boolean {
   if (typeof window === 'undefined') return false;
   return '__TAURI_INTERNALS__' in window;
+}
+
+const tauriTransport: BridgeTransport = {
+  invoke: (command, args) => invoke<unknown>(command, args),
+  listen: (event, handler) =>
+    listen<unknown>(event, (message) => {
+      handler(message.payload);
+    })
+};
+
+function argsSchemaFor(command: string): z.ZodType | undefined {
+  switch (command) {
+    case 'get_live_snapshot':
+      return commandArgsSchemas.get_live_snapshot;
+    case 'get_coverage':
+      return commandArgsSchemas.get_coverage;
+    case 'recheck_coverage':
+      return commandArgsSchemas.recheck_coverage;
+    case 'request_low_level_access':
+      return commandArgsSchemas.request_low_level_access;
+    case 'disable_advanced_access':
+      return commandArgsSchemas.disable_advanced_access;
+    default:
+      return undefined;
+  }
 }
 
 function errorFromUnknown(
@@ -67,14 +100,18 @@ function errorFromUnknown(
 export async function invokeValidated<T>(
   command: string,
   args: Record<string, unknown> | undefined,
-  responseSchema: z.ZodType<T>
+  responseSchema: z.ZodType<T>,
+  transport: BridgeTransport | undefined = hasTauriRuntime()
+    ? tauriTransport
+    : undefined
 ): Promise<BridgeResult<T>> {
-  if (!hasTauriRuntime()) {
+  if (transport === undefined) {
     return { ok: false, error: TAURI_UNAVAILABLE_ERROR };
   }
 
   try {
-    const raw = await invoke<unknown>(command, args);
+    argsSchemaFor(command)?.parse(args);
+    const raw = await transport.invoke(command, args);
     return { ok: true, value: responseSchema.parse(raw) };
   } catch (error) {
     const kind = error instanceof z.ZodError ? 'validation' : 'backend';
@@ -111,16 +148,33 @@ export function parseEvent(
 
 export async function listenValidated(
   event: keyof typeof eventSchemas,
-  handler: (value: unknown) => void
+  handler: (value: unknown) => void,
+  transport: BridgeTransport | undefined = hasTauriRuntime()
+    ? tauriTransport
+    : undefined
 ): Promise<UnlistenFn> {
-  if (!hasTauriRuntime()) {
+  if (transport === undefined) {
     return () => undefined;
   }
 
-  return listen<unknown>(event, (message) => {
-    const parsed = eventSchemas[event].safeParse(message.payload);
+  return transport.listen(event, (value) => {
+    const parsed = eventSchemas[event].safeParse(value);
     if (parsed.success) handler(parsed.data);
   });
+}
+
+export function createBridge(transport: BridgeTransport) {
+  return {
+    invokeValidated: <T>(
+      command: string,
+      args: Record<string, unknown> | undefined,
+      responseSchema: z.ZodType<T>
+    ) => invokeValidated(command, args, responseSchema, transport),
+    listenValidated: (
+      event: keyof typeof eventSchemas,
+      handler: (value: unknown) => void
+    ) => listenValidated(event, handler, transport)
+  };
 }
 
 export function validateEnvelope(

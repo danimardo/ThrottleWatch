@@ -5,6 +5,7 @@ export type CoverageTier = 'A' | 'B' | 'C';
 export type Freshness = 'fresh' | 'stale' | 'disconnected';
 export type AdvancedAccess =
   'not_needed' | 'available' | 'installable' | 'denied' | 'error';
+export type Translate = (key: string) => string;
 
 export interface DashboardSnapshot {
   cpuLabel: string;
@@ -32,11 +33,11 @@ export interface DashboardSnapshot {
 }
 
 export const DEMO_SNAPSHOT: DashboardSnapshot = {
-  cpuLabel: 'CPU no detectada todavía',
-  topologyLabel: 'Esperando catálogo del colector',
-  powerLabel: 'Fuente desconocida',
+  cpuLabel: 'CPU not detected yet',
+  topologyLabel: 'Waiting for collector catalog',
+  powerLabel: 'Unknown power source',
   collectorState: 'disconnected',
-  collectorLabel: 'Colector desconectado',
+  collectorLabel: 'Collector disconnected',
   classification: 'indeterminate',
   temperatureC: null,
   thermalLimitC: null,
@@ -47,21 +48,43 @@ export const DEMO_SNAPSHOT: DashboardSnapshot = {
   powerLimitW: null,
   coverage: 'C',
   advancedAccess: 'installable',
-  confidenceLabel: 'Confianza máxima alcanzable: baja'
+  confidenceLabel: 'Maximum reachable confidence: low'
 };
 
-export function formatNumber(value: number | null, digits = 0): string {
-  if (value === null || !Number.isFinite(value)) return 'No disponible';
-  return value.toLocaleString('es-ES', {
+export function createDemoSnapshot(t: Translate): DashboardSnapshot {
+  return {
+    ...DEMO_SNAPSHOT,
+    cpuLabel: t('dashboard.demoCpu'),
+    topologyLabel: t('dashboard.demoTopology'),
+    powerLabel: t('dashboard.demoPower'),
+    collectorLabel: t('dashboard.demoCollector'),
+    confidenceLabel: t('dashboard.confidenceLow')
+  };
+}
+
+export function formatNumber(
+  value: number | null,
+  digits = 0,
+  locale = 'es-ES',
+  unavailable = 'Unavailable'
+): string {
+  if (value === null || !Number.isFinite(value)) return unavailable;
+  return value.toLocaleString(locale, {
     maximumFractionDigits: digits,
     minimumFractionDigits: digits
   });
 }
 
-export function marginText(snapshot: DashboardSnapshot): string {
-  if (snapshot.temperatureC === null || snapshot.thermalLimitC === null)
-    return 'Límite térmico no disponible';
-  return `${formatNumber(snapshot.thermalLimitC - snapshot.temperatureC)} °C hasta el límite`;
+export function marginText(
+  snapshot: DashboardSnapshot,
+  t: Translate,
+  locale = 'es-ES'
+): string {
+  if (snapshot.temperatureC === null || snapshot.thermalLimitC === null) {
+    return t('dashboard.limitUnavailable');
+  }
+  const suffix = locale === 'es-ES' ? 'hasta el límite' : 'to limit';
+  return `${formatNumber(snapshot.thermalLimitC - snapshot.temperatureC, 0, locale, t('dashboard.unavailableShort'))} ${t('dashboard.celsius')} ${suffix}`;
 }
 
 export function fromLiveSnapshot(value: LiveSnapshot): DashboardSnapshot {
