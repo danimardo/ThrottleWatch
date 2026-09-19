@@ -21,6 +21,11 @@ jobs:
       - run: pnpm lint
       - run: pnpm check
       - run: pnpm design:check
+      - run: npm ci
+        working-directory: design/harness
+      - run: npm ci
+        working-directory: design/mockup
+      - run: pnpm design:check:sources
       - run: pnpm check:contracts
       - run: pnpm test
       - run: pnpm build

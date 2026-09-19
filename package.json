@@ -25,7 +25,7 @@
     "check:traceability": "node scripts/check-traceability.mjs",
     "verify:batch": "pnpm format && pnpm lint && pnpm check && pnpm test && pnpm build",
     "verify:pr": "pnpm install --frozen-lockfile && pnpm verify:batch",
-    "design:check": "pnpm --dir design/harness check && pnpm --dir design/mockup check",
+    "design:check:sources": "pnpm --dir design/harness check && pnpm --dir design/mockup check",
     "logs:view": "Write-Output 'Los registros se inspeccionan desde la carpeta local documentada.'"
   },
   "devDependencies": {
