@@ -14,6 +14,17 @@ export type BridgeResult<T> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly error: BridgeError };
 
+const TAURI_UNAVAILABLE_ERROR: BridgeError = {
+  kind: 'transport',
+  code: 'TAURI_UNAVAILABLE',
+  message_key: 'bridge.tauri_unavailable'
+};
+
+function hasTauriRuntime(): boolean {
+  if (typeof window === 'undefined') return false;
+  return '__TAURI_INTERNALS__' in window;
+}
+
 function errorFromUnknown(
   kind: BridgeError['kind'],
   error: unknown
@@ -58,6 +69,10 @@ export async function invokeValidated<T>(
   args: Record<string, unknown> | undefined,
   responseSchema: z.ZodType<T>
 ): Promise<BridgeResult<T>> {
+  if (!hasTauriRuntime()) {
+    return { ok: false, error: TAURI_UNAVAILABLE_ERROR };
+  }
+
   try {
     const raw = await invoke<unknown>(command, args);
     return { ok: true, value: responseSchema.parse(raw) };
@@ -67,11 +82,26 @@ export async function invokeValidated<T>(
   }
 }
 
-export function parseEvent(event: 'telemetry:snapshot', value: unknown): BridgeResult<import('./schemas').LiveSnapshot>;
-export function parseEvent(event: 'collector:state', value: unknown): BridgeResult<import('./schemas').CollectorStateEvent>;
-export function parseEvent(event: 'coverage:changed', value: unknown): BridgeResult<import('./schemas').CoverageMatrix>;
-export function parseEvent(event: 'power:context', value: unknown): BridgeResult<import('./schemas').PowerContextEvent>;
-export function parseEvent(event: keyof typeof eventSchemas, value: unknown): BridgeResult<unknown> {
+export function parseEvent(
+  event: 'telemetry:snapshot',
+  value: unknown
+): BridgeResult<import('./schemas').LiveSnapshot>;
+export function parseEvent(
+  event: 'collector:state',
+  value: unknown
+): BridgeResult<import('./schemas').CollectorStateEvent>;
+export function parseEvent(
+  event: 'coverage:changed',
+  value: unknown
+): BridgeResult<import('./schemas').CoverageMatrix>;
+export function parseEvent(
+  event: 'power:context',
+  value: unknown
+): BridgeResult<import('./schemas').PowerContextEvent>;
+export function parseEvent(
+  event: keyof typeof eventSchemas,
+  value: unknown
+): BridgeResult<unknown> {
   try {
     return { ok: true, value: eventSchemas[event].parse(value) };
   } catch (error) {
@@ -83,6 +113,10 @@ export async function listenValidated(
   event: keyof typeof eventSchemas,
   handler: (value: unknown) => void
 ): Promise<UnlistenFn> {
+  if (!hasTauriRuntime()) {
+    return () => undefined;
+  }
+
   return listen<unknown>(event, (message) => {
     const parsed = eventSchemas[event].safeParse(message.payload);
     if (parsed.success) handler(parsed.data);

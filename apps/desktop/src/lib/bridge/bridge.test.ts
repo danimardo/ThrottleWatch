@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { validateEnvelope } from './index';
+import { invokeValidated, listenValidated, validateEnvelope } from './index';
+import { z } from 'zod';
 
 const validEnvelope = {
   protocol_version: 1,
@@ -21,5 +22,33 @@ describe('bridge envelope validation', () => {
       ok: false,
       error: { code: 'BRIDGE_VALIDATION_FAILED' }
     });
+  });
+});
+
+describe('bridge outside Tauri', () => {
+  it('returns a transport error instead of invoking Tauri', async () => {
+    const result = await invokeValidated(
+      'get_live_snapshot',
+      undefined,
+      z.unknown()
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        kind: 'transport',
+        code: 'TAURI_UNAVAILABLE',
+        message_key: 'bridge.tauri_unavailable'
+      }
+    });
+  });
+
+  it('returns a no-op unsubscriber instead of registering a Tauri listener', async () => {
+    const unlisten = await listenValidated(
+      'telemetry:snapshot',
+      () => undefined
+    );
+
+    unlisten();
   });
 });
