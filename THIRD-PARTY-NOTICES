@@ -9,7 +9,7 @@ Código fuente y licencia declarada: https://github.com/namazso/PawnIO
 Licencia del código fuente: GNU General Public License, versión 2 o posterior, con la excepción
 de combinación indicada por los titulares en el aviso de licencia de PawnIO. El instalador oficial
 se conserva sin modificaciones y su redistribución queda sujeta a conservar el aviso/licencia de
-la release y a la revisión legal del artefacto binario antes de T153.
+la release y a la revisión legal del artefacto binario antes de publicar una versión que lo incluya.
 ThrottleWatch no desinstala ni sustituye PawnIO; es un controlador compartido por máquina.
 Desde 2026-09-19 el binario del instalador NO se versiona en este repositorio: `scripts/fetch-pawnio.mjs`
 lo obtiene de la release oficial en tiempo de compilación, comprueba el SHA-256 y la firma Authenticode

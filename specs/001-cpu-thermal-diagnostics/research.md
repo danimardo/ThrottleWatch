@@ -308,7 +308,9 @@ con software GPL/LGPL y módulos independientes que se comuniquen únicamente me
 de dispositivo. El repositorio oficial de `PawnIO.Setup` publica las releases del instalador,
 pero su README no contiene una licencia separada del instalador binario. Por ello, la distribución
 del instalador empaquetado queda condicionada a conservar el texto de licencia y el aviso de la
-release 2.2.0 junto al artefacto y a completar la revisión legal del paquete antes de T153.
+release 2.2.0 junto al artefacto y a completar la revisión legal del paquete antes de **publicar** una
+versión que lo incluya (decisión de la persona propietaria, 2026-09-19: el gate deja de ser «antes de
+T153»; el desarrollo y las pruebas locales de T153–T155 no esperan a la respuesta de namazso).
 
 No se atribuye a ThrottleWatch una licencia de PawnIO, no se modifica el controlador y el
 desinstalador nunca lo elimina. La fuente consultada queda registrada en `THIRD-PARTY-NOTICES`.
