@@ -198,44 +198,35 @@ por tanto T019a queda cerrada con resultado parcial y la implementación contin�
 → T155, manteniendo B/C para cuentas estándar. El resto de la matriz de hardware y los demás
 spikes de L03 permanecen abiertos.
 
-### 2026-09-19 — equipo de desarrollo, usuario estándar con el servicio PawnIO en marcha (tras T020)
+### 2026-09-19 — equipo de desarrollo, servicio PawnIO en marcha (tras T020): CORRECCIÓN
 
-Tras el ciclo de desinstalación y reinstalación silenciosa de T020 (`low-level-driver.md`), sin
-reiniciar y desde una sesión **sin** elevar (`IsInRole(Administrators)` → `False`), con
-`Get-Service PawnIO` → `Running`:
+**Esta entrada sustituye a una anterior del mismo día que afirmaba lo contrario y era errónea.**
+La versión retirada decía que un usuario estándar leía el SMU (`0x002B1800`) con el servicio en
+marcha y atribuía el `denied` de T152 a que nadie arrancaba el servicio. Esa lectura salió de una
+sesión de trabajo que **estaba elevada** (nivel de integridad alto): la comprobación empleada,
+`IsInRole('Administrators')`, devuelve siempre `False` en un Windows en español (el grupo se llama
+«Administradores»); solo la forma `IsInRole([WindowsBuiltInRole]::Administrator)` o
+`whoami /groups` es fiable.
 
-```json
-{
-  "cpu_vendor": "amd",
-  "state": "available",
-  "provider": "pawnio",
-  "provider_version": "2.2.0.0",
-  "registers": [],
-  "smu_version": "0x002B1800",
-  "log_clear_supported": false,
-  "details_code": "AMD_PM_TABLE_REQUIRES_ALLOWLIST",
-  "error": null
-}
-```
+Repetido con integridad **media** real (tarea programada `/RL LIMITED` del mismo usuario; la
+etiqueta del proceso es `S-1-16-8192`, «Nivel obligatorio medio») y con `Get-Service PawnIO` →
+`Running`:
 
-Lectura: el mismo binario que en T152 devuelve como usuario estándar el mismo SMU que el proceso
-elevado (`0x002B1800`). La diferencia con T152 no es el privilegio del proceso sino el estado del
-servicio: `sc sdshow PawnIO` no concede `SERVICE_START` a los usuarios interactivos y el servicio
-es `DEMAND_START`, así que tras un reinicio nadie lo arranca y la sonda ve `SMU_VERSION_ZERO`.
-**Contradicción anotada, no resuelta:** la frase de T152 «el nivel A solo es alcanzable con el
-sidecar elevado» debe leerse como «el nivel A requiere que un proceso con privilegios arranque
-el servicio»; el sidecar en sí puede seguir sin privilegios. No cambia el resultado (b) ni
-ADR-0004 (sigue haciendo falta un paso privilegiado por sesión), pero acota lo que ese paso debe
-hacer (véase `low-level-driver.md` § Consecuencias). Confirmación pendiente por reinicio:
+| Proceso | Nivel de integridad | Servicio PawnIO | Sonda |
+|---|---|---|---|
+| Sesión elevada | alto | Running | `available`, SMU `0x002B1800` |
+| Token restringido (`runas /trustlevel:0x20000`) | alto, sin administrador | Running | `denied`, SMU `0x00000000`, `SMU_VERSION_ZERO` |
+| Tarea `/RL LIMITED` | **medio (usuario estándar)** | Running | `denied`, SMU `0x00000000`, `SMU_VERSION_ZERO` |
 
-```powershell
-# tras reiniciar, sin elevar
-Get-Service PawnIO | Select-Object Status, StartType          # esperado: Stopped / Manual
-& .\apps\sensor-agent\bin\Debug\net10.0-windows\SensorAgent.exe --probe-low-level   # esperado: denied / SMU_VERSION_ZERO
-# elevar solo para arrancar el servicio y repetir la sonda sin elevar
-Start-Process sc.exe -ArgumentList 'start','PawnIO' -Verb RunAs -Wait
-& .\apps\sensor-agent\bin\Debug\net10.0-windows\SensorAgent.exe --probe-low-level   # esperado: available / 0x002B1800
-```
+Lectura: con el servicio en marcha, el usuario estándar sigue obteniendo `SMU_VERSION_ZERO`; la
+diferencia es el privilegio del proceso, no el estado del servicio. Queda **confirmado el
+resultado (b) de T152 y ADR-0004 sigue vigente sin enmienda**: el nivel A exige el sidecar
+elevado. Se descartan las opciones de «arrancar solo el servicio» que este spike y
+`low-level-driver.md` llegaron a apuntar.
+
+Regla para todas las pruebas de este spike: antes de anotar «usuario estándar», comprobar con
+`whoami /groups` la etiqueta de integridad (`S-1-16-8192` = media) o lanzar la orden con
+`schtasks /create … /rl LIMITED`; no confiar en `IsInRole('Administrators')`.
 
 ## Ejecución en el resto de la matriz (pendiente de hardware)
 

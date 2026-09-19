@@ -2,7 +2,7 @@
 
 **Estado:** ejecutado en el equipo de desarrollo; decisión legal pendiente de la persona responsable
 **Fecha:** 2026-09-19
-**Equipo:** AMD Ryzen 5 2600X, Windows 11 Pro 26200, sesión de usuario estándar; instalador
+**Equipo:** AMD Ryzen 5 2600X, Windows 11 Pro 26200, sesión de trabajo elevada (corregido: véase la pregunta 3); instalador
 `apps/desktop/src-tauri/resources/pawnio/PawnIO_setup_2.2.0.exe` (el que empaqueta T153)
 
 Responde a las preguntas 2, 3 y 4 de `research.md` § 9 («Preguntas del spike»). La pregunta 1
@@ -24,7 +24,9 @@ El instalador se copia a sí mismo como `C:\Program Files\PawnIO\uninstall.exe` 
 ## Ciclo ejecutado
 
 Ejecutado con dos elevaciones (una por proceso) aceptadas por la persona usuaria; las sondas
-intermedias se lanzaron como usuario estándar con `SensorAgent.exe --probe-low-level`.
+intermedias son `SensorAgent.exe --probe-low-level` lanzadas desde la sesión de trabajo, que
+estaba elevada. Las cifras de instalación y retirada no dependen de ello; las lecturas del SMU
+solo valen para «proceso elevado» (con integridad media dan `denied`).
 
 | Paso | Orden | Salida | Estado observado |
 |---|---|---|---|
@@ -33,7 +35,7 @@ intermedias se lanzaron como usuario estándar con `SensorAgent.exe --probe-low-
 | 1b | residuos tras 1 | — | entrada de servicio `PawnIO` sigue registrada (`STOPPED`, `DEMAND_START`, `WIN32_EXIT_CODE 31`) apuntando al `.sys` del DriverStore; paquete `oem44.inf` sigue en el DriverStore. Retirada completa solo tras reinicio o `pnputil /delete-driver oem44.inf /uninstall` |
 | 2 | sonda tras 1 | — | `missing`, `PAWNIO_NOT_INSTALLED` |
 | 3 | `PawnIO_setup_2.2.0.exe -install -silent` (elevado) | exit **0**, 1,1 s, **sin reinicio** | ficheros, clave `Uninstall` (2.2.0.0) y servicio **Running/Manual** de inmediato |
-| 4 | sonda tras 3 (usuario estándar, sin reiniciar) | — | `available`, SMU `0x002B1800`: la lectura funciona en cuanto el servicio está en marcha |
+| 4 | sonda tras 3 (desde la sesión de trabajo, **que estaba elevada**; véase la corrección de la pregunta 3) | — | `available`, SMU `0x002B1800`; con integridad media real el mismo binario da `denied` / `SMU_VERSION_ZERO` |
 | 5 | segundo `-install -silent` con PawnIO ya instalado (elevado) | exit **183** (`ERROR_ALREADY_EXISTS`) | sin cambios; mensaje interno «A previous installation of PawnIO was found. Please uninstall it first» |
 
 ## Respuestas
@@ -42,14 +44,16 @@ intermedias se lanzaron como usuario estándar con `SensorAgent.exe --probe-low-
 x64 firmado, sin dependencias, con instalación y retirada silenciosas y códigos de salida
 estables (0, 183). Jurídicamente, véase «Licencia» más abajo; la decisión no es de este spike.
 
-**3. ¿Permite una instalación por máquina la lectura posterior a usuario estándar?** Sí
-**mientras el servicio esté en marcha**. El descriptor de seguridad del servicio
-(`sc sdshow PawnIO`) da a `IU`/`SU` solo `CC LC SW LO CR RC`: los usuarios interactivos pueden
-consultar el servicio pero **no arrancarlo** (`RP` solo para `SY` y `BA`). Como el inicio es
-`DEMAND_START`, tras un reinicio el controlador está parado y el usuario estándar obtiene
-`denied` (fila del 2600X en `sensor-access.md`, T152). Es la causa raíz del resultado (b) de la
-puerta T019a: **no es que el dispositivo rechace al usuario estándar, es que nadie arranca el
-servicio**. Hoy el servicio estaba en marcha porque una sonda elevada previa lo había iniciado.
+**3. ¿Permite una instalación por máquina la lectura posterior a usuario estándar?** **No.**
+Con el servicio `PawnIO` en marcha, un proceso de integridad media (usuario estándar) obtiene
+`denied` / `SMU_VERSION_ZERO`, y solo un proceso elevado lee el SMU (`0x002B1800`); es el
+resultado (b) de T019a, confirmado en T152 y de nuevo aquí (`sensor-access.md`, «CORRECCIÓN»).
+*Corrección de una versión anterior de este documento (2026-09-19):* afirmaba que bastaba con que
+el servicio estuviera en marcha y que el privilegio no importaba; se basó en sondeos lanzados
+desde una sesión elevada, mal detectada como no elevada por usar `IsInRole('Administrators')`, que
+en Windows en español devuelve siempre `False`. Dato que sí se mantiene: el servicio es
+`DEMAND_START` y `sc sdshow PawnIO` da a `IU`/`SU` solo `CC LC SW LO CR RC` (`RP` solo para `SY`
+y `BA`), es decir, un usuario estándar tampoco podría arrancarlo tras un reinicio.
 
 **4. ¿Qué mecanismos de desinstalación y actualización exige?**
 
@@ -67,15 +71,14 @@ servicio**. Hoy el servicio estaba en marcha porque una sonda elevada previa lo 
 ## Consecuencias para T153 y T154
 
 1. `request_low_level_access` (T153) solo necesita **una** UAC y no requiere reinicio: tras
-   `-install -silent` el servicio ya está en marcha y el sidecar sin privilegios lee nivel A
-   en la misma sesión.
-2. La persistencia entre sesiones (T154) se reduce a **arrancar el servicio `PawnIO`** en cada
-   inicio de sesión, no a ejecutar el sidecar elevado. Opciones a valorar en T154 dentro del
-   marco de ADR-0004: (a) el lanzador elevado de la ADR arranca el servicio y no hace nada
-   más; (b) el paso elevado de T153 registra una tarea programada «al iniciar sesión» que
-   ejecute `sc start PawnIO` con privilegios; (c) cambiar el inicio del servicio a automático
-   (`sc config PawnIO start= auto`) modifica la configuración de un componente de terceros y
-   se descarta salvo que el proveedor lo documente. Este spike **no** decide entre ellas.
+   `-install -silent` el servicio queda en marcha y el sidecar **elevado** lee nivel A en la misma
+   sesión. El sidecar sin privilegios no puede (punto 3 arriba): T154 sigue siendo el lanzador
+   elevado de ADR-0004, sin cambios.
+2. Con un servicio `DEMAND_START` que un usuario estándar no puede arrancar, el lanzador elevado
+   de ADR-0004 es también quien deja el servicio en marcha si tras un reinicio está parado
+   (`sc start PawnIO` desde el proceso elevado, sin UAC porque la tarea programada ya está
+   registrada). T154 debe cubrirlo con una prueba: servicio `Stopped` → sesión de nivel A →
+   servicio `Running`.
 3. Códigos de salida a contemplar en el comando: `0` (instalado), `183` (ya instalado),
    cualquier otro → `error` con `details_code`. Con `-silent` no hay diálogo ni en error.
 4. El desinstalador de ThrottleWatch no toca PawnIO; documentar en la ayuda la retirada
