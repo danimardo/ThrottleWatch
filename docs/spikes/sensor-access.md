@@ -197,3 +197,70 @@ reiniciar y `0x002B1800` en el proceso elevado. ADR-0004 queda aceptado con cond
 por tanto T019a queda cerrada con resultado parcial y la implementación continúa por T153 → T154
 → T155, manteniendo B/C para cuentas estándar. El resto de la matriz de hardware y los demás
 spikes de L03 permanecen abiertos.
+
+### 2026-09-19 — equipo de desarrollo, usuario estándar con el servicio PawnIO en marcha (tras T020)
+
+Tras el ciclo de desinstalación y reinstalación silenciosa de T020 (`low-level-driver.md`), sin
+reiniciar y desde una sesión **sin** elevar (`IsInRole(Administrators)` → `False`), con
+`Get-Service PawnIO` → `Running`:
+
+```json
+{
+  "cpu_vendor": "amd",
+  "state": "available",
+  "provider": "pawnio",
+  "provider_version": "2.2.0.0",
+  "registers": [],
+  "smu_version": "0x002B1800",
+  "log_clear_supported": false,
+  "details_code": "AMD_PM_TABLE_REQUIRES_ALLOWLIST",
+  "error": null
+}
+```
+
+Lectura: el mismo binario que en T152 devuelve como usuario estándar el mismo SMU que el proceso
+elevado (`0x002B1800`). La diferencia con T152 no es el privilegio del proceso sino el estado del
+servicio: `sc sdshow PawnIO` no concede `SERVICE_START` a los usuarios interactivos y el servicio
+es `DEMAND_START`, así que tras un reinicio nadie lo arranca y la sonda ve `SMU_VERSION_ZERO`.
+**Contradicción anotada, no resuelta:** la frase de T152 «el nivel A solo es alcanzable con el
+sidecar elevado» debe leerse como «el nivel A requiere que un proceso con privilegios arranque
+el servicio»; el sidecar en sí puede seguir sin privilegios. No cambia el resultado (b) ni
+ADR-0004 (sigue haciendo falta un paso privilegiado por sesión), pero acota lo que ese paso debe
+hacer (véase `low-level-driver.md` § Consecuencias). Confirmación pendiente por reinicio:
+
+```powershell
+# tras reiniciar, sin elevar
+Get-Service PawnIO | Select-Object Status, StartType          # esperado: Stopped / Manual
+& .\apps\sensor-agent\bin\Debug\net10.0-windows\SensorAgent.exe --probe-low-level   # esperado: denied / SMU_VERSION_ZERO
+# elevar solo para arrancar el servicio y repetir la sonda sin elevar
+Start-Process sc.exe -ArgumentList 'start','PawnIO' -Verb RunAs -Wait
+& .\apps\sensor-agent\bin\Debug\net10.0-windows\SensorAgent.exe --probe-low-level   # esperado: available / 0x002B1800
+```
+
+## Ejecución en el resto de la matriz (pendiente de hardware)
+
+Para cada equipo de la tabla «Matriz de ejecución» que siga en `pendiente`, en ese equipo:
+
+1. Copiar la salida de `dotnet publish apps/sensor-agent/SensorAgent.csproj -c Release -r win-x64 --self-contained -o <carpeta>`
+   (o clonar el repositorio y compilar) y `docs/spikes/tools/sensor-access-matrix.ps1`.
+2. Ejecutar `powershell -ExecutionPolicy Bypass -File sensor-access-matrix.ps1 -Sidecar <carpeta>\SensorAgent.exe -Phase before`
+   sin PawnIO instalado y sin elevar. Genera `sensor-access-<fase>.json` con: CPU, familia,
+   Windows, alimentación, sonda, 10 s de contadores PDH por procesador lógico
+   (`% Processor Performance`, `Processor Frequency`, `% Processor Utility`) y catálogo LHM.
+3. Instalar PawnIO con `PawnIO_setup_2.2.0.exe -install` (una UAC), repetir con `-Phase installed`.
+4. Reiniciar, repetir sin elevar con `-Phase after-reboot`.
+5. Traer los tres JSON (no contienen identificadores) y rellenar la fila. El contraste con
+   APERF/MPERF sigue pendiente: el sidecar todavía no lee `0xE7`/`0xE8`; cuando lo haga, el
+   guion añadirá esa columna.
+
+### Hallazgo 2026-09-19 — contadores PDH localizados
+
+En este Windows en español `Get-Counter '\Processor Information(*)\% Processor Performance'`
+falla con «El objeto especificado no se encontró en el equipo»: los nombres PDH están
+localizados (`\Información del procesador(*)\% de rendimiento del procesador`) y
+`PdhLookupPerfNameByIndex` devuelve `PDH_INVALID_ARGUMENT` para los índices del proveedor v2
+«Processor Information», así que la tabla `Perflib\009` no sirve para traducirlos. El host
+Rust (`active_clock`/`base_clock` derivados, contrato IPC § Muestreo) debe abrir los contadores
+con `PdhAddEnglishCounterW`, nunca con la ruta localizada ni con la inglesa literal. El guion
+de la matriz usa `Win32_PerfFormattedData_Counters_ProcessorInformation`, cuyos nombres son
+fijos en todos los idiomas. Se anota para T-ENG (frecuencia derivada) y no se corrige aquí.
