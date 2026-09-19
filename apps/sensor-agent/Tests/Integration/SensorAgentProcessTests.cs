@@ -2,7 +2,6 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Runtime.Intrinsics.X86;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Shouldly;
@@ -12,22 +11,14 @@ namespace ThrottleWatch.SensorAgent.Tests.Integration;
 
 public sealed class SensorAgentProcessTests
 {
-    // A guest needs both the CPUID "hypervisor present" bit (leaf 1, ECX bit 31) and a
-    // virtual SMBIOS product name. The bit alone is also set on bare-metal Windows hosts
-    // with virtualization-based security enabled, so it cannot decide on its own.
-    // Used to decide whether the degraded-catalog assertions of T-INT-005
-    // (`virtualized-no-sensors`) apply; the CI runner is an Azure "Virtual Machine".
-    private static readonly string[] VirtualProductNames =
-        ["Virtual Machine", "VMware", "VirtualBox", "QEMU", "KVM", "Google Compute Engine"];
+    // The collector hides temperature, power and voltage on a guest (HostVirtualization);
+    // T-INT-005 checks that on the virtualized CI runner, whatever CPU vendor it lands on.
+    private static bool HypervisorPresent => HostVirtualization.IsVirtualized();
 
-    private static bool HypervisorPresent =>
-        X86Base.IsSupported
-        && (X86Base.CpuId(1, 0).Ecx & (1 << 31)) != 0
-        && VirtualProductNames.Any(name => SystemProductName.Contains(name, StringComparison.OrdinalIgnoreCase));
-
+    // Evidence only (printed in the CI log); the decision above uses the production classifier.
     private static string SystemProductName =>
-        Microsoft.Win32.Registry.GetValue(
-            @"HKEY_LOCAL_MACHINE\HARDWARE\DESCRIPTION\System\BIOS", "SystemProductName", null) as string ?? string.Empty;
+        Microsoft.Win32.Registry.GetValue(@"HKEY_LOCAL_MACHINE\HARDWARE\DESCRIPTION\System\BIOS", "SystemProductName", null) as string
+        ?? string.Empty;
 
     [Fact]
     [Trait("Category", "Integration")]
@@ -63,11 +54,9 @@ public sealed class SensorAgentProcessTests
         }
 
         // Virtualized host without sensors: the collector must still open, list whatever the
-        // library exposes and report every physical reading as unavailable instead of throwing
-        // (the library throws from Update() on the CI runner; the collector maps that to "missing").
-        var physical = sample.Where(reading => catalog
-            .First(descriptor => descriptor.Id == reading.SensorId).Metric is "temperature" or "power" or "voltage");
-        physical.ShouldAllBe(reading => reading.Status == "invalid" || reading.Status == "missing", summary);
+        // library still exposes (load) and never publish physical readings: the library reports
+        // temperature/power/voltage from virtual MSRs (0 °C, 0 W, constant volts) with status ok.
+        catalog.ShouldNotContain(descriptor => descriptor.Metric == "temperature" || descriptor.Metric == "power" || descriptor.Metric == "voltage", summary);
         access.State.ShouldNotBe("available", summary);
     }
 

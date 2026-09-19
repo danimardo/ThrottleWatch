@@ -21,6 +21,9 @@ public static partial class Log
     [LoggerMessage(EventId = 1002, Level = LogLevel.Warning, Message = "{Code}: hardware {HardwareId} update failed ({ExceptionType})")]
     public static partial void HardwareUpdateFailed(this ILogger logger, string Code, string HardwareId, string ExceptionType, Exception exception);
 
+    [LoggerMessage(EventId = 1003, Level = LogLevel.Information, Message = "{Code}: physical sensors are hidden on a virtualized host")]
+    public static partial void HostVirtualized(this ILogger logger, string Code);
+
     public static void AttachUnhandledExceptionHandlers(ILogger logger)
     {
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>

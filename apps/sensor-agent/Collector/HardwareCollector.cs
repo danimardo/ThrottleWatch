@@ -72,18 +72,21 @@ public sealed class HardwareCollector : ICollectorSession, IDisposable
     private readonly IHardwareSource source;
     private readonly ILogger logger;
     private readonly HashSet<string> failedUpdates = [];
+    private readonly Func<bool> isVirtualized;
     private bool opened;
     private bool catalogRead;
+    private bool virtualizedHost;
 
     public HardwareCollector()
-        : this(new ComputerHardwareSource(), Log.Create("sensor-agent.collector"))
+        : this(new ComputerHardwareSource(), Log.Create("sensor-agent.collector"), HostVirtualization.IsVirtualized)
     {
     }
 
-    internal HardwareCollector(IHardwareSource source, ILogger logger)
+    internal HardwareCollector(IHardwareSource source, ILogger logger, Func<bool>? isVirtualized = null)
     {
         this.source = source;
         this.logger = logger;
+        this.isVirtualized = isVirtualized ?? (() => false);
     }
 
     public bool IsOpen => opened;
@@ -97,13 +100,18 @@ public sealed class HardwareCollector : ICollectorSession, IDisposable
 
         source.Open();
         opened = true;
+        virtualizedHost = isVirtualized();
+        if (virtualizedHost)
+        {
+            logger.HostVirtualized("HOST_VIRTUALIZED");
+        }
     }
 
     public IReadOnlyList<SensorDescriptor> ReadCatalog()
     {
         EnsureOpened();
         var catalog = source.CpuHardware()
-            .SelectMany(hardware => hardware.Sensors.Select(sensor =>
+            .SelectMany(hardware => hardware.Sensors.Where(sensor => !IsHiddenOnThisHost(sensor.SensorType)).Select(sensor =>
                 new SensorDescriptor(
                     $"{hardware.Identifier}/{sensor.Name}",
                     hardware.Identifier.ToString(),
@@ -141,7 +149,7 @@ public sealed class HardwareCollector : ICollectorSession, IDisposable
             // makes the library throw from inside Update(); the sidecar must keep running
             // and report the readings as missing instead of dying (T-INT-005).
             var updated = TryUpdate(hardware);
-            foreach (var sensor in hardware.Sensors)
+            foreach (var sensor in hardware.Sensors.Where(sensor => !IsHiddenOnThisHost(sensor.SensorType)))
             {
                 var id = $"{hardware.Identifier}/{sensor.Name}";
                 if (!updated)
@@ -168,6 +176,10 @@ public sealed class HardwareCollector : ICollectorSession, IDisposable
             catalogRead = false;
         }
     }
+
+    /// <summary>Guests report physical sensors from virtual MSRs; those are not measurements (see HostVirtualization).</summary>
+    private bool IsHiddenOnThisHost(SensorType type) =>
+        virtualizedHost && type is SensorType.Temperature or SensorType.Power or SensorType.Voltage;
 
     public static bool IsPhysicallyValid(SensorType type, float value)
     {
