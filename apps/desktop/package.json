@@ -1,0 +1,35 @@
+{
+  "name": "@throttlewatch/desktop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "check": "svelte-check --tsconfig ./tsconfig.app.json --fail-on-warnings && tsc --noEmit -p tsconfig.node.json",
+    "test": "vitest run --config vitest.config.ts",
+    "test:unit": "vitest run --config vitest.unit.config.ts",
+    "test:component": "vitest run --config vitest.component.config.ts",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "lint": "eslint .",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "@tauri-apps/api": "2.11.1",
+    "loglevel": "1.9.2",
+    "svelte": "5.57.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "7.3.0",
+    "@tsconfig/svelte": "5.0.8",
+    "svelte-check": "4.7.6",
+    "@vitest/coverage-v8": "5.0.1",
+    "@playwright/test": "1.63.0",
+    "jsdom": "30.1.0",
+    "typescript": "6.0.3",
+    "vite": "8.3.0",
+    "vitest": "5.0.1"
+  }
+}

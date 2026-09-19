@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  foundation:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format
+      - run: pnpm lint
+      - run: pnpm check
+      - run: pnpm design:check
+      - run: pnpm check:contracts
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm check:traceability
+      - run: pnpm licenses list --json > docs/licenses/npm.json
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore apps/sensor-agent/SensorAgent.csproj --locked-mode
+      - run: dotnet format apps/sensor-agent/SensorAgent.csproj --no-restore --verify-no-changes
+      - run: dotnet build apps/sensor-agent/SensorAgent.csproj --no-restore
+      - run: dotnet format apps/sensor-agent/Tests/SensorAgent.Tests.csproj --no-restore --verify-no-changes
+      - run: dotnet build apps/sensor-agent/Tests/SensorAgent.Tests.csproj --no-restore
+      - run: dotnet apps/sensor-agent/Tests/bin/Debug/net10.0-windows/SensorAgent.Tests.dll -noColor -reporter silent
+      - run: dotnet tool install --global nuget-license --version 4.0.17
+      - run: nuget-license -i apps/sensor-agent/SensorAgent.sln -t -o JsonPretty -fo docs/licenses/nuget.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.98.1
+          components: rustfmt, clippy, llvm-tools-preview
+      - name: Install Rust test tooling
+        run: |
+          cargo install cargo-nextest --version 0.9.145 --locked
+          cargo install cargo-llvm-cov --version 0.9.1 --locked
+          cargo install cargo-deny --version 0.20.2 --locked
+          cargo install cargo-about --version 0.8.2 --locked
+      - run: cargo fmt --all -- --check
+        working-directory: apps/desktop/src-tauri
+      - run: cargo check --locked
+        working-directory: apps/desktop/src-tauri
+      - run: cargo clippy --locked -- -D warnings
+        working-directory: apps/desktop/src-tauri
+      - run: $env:RUSTFLAGS='-A linker_messages'; cargo nextest run --profile ci --no-tests=pass
+        working-directory: apps/desktop/src-tauri
+      - run: cargo llvm-cov --no-report --locked
+        working-directory: apps/desktop/src-tauri
+      - run: cargo deny check advisories licenses sources
+        working-directory: apps/desktop/src-tauri
+      - name: Report Rust duplicate dependencies
+        continue-on-error: true
+        run: cargo deny check bans
+        working-directory: apps/desktop/src-tauri
+      - run: cargo about generate -o ..\..\..\docs\licenses\rust-third-party.html ..\..\..\about.hbs
+        working-directory: apps/desktop/src-tauri
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: l00-test-artifacts
+          path: |
+            apps/desktop/coverage/
+            apps/desktop/playwright-report/
+          if-no-files-found: ignore

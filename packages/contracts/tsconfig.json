@@ -1,0 +1,8 @@
+{
+  "extends": "../../apps/desktop/tsconfig.node.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "src"
+  },
+  "include": ["src/**/*.ts"]
+}

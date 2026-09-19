@@ -2,6 +2,19 @@
 
 Este documento describe el estado objetivo del repositorio. Los comandos de aplicación empezarán a funcionar a medida que se completen las tareas.
 
+## Scripts disponibles en L00
+
+Desde la raíz del repositorio:
+
+- `pnpm test:unit`: suite unitaria de Vitest.
+- `pnpm test:component`: suite de componentes de Vitest.
+- `pnpm test:corpus`: valida la integridad del corpus etiquetado v1.
+- `pnpm test:e2e`: Playwright para los proyectos `frontend` y `app`.
+- `pnpm verify:batch`: formato, lint, check, pruebas y compilación.
+- `pnpm verify:pr`: instalación bloqueada y verificación completa del lote.
+- `pnpm design:check`: comprobaciones del harness y mockup del sistema de diseño.
+- `pnpm logs:view`: indicación del origen de los registros locales.
+
 ## 1. Preparar SpecKit
 
 ```powershell
@@ -49,7 +62,7 @@ pnpm test
 pnpm lint
 pnpm test:e2e
 cargo test --workspace
-dotnet test .\apps\sensor-agent
+dotnet test .\apps\sensor-agent --no-restore
 ```
 
 `pnpm dev` debe compilar/iniciar el sidecar de desarrollo y lanzar Tauri. Debe existir también un modo replay que no requiera acceso real al hardware:
@@ -125,7 +138,7 @@ cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 dotnet format --verify-no-changes .\apps\sensor-agent
-dotnet test .\apps\sensor-agent
+dotnet test .\apps\sensor-agent --no-restore
 pnpm test:e2e
 ```
 

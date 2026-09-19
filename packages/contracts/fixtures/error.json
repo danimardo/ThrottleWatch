@@ -1,0 +1,8 @@
+{
+  "protocol_version": 1,
+  "session_nonce": "fixture-session-nonce-1",
+  "sequence": 3,
+  "timestamp_utc": "2026-09-18T10:00:02.000Z",
+  "type": "error",
+  "payload": { "code": "SENSOR_ENUMERATION_FAILED", "severity": "recoverable", "message_key": "collector.sensor_enumeration_failed", "context": { "hardware_type": "cpu" } }
+}

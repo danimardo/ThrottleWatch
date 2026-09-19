@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ThrottleWatch third-party licenses</title>
+</head>
+<body>
+  <h1>ThrottleWatch third-party licenses</h1>
+  {{#each licenses}}
+  <section>
+    <h2>{{name}} {{version}}</h2>
+    <p>{{license}}</p>
+    {{#if text}}
+    <pre>{{text}}</pre>
+    {{/if}}
+  </section>
+  {{/each}}
+</body>
+</html>

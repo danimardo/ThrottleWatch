@@ -1,0 +1,33 @@
+{
+  "messages": [
+    {
+      "protocol_version": 1,
+      "session_nonce": "fixture-session-nonce-1",
+      "sequence": 0,
+      "timestamp_utc": "2026-09-18T10:00:00.000Z",
+      "type": "hello_ack",
+      "payload": {
+        "agent_version": "0.1.0",
+        "selected_protocol": 1,
+        "runtime": ".NET",
+        "low_level_access": { "state": "available", "provider": "fixture", "details_code": null }
+      }
+    },
+    {
+      "protocol_version": 1,
+      "session_nonce": "fixture-session-nonce-1",
+      "sequence": 1,
+      "timestamp_utc": "2026-09-18T10:00:01.000Z",
+      "type": "sample",
+      "payload": {
+        "monotonic_ms": 1000,
+        "duration_ms": 28,
+        "values": [
+          { "sensor_id": "cpu.package.temp", "number": 96, "status": "ok" },
+          { "sensor_id": "cpu.thermal.flag", "boolean": true, "status": "ok" },
+          { "sensor_id": "cpu.package.power", "number": 42, "status": "ok" }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+disallowed-macros = [
+  { path = "std::print", reason = "usa el envoltorio de logging" },
+  { path = "std::println", reason = "usa el envoltorio de logging" },
+  { path = "std::dbg", reason = "no se permite depuración temporal" }
+]

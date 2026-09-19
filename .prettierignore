@@ -1,0 +1,8 @@
+node_modules/
+dist/
+build/
+coverage/
+packages.lock.json
+Cargo.lock
+pnpm-lock.yaml
+apps/desktop/src/design-system/

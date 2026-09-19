@@ -286,3 +286,36 @@ Sin verdad de referencia objetiva, «90 % de acierto» no es verificable. Los bi
 | Clave de firma del actualizador comprometida | Alto | secreto solo en CI protegida, rotación documentada y clave pública fijada en binario |
 | Restauración de ventana con topología de monitores distinta | Bajo/medio | validar área visible y recentrar antes de mostrar |
 | Traducciones divergentes o literales sin catálogo | Medio | igualdad de claves y detector de literales en CI |
+
+## 16. Acceso avanzado y redistribución de PawnIO
+
+*Añadido el 2026-09-19 por T158.*
+
+### Decisión de versión
+
+- Versión mínima aceptada: `2.2.0`.
+- Versión fijada para el instalador de ThrottleWatch: `2.2.0`.
+- Si ya existe una versión igual o superior, se reutiliza sin instalar ni pedir UAC. Una versión
+  inferior solo se actualiza mediante la acción explícita de reparación/actualización.
+- La release oficial 2.2.0 se conserva como referencia de procedencia y se verificará por firma
+  Authenticode y hash antes de cualquier lanzamiento. El hash concreto pertenece al artefacto de
+  release y no se inventa en documentación hasta fijar el fichero binario exacto.
+
+### Licencia y condición de distribución
+
+El código fuente oficial de PawnIO declara GPL-2.0-or-later con una excepción para combinarlo
+con software GPL/LGPL y módulos independientes que se comuniquen únicamente mediante la interfaz
+de dispositivo. El repositorio oficial de `PawnIO.Setup` publica las releases del instalador,
+pero su README no contiene una licencia separada del instalador binario. Por ello, la distribución
+del instalador empaquetado queda condicionada a conservar el texto de licencia y el aviso de la
+release 2.2.0 junto al artefacto y a completar la revisión legal del paquete antes de T153.
+
+No se atribuye a ThrottleWatch una licencia de PawnIO, no se modifica el controlador y el
+desinstalador nunca lo elimina. La fuente consultada queda registrada en `THIRD-PARTY-NOTICES`.
+
+### Dependencias
+
+`T020 → T153`: la decisión de proveedor y su contrato de instalación preceden al empaquetado.
+`T151` define la revisión de amenazas del lanzador elevado; `T153–T155` permanecen bloqueadas
+hasta su aprobación. La regla de vida del `Computer` y la prueba de runner del sidecar se
+implementan independientemente en `T162–T163`.

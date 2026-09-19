@@ -1,0 +1,4 @@
+T:System.Console
+T:System.Diagnostics.Debug
+T:System.Diagnostics.Trace
+M:System.Environment.GetEnvironmentVariable(System.String)

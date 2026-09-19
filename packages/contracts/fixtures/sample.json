@@ -1,0 +1,8 @@
+{
+  "protocol_version": 1,
+  "session_nonce": "fixture-session-nonce-1",
+  "sequence": 2,
+  "timestamp_utc": "2026-09-18T10:00:01.000Z",
+  "type": "sample",
+  "payload": { "monotonic_ms": 1000, "duration_ms": 28, "values": [{ "sensor_id": "cpu.package.temp", "number": 72.5, "status": "ok" }] }
+}

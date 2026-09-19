@@ -1,0 +1,8 @@
+{
+  "protocol_version": 1,
+  "session_nonce": "fixture-session-nonce-1",
+  "sequence": 4,
+  "timestamp_utc": "2026-09-18T10:00:03.000Z",
+  "type": "error",
+  "payload": { "code": "not-uppercase", "severity": "recoverable", "message_key": "collector.invalid" }
+}

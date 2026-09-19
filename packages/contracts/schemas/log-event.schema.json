@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://throttlewatch.local/schemas/log-event-v1.json",
+  "title": "ThrottleWatch log event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ts", "level", "component", "target", "code", "msg", "session_id", "protocol_version", "fields"],
+  "properties": {
+    "ts": { "type": "string", "format": "date-time" },
+    "level": { "enum": ["trace", "debug", "info", "warn", "error"] },
+    "component": { "enum": ["ui", "core", "agent"] },
+    "target": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "code": { "type": "string", "pattern": "^[A-Z0-9_]+$" },
+    "msg": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "session_id": { "type": ["string", "null"], "maxLength": 128 },
+    "protocol_version": { "type": "integer", "minimum": 1 },
+    "fields": { "type": "object", "additionalProperties": true },
+    "err": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["code", "message_key"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^[A-Z0-9_]+$" },
+        "message_key": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "path": { "type": ["string", "null"], "maxLength": 256 },
+        "context": { "type": ["object", "null"], "additionalProperties": true }
+      }
+    }
+  }
+}

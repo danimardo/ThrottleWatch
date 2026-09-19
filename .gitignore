@@ -9,6 +9,7 @@ pnpm-debug.log*
 # Rust (apps/desktop/src-tauri, once the app exists)
 # Cargo.lock is intentionally tracked for a binary crate (reproducible builds).
 target/
+.tools/
 
 # .NET (apps/sensor-agent, once the app exists)
 bin/
@@ -26,6 +27,12 @@ logs/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Test reports and tool caches
+test-results/
+playwright-report/
+TestResults/
+.specify/integrations/.cache/
 
 # Browser automation screenshots taken during verification
 .playwright-mcp/

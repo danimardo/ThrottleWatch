@@ -100,6 +100,9 @@ flowchart TD
 **Sidecar .NET**
 
 - Integra LibreHardwareMonitorLib sin ejecutar su GUI.
+- Mantiene un único `Computer` abierto durante toda la vida del proceso; `Close()` solo se ejecuta
+  al salir. El catálogo se lee antes de cada sonda de acceso avanzado y la misma sesión de
+  `Computer` se reutiliza al revalidar cobertura.
 - Descubre hardware y sensores; conserva nombre/ID original.
 - Normaliza magnitud, unidad, alcance y topología cuando puede.
 - Emite capacidades y muestras; no emite diagnósticos de negocio.
@@ -112,10 +115,14 @@ flowchart TD
 
 **Acceso de bajo nivel**
 
-- La instalación de un controlador firmado, si la distribución lo permite y el usuario lo acepta, ocurre en un paso explícito con UAC.
+- La versión mínima aceptada y la versión empaquetada de PawnIO son `2.2.0`; la instalación del
+  instalador oficial, si el usuario la acepta, ocurre en un paso explícito con UAC y nunca se
+  descarga durante la ejecución.
 - La aplicación intenta primero modo estándar. La cobertura reducida es un estado soportado.
 - El MVP no elevará silenciosamente la UI ni ejecutará comandos arbitrarios.
-- Un servicio privilegiado persistente solo se añadirá si un spike demuestra que es imprescindible y supera una revisión de amenazas.
+- El lanzador elevado bajo demanda y la tubería autenticada quedan definidos por
+  `docs/adr/0004-lanzador-elevado-del-sidecar.md`, aceptado el 2026-09-19. Su implementación debe
+  añade un servicio privilegiado persistente.
 
 ## Flujo de datos
 
@@ -391,7 +398,7 @@ tests/
 2. ¿Qué porcentaje de la matriz de hardware objetivo alcanza nivel A (Intel) y nivel B (con potencia) sin acceso?
 3. En AMD, ¿qué versiones de la tabla PM del SMU se pueden incluir en la lista permitida?
 
-Resultados posibles: **(a)** nivel A sin UAC recurrente → se continúa con el plan completo. **(b)** Nivel A solo con un servicio privilegiado → se continúa si el servicio supera la revisión de amenazas exigida por la constitución (principio IV); si no, (c). **(c)** Nivel A inalcanzable → el producto se reposiciona como explicador prudente (niveles B/C), se retiran la clasificación confirmada y el potencial cuantificado de la propuesta de valor y se decide explícitamente si continuar. La decisión se registra en un ADR.
+Resultados posibles: **(a)** nivel A sin UAC recurrente → se continúa con el plan completo. **(b)** Nivel A solo con un lanzador elevado bajo demanda → se continúa únicamente después de aprobar ADR-0004 y completar la revisión de amenazas exigida por la constitución (principio IV); si no, (c). **(c)** Nivel A inalcanzable → el producto se reposiciona como explicador prudente (niveles B/C), se retiran la clasificación confirmada y el potencial cuantificado de la propuesta de valor y se decide explícitamente si continuar. La decisión se registra en un ADR.
 
 - Confirmar sensores expuestos en Intel/AMD y comportamiento sin privilegios.
 - Probar empaquetado del sidecar en x64 y validar firma/controlador.

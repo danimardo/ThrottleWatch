@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  html, body { margin: 0; padding: 0; background: transparent; }
+  svg { display: block; }
+</style>
+</head>
+<body>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!--
+    ThrottleWatch app icon — "anillo parcial" concept.
+    Backdrop: rounded-square ("squircle-ish", radius ~22% of the
+    canvas) filled with the app's own --bg dark value (#101114), the
+    same near-black ground the Cover component (in the separate
+    ThrottleWatch visual Design System artifact — not part of this
+    Svelte package) uses — the icon reads as an extension of the
+    in-app dark identity, not a new color.
+    Glyph: the thermal ring gauge, the product's one signature shape —
+    drawn much chunkier than the in-UI StatusHero ring (which is a
+    130px UI element that can afford a slender stroke) because a
+    16-32px taskbar icon needs a bold, high-contrast shape to read at
+    all. Track in --surface-sunken, progress arc in --status-thermal
+    (dark values, hardcoded — an OS icon can't respond to the app's
+    own theme toggle, so it always ships in the dark-native identity).
+  -->
+  <rect x="0" y="0" width="1024" height="1024" rx="225" ry="225" fill="#101114" />
+  <circle cx="512" cy="512" r="300" fill="none" stroke="#2C2C2E" stroke-width="110" />
+  <circle
+    cx="512" cy="512" r="300" fill="none"
+    stroke="#FF453A" stroke-width="110" stroke-linecap="round"
+    stroke-dasharray="1885.0"
+    stroke-dashoffset="490"
+    transform="rotate(-90 512 512)"
+  />
+</svg>
+</body>
+</html>

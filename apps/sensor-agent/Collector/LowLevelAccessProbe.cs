@@ -43,7 +43,12 @@ public static class LowLevelAccessProbe
 
     public static string RunJson()
     {
-        return JsonSerializer.Serialize(Run(), JsonOptions);
+        return ToJson(Run());
+    }
+
+    public static string ToJson(LowLevelAccessProbeReport report)
+    {
+        return JsonSerializer.Serialize(report, JsonOptions);
     }
 
     public static LowLevelAccessProbeReport Run()

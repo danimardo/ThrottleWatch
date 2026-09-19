@@ -1,0 +1,12 @@
+{
+  "protocol_version": 1,
+  "session_nonce": "fixture-session-nonce-1",
+  "sequence": 1,
+  "timestamp_utc": "2026-09-18T10:00:00.100Z",
+  "type": "capabilities",
+  "payload": {
+    "cpu": { "vendor": "intel", "display_name": "Fixture CPU", "logical_processors": 8, "physical_cores": 4, "hybrid": false, "virtualized": true },
+    "groups": [{ "id": "all", "kind": "homogeneous", "logical_count": 8 }],
+    "sensors": [{ "id": "cpu.package.temp", "source_id": "fixture-temp", "source_name": "CPU Package", "metric": "temperature", "scope": "package", "scope_ref": null, "unit": "celsius", "quality": "direct" }]
+  }
+}

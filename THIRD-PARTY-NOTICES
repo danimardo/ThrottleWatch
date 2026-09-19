@@ -1,0 +1,13 @@
+ThrottleWatch incluye o prevé incluir componentes de terceros bajo las licencias indicadas en
+docs/licenses/inventory.md. Los avisos completos de dependencias transitivas se generan durante
+el pipeline de distribución y se incorporan al paquete publicado.
+
+PawnIO 2.2.0
+-------------
+Procedencia: https://github.com/namazso/PawnIO.Setup/releases/tag/2.2.0
+Código fuente y licencia declarada: https://github.com/namazso/PawnIO
+Licencia del código fuente: GNU General Public License, versión 2 o posterior, con la excepción
+de combinación indicada por los titulares en el aviso de licencia de PawnIO. El instalador oficial
+se conserva sin modificaciones y su redistribución queda sujeta a conservar el aviso/licencia de
+la release y a la revisión legal del artefacto binario antes de T153.
+ThrottleWatch no desinstala ni sustituye PawnIO; es un controlador compartido por máquina.

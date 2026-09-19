@@ -1,0 +1,6 @@
+packages:
+  - apps/desktop
+  - packages/contracts
+
+minimumReleaseAgeExclude:
+  - prettier@3.9.8

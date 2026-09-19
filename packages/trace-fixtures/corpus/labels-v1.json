@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "cases": [
+    { "id": "intel-hybrid-thermal", "source": "intel-thermal-confirmed.json", "expected": "thermal_confirmed", "reasons": ["thermal_reason"], "levels": ["A", "B", "C"] },
+    { "id": "intel-turbo-end", "source": "intel-turbo-end.json", "expected": "normal", "reasons": ["turbo_end"], "levels": ["A", "B", "C"] },
+    { "id": "portable-dptf", "source": "portable-dptf.json", "expected": "platform_limited", "reasons": ["progressive_power_limit_drop"], "levels": ["A", "B"] },
+    { "id": "desktop-open-limits", "source": "desktop-open-limits.json", "expected": "normal", "reasons": ["no_limiting_evidence"], "levels": ["A", "B", "C"] },
+    { "id": "amd-zen4-thermal", "source": "amd-zen4-thermal.json", "expected": "thermal_confirmed", "reasons": ["thermal_reason"], "levels": ["A", "B"] },
+    { "id": "few-cores-game", "source": "few-cores-game.json", "expected": "normal", "reasons": ["no_sustained_load"], "levels": ["A", "B", "C"] },
+    { "id": "hot-start", "source": "hot-start.json", "expected": "hot_unproven", "reasons": ["no_sustained_load"], "levels": ["A", "B", "C"] },
+    { "id": "eco-qos", "source": "eco-qos.json", "expected": "indeterminate", "reasons": ["energy_policy"], "levels": ["A", "B", "C"] }
+  ]
+}
