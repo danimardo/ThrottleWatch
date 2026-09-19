@@ -1,5 +1,6 @@
 namespace ThrottleWatch.SensorAgent.Protocol;
 
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -58,7 +59,9 @@ public static class ProtocolValidator
                 || !root.TryGetProperty("type", out var type)
                 || string.IsNullOrWhiteSpace(type.GetString())
                 || !root.TryGetProperty("payload", out var payload)
-                || payload.ValueKind != JsonValueKind.Object)
+                || payload.ValueKind != JsonValueKind.Object
+                || !IsKnownType(type.GetString()!)
+                || !IsValidPayload(type.GetString()!, payload))
             {
                 sequence = 0;
                 return false;
@@ -66,9 +69,97 @@ public static class ProtocolValidator
 
             return true;
         }
-        catch (JsonException)
+        catch (Exception exception)
+            when (exception is JsonException or InvalidOperationException or FormatException)
         {
             return false;
         }
+    }
+
+    private static bool IsKnownType(string type) => type is
+        "hello" or "hello_ack" or "capabilities" or "start" or "started" or "set_rate" or
+        "snapshot" or "sample" or "stop" or "stopped" or "shutdown" or "error";
+
+    private static bool IsValidPayload(string type, JsonElement payload) => type switch
+    {
+        "hello" => payload.TryGetProperty("app_version", out var appVersion)
+            && appVersion.ValueKind == JsonValueKind.String
+            && !string.IsNullOrWhiteSpace(appVersion.GetString())
+            && payload.TryGetProperty("supported_protocols", out var protocols)
+            && protocols.ValueKind == JsonValueKind.Array
+            && protocols.EnumerateArray().Any(protocol => protocol.TryGetInt32(out var value) && value == 1),
+        "capabilities" => payload.TryGetProperty("cpu", out var cpu)
+            && cpu.ValueKind == JsonValueKind.Object
+            && payload.TryGetProperty("groups", out var groups)
+            && groups.ValueKind == JsonValueKind.Array
+            && payload.TryGetProperty("sensors", out var sensors)
+            && sensors.ValueKind == JsonValueKind.Array,
+        "sample" => IsValidSamplePayload(payload),
+        "error" => IsValidErrorPayload(payload),
+        _ => true
+    };
+
+    private static bool IsValidSamplePayload(JsonElement payload)
+    {
+        if (!payload.TryGetProperty("monotonic_ms", out var monotonic)
+            || !monotonic.TryGetInt64(out _)
+            || !payload.TryGetProperty("duration_ms", out var duration)
+            || !duration.TryGetInt64(out var durationValue)
+            || durationValue < 0
+            || durationValue > 10_000
+            || !payload.TryGetProperty("values", out var values)
+            || values.ValueKind != JsonValueKind.Array)
+        {
+            return false;
+        }
+
+        foreach (var value in values.EnumerateArray())
+        {
+            if (value.ValueKind != JsonValueKind.Object
+                || !value.TryGetProperty("sensor_id", out var sensorId)
+                || string.IsNullOrWhiteSpace(sensorId.GetString())
+                || !value.TryGetProperty("status", out var status))
+            {
+                return false;
+            }
+
+            var statusValue = status.GetString();
+            var hasNumber = value.TryGetProperty("number", out var number)
+                && number.ValueKind == JsonValueKind.Number;
+            var hasBoolean = value.TryGetProperty("boolean", out var boolean)
+                && (boolean.ValueKind is JsonValueKind.True or JsonValueKind.False);
+            if (statusValue == "ok" ? hasNumber == hasBoolean : hasNumber || hasBoolean)
+            {
+                return false;
+            }
+
+            if (statusValue is not ("ok" or "missing" or "stale" or "invalid" or "unsupported"))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsValidErrorPayload(JsonElement payload)
+    {
+        if (!payload.TryGetProperty("code", out var code)
+            || code.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(code.GetString())
+            || code.GetString()!.Any(character =>
+                !(character is >= 'A' and <= 'Z')
+                && !(character is >= '0' and <= '9')
+                && character != '_')
+            || !payload.TryGetProperty("severity", out var severity)
+            || severity.GetString() is not ("info" or "recoverable" or "fatal")
+            || !payload.TryGetProperty("message_key", out var messageKey)
+            || messageKey.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(messageKey.GetString()))
+        {
+            return false;
+        }
+
+        return true;
     }
 }

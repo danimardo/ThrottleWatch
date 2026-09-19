@@ -1,37 +1,40 @@
-use serde_json::Value;
+use std::{fs, path::PathBuf};
 
-const HANDSHAKE: &str =
-    include_str!("../../../../../../packages/contracts/fixtures/handshake.json");
-const INVALID_SAMPLE: &str =
-    include_str!("../../../../../../packages/contracts/fixtures/invalid-sample.json");
+use super::protocol::validate_message;
 
-#[test]
-fn canonical_handshake_deserializes_as_an_ipc_envelope() {
-    let value = match serde_json::from_str::<Value>(HANDSHAKE) {
-        Ok(value) => value,
-        Err(error) => panic!("fixture must be valid JSON: {error}"),
-    };
-
-    assert_eq!(value.get("protocol_version"), Some(&Value::from(1)));
-    assert_eq!(value.get("type").and_then(Value::as_str), Some("hello"));
-    assert!(value.get("payload").is_some_and(Value::is_object));
+fn fixture_paths() -> Vec<PathBuf> {
+    let fixture_dir =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../packages/contracts/fixtures");
+    let mut paths = fs::read_dir(fixture_dir)
+        .unwrap_or_else(|error| panic!("contract fixture directory must exist: {error}"))
+        .map(|entry| {
+            entry.unwrap_or_else(|error| panic!("fixture entry must be readable: {error}")).path()
+        })
+        .filter(|path| path.extension().is_some_and(|extension| extension == "json"))
+        .collect::<Vec<_>>();
+    paths.sort();
+    paths
 }
 
 #[test]
-fn invalid_sample_is_rejected_by_the_value_shape_guard() {
-    let value = match serde_json::from_str::<Value>(INVALID_SAMPLE) {
-        Ok(value) => value,
-        Err(error) => panic!("fixture must be valid JSON: {error}"),
-    };
-    let sample = value
-        .get("payload")
-        .and_then(|payload| payload.get("values"))
-        .and_then(Value::as_array)
-        .and_then(|values| values.first());
+fn all_contract_fixtures_have_the_same_acceptance_result() {
+    let paths = fixture_paths();
+    assert_eq!(paths.len(), 6, "the conformance corpus must contain six fixtures");
 
-    assert!(
-        sample.is_some_and(|entry| {
-            entry.get("number").is_some() && entry.get("boolean").is_some()
-        })
-    );
+    for path in paths {
+        let raw =
+            fs::read(&path).unwrap_or_else(|error| panic!("fixture must be readable: {error}"));
+        let value = serde_json::from_slice::<serde_json::Value>(&raw)
+            .unwrap_or_else(|error| panic!("fixture must be valid JSON: {error}"));
+        let nonce = value
+            .get("session_nonce")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_else(|| panic!("fixture must contain a session nonce"));
+        let accepted = validate_message(&raw, nonce, None).is_ok();
+        let expected = !path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.starts_with("invalid-"));
+        assert_eq!(accepted, expected, "fixture {:?}", path.file_name());
+    }
 }

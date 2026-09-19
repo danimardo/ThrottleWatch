@@ -3,42 +3,43 @@ namespace ThrottleWatch.SensorAgent.Tests;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
+using System.Linq;
 using System.Text.Json;
 using Shouldly;
 using ThrottleWatch.SensorAgent.Protocol;
 
 public sealed class ProtocolFixturesTests
 {
-    public static IEnumerable<object[]> ValidFixtures()
+    public static IEnumerable<object[]> ContractFixtures()
     {
-        yield return ["handshake.json"];
-        yield return ["capabilities.json"];
-        yield return ["sample.json"];
-        yield return ["error.json"];
+        var fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "Fixtures");
+        foreach (var path in Directory.EnumerateFiles(fixtureDirectory, "*.json").OrderBy(path => path))
+        {
+            yield return [Path.GetFileName(path)];
+        }
     }
 
     [Theory]
     [Trait("Category", "Protocol")]
-    [MemberData(nameof(ValidFixtures))]
-    public void CanonicalFixtureHasEnvelope(string filename)
+    [MemberData(nameof(ContractFixtures))]
+    public void ContractFixtureMatchesAcceptanceConvention(string filename)
     {
         var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", filename);
-        using var document = JsonDocument.Parse(File.ReadAllText(path));
+        var raw = File.ReadAllBytes(path);
+        using var document = JsonDocument.Parse(raw);
         var root = document.RootElement;
+        var nonce = root.GetProperty("session_nonce").GetString();
+        var accepted = ProtocolValidator.TryValidate(raw, nonce!, null, out _);
+        var expected = !filename.StartsWith("invalid-", StringComparison.Ordinal);
 
-        root.GetProperty("protocol_version").GetInt32().ShouldBe(1);
-        root.GetProperty("session_nonce").GetString().ShouldNotBeNullOrWhiteSpace();
-        root.GetProperty("sequence").GetInt32().ShouldBeGreaterThanOrEqualTo(0);
-        root.GetProperty("type").GetString().ShouldNotBeNullOrWhiteSpace();
-        root.GetProperty("payload").ValueKind.ShouldBe(JsonValueKind.Object);
+        accepted.ShouldBe(expected);
     }
 
     [Fact]
     [Trait("Category", "Protocol")]
     public void ValidatorRejectsNonceAndSequenceViolations()
     {
-        const string message = "{\"protocol_version\":1,\"session_nonce\":\"nonce\",\"sequence\":2,\"type\":\"sample\",\"payload\":{}}";
+        const string message = "{\"protocol_version\":1,\"session_nonce\":\"nonce\",\"sequence\":2,\"type\":\"sample\",\"payload\":{\"monotonic_ms\":1,\"duration_ms\":1,\"values\":[]}}";
         var bytes = System.Text.Encoding.UTF8.GetBytes(message);
 
         ProtocolValidator.TryValidate(bytes, "nonce", 1, out var sequence).ShouldBeTrue();
@@ -75,7 +76,7 @@ public sealed class ProtocolFixturesTests
         ack!.Type.ShouldBe("hello_ack");
         ack.SessionNonce.ShouldBe("fixture-session-nonce-1");
 
-        var replay = Encoding.UTF8.GetBytes(File.ReadAllText(path));
+        var replay = File.ReadAllBytes(path);
         processor.TryProcess(replay, out _).ShouldBeFalse();
     }
 }

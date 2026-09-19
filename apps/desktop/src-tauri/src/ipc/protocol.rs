@@ -12,6 +12,109 @@ pub enum ProtocolError {
     UnsupportedVersion(u64),
     NonceMismatch,
     SequenceRegression { previous: u64, received: u64 },
+    SequenceGap { expected: u64, received: u64 },
+}
+
+fn is_known_message_type(message_type: &str) -> bool {
+    matches!(
+        message_type,
+        "hello"
+            | "hello_ack"
+            | "capabilities"
+            | "start"
+            | "started"
+            | "set_rate"
+            | "snapshot"
+            | "sample"
+            | "stop"
+            | "stopped"
+            | "shutdown"
+            | "error"
+            | "elevated_start"
+    )
+}
+
+fn has_exactly_one_value(entry: &serde_json::Map<String, Value>) -> bool {
+    let has_number = entry.get("number").is_some_and(Value::is_number);
+    let has_boolean = entry.get("boolean").is_some_and(Value::is_boolean);
+    has_number ^ has_boolean
+}
+
+fn valid_sample_payload(payload: &Value) -> bool {
+    let Some(object) = payload.as_object() else {
+        return false;
+    };
+    let Some(values) = object.get("values").and_then(Value::as_array) else {
+        return false;
+    };
+    if object.get("monotonic_ms").and_then(Value::as_u64).is_none()
+        || object
+            .get("duration_ms")
+            .and_then(Value::as_u64)
+            .is_none_or(|duration| duration > 10_000)
+    {
+        return false;
+    }
+
+    values.iter().all(|value| {
+        let Some(entry) = value.as_object() else {
+            return false;
+        };
+        let Some(status) = entry.get("status").and_then(Value::as_str) else {
+            return false;
+        };
+        if entry.get("sensor_id").and_then(Value::as_str).is_none_or(str::is_empty) {
+            return false;
+        }
+        match status {
+            "ok" => has_exactly_one_value(entry),
+            "missing" | "stale" | "invalid" | "unsupported" => {
+                !entry.contains_key("number") && !entry.contains_key("boolean")
+            }
+            _ => false,
+        }
+    })
+}
+
+fn valid_payload(message_type: &str, payload: &Value) -> bool {
+    let Some(object) = payload.as_object() else {
+        return false;
+    };
+    match message_type {
+        "hello" => {
+            object
+                .get("app_version")
+                .and_then(Value::as_str)
+                .is_some_and(|version| !version.is_empty())
+                && object.get("supported_protocols").and_then(Value::as_array).is_some_and(
+                    |protocols| protocols.iter().any(|protocol| protocol.as_u64() == Some(1)),
+                )
+        }
+        "capabilities" => {
+            object.get("cpu").is_some_and(Value::is_object)
+                && object.get("groups").is_some_and(Value::is_array)
+                && object.get("sensors").is_some_and(Value::is_array)
+        }
+        "sample" => valid_sample_payload(payload),
+        "error" => {
+            object.get("code").and_then(Value::as_str).is_some_and(|code| {
+                !code.is_empty()
+                    && code.chars().all(|character| {
+                        character.is_ascii_uppercase()
+                            || character.is_ascii_digit()
+                            || character == '_'
+                    })
+            }) && object
+                .get("severity")
+                .and_then(Value::as_str)
+                .is_some_and(|severity| matches!(severity, "info" | "recoverable" | "fatal"))
+                && object
+                    .get("message_key")
+                    .and_then(Value::as_str)
+                    .is_some_and(|message_key| !message_key.is_empty())
+        }
+        _ => true,
+    }
 }
 
 impl Display for ProtocolError {
@@ -26,6 +129,9 @@ impl Display for ProtocolError {
             Self::NonceMismatch => formatter.write_str("session nonce does not match"),
             Self::SequenceRegression { previous, received } => {
                 write!(formatter, "sequence regressed from {previous} to {received}")
+            }
+            Self::SequenceGap { expected, received } => {
+                write!(formatter, "sequence gap: expected {expected}, received {received}")
             }
         }
     }
@@ -68,10 +174,16 @@ pub fn validate_message(
         .get("sequence")
         .and_then(Value::as_u64)
         .ok_or(ProtocolError::InvalidEnvelope("sequence"))?;
-    if let Some(previous) = previous_sequence
-        && sequence <= previous
-    {
-        return Err(ProtocolError::SequenceRegression { previous, received: sequence });
+    if let Some(previous) = previous_sequence {
+        if sequence <= previous {
+            return Err(ProtocolError::SequenceRegression { previous, received: sequence });
+        }
+        if sequence != previous.saturating_add(1) {
+            return Err(ProtocolError::SequenceGap {
+                expected: previous.saturating_add(1),
+                received: sequence,
+            });
+        }
     }
 
     let message_type = object
@@ -79,7 +191,11 @@ pub fn validate_message(
         .and_then(Value::as_str)
         .filter(|message_type| !message_type.is_empty())
         .ok_or(ProtocolError::InvalidEnvelope("type"))?;
-    if !object.get("payload").is_some_and(Value::is_object) {
+    if !is_known_message_type(message_type)
+        || !object
+            .get("payload")
+            .is_some_and(|payload| payload.is_object() && valid_payload(message_type, payload))
+    {
         return Err(ProtocolError::InvalidEnvelope("payload"));
     }
 
@@ -90,7 +206,7 @@ pub fn validate_message(
 mod tests {
     use super::{ProtocolError, validate_message};
 
-    const MESSAGE: &[u8] = br#"{"protocol_version":1,"session_nonce":"nonce","sequence":2,"timestamp_utc":"2026-09-18T10:00:00Z","type":"sample","payload":{}}"#;
+    const MESSAGE: &[u8] = br#"{"protocol_version":1,"session_nonce":"nonce","sequence":2,"timestamp_utc":"2026-09-18T10:00:00Z","type":"sample","payload":{"monotonic_ms":1,"duration_ms":1,"values":[]}}"#;
 
     #[test]
     fn accepts_matching_nonce_and_increasing_sequence() {
