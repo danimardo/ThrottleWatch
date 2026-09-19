@@ -5,13 +5,49 @@ use std::process::Command;
 use std::time::Duration;
 
 pub const ELEVATED_TASK_NAME: &str = "ThrottleWatch\\SidecarElevated";
-pub const ELEVATED_PIPE_NAME: &str = r"\\.\pipe\ThrottleWatch.ElevatedSidecar";
+pub const ELEVATED_PIPE_PREFIX: &str = r"\\.\pipe\ThrottleWatch.ElevatedSidecar.";
+const FILE_FLAG_FIRST_PIPE_INSTANCE: u32 = 0x0008_0000;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ElevatedLaunchPayload {
     pub sidecar_path: PathBuf,
     pub sidecar_sha256: String,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+struct EmptyPayload {}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+enum ElevatedCommand {
+    StartSession(ElevatedLaunchPayload),
+    Heartbeat(EmptyPayload),
+    RecheckCoverage(EmptyPayload),
+    StopSession(EmptyPayload),
+}
+
+fn parse_command(value: &serde_json::Value) -> Result<ElevatedCommand, String> {
+    let message_type = value
+        .get("type")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "missing elevated command".to_owned())?;
+    let payload = value.get("payload").cloned().unwrap_or_else(|| serde_json::json!({}));
+    match message_type {
+        "elevated_start" => serde_json::from_value(payload)
+            .map(ElevatedCommand::StartSession)
+            .map_err(|_| "invalid launch payload".to_owned()),
+        "elevated_heartbeat" => serde_json::from_value(payload)
+            .map(ElevatedCommand::Heartbeat)
+            .map_err(|_| "invalid heartbeat payload".to_owned()),
+        "elevated_recheck_coverage" => serde_json::from_value(payload)
+            .map(ElevatedCommand::RecheckCoverage)
+            .map_err(|_| "invalid coverage payload".to_owned()),
+        "elevated_stop_session" => serde_json::from_value(payload)
+            .map(ElevatedCommand::StopSession)
+            .map_err(|_| "invalid stop payload".to_owned()),
+        _ => Err("unknown elevated command".to_owned()),
+    }
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -38,9 +74,9 @@ pub fn validate_launch_request(
     }
     let value: serde_json::Value =
         serde_json::from_slice(raw).map_err(|_| "invalid JSON".to_owned())?;
-    let payload = value.get("payload").ok_or_else(|| "missing payload".to_owned())?;
-    let parsed: ElevatedLaunchPayload =
-        serde_json::from_value(payload.clone()).map_err(|_| "invalid launch payload".to_owned())?;
+    let ElevatedCommand::StartSession(parsed) = parse_command(&value)? else {
+        return Err("only StartSession is valid during launcher handshake".to_owned());
+    };
     if parsed.sidecar_path != expected_path
         || !parsed.sidecar_sha256.eq_ignore_ascii_case(expected_sha256)
     {
@@ -59,39 +95,6 @@ pub fn validate_launch_request(
         message_type: "elevated_start",
         payload: parsed,
     })
-}
-
-pub fn task_create_arguments(launcher_path: &Path) -> Vec<String> {
-    vec![
-        "/Create".to_owned(),
-        "/TN".to_owned(),
-        ELEVATED_TASK_NAME.to_owned(),
-        "/TR".to_owned(),
-        format!("\"{}\" --elevated-launcher", launcher_path.display()),
-        "/SC".to_owned(),
-        "ONDEMAND".to_owned(),
-        "/RL".to_owned(),
-        "HIGHEST".to_owned(),
-        "/F".to_owned(),
-    ]
-}
-
-pub fn register_task(launcher_path: &Path) -> io::Result<()> {
-    #[cfg(windows)]
-    {
-        let status =
-            Command::new("schtasks.exe").args(task_create_arguments(launcher_path)).status()?;
-        if status.success() {
-            return Ok(());
-        }
-        Err(io::Error::new(io::ErrorKind::PermissionDenied, "elevated task registration failed"))
-    }
-
-    #[cfg(not(windows))]
-    {
-        let _ = launcher_path;
-        Err(io::Error::new(io::ErrorKind::Unsupported, "scheduled tasks are Windows-only"))
-    }
 }
 
 pub fn run_registered_task() -> io::Result<()> {
@@ -119,6 +122,12 @@ pub fn start_registered_sidecar(
 ) -> io::Result<std::fs::File> {
     #[cfg(windows)]
     {
+        use std::os::windows::io::FromRawHandle;
+
+        let pipe_name = random_pipe_name()?;
+        let (pipe_handle, descriptor) = create_secure_pipe(&pipe_name)?;
+        unsafe { free_security_descriptor(descriptor) };
+        let mut pipe = unsafe { std::fs::File::from_raw_handle(pipe_handle as _) };
         run_registered_task()?;
         let nonce = session_nonce()?;
         let request = serde_json::json!({
@@ -137,22 +146,10 @@ pub fn start_registered_sidecar(
             "session_nonce": nonce,
             "type": "hello"
         });
-        let mut pipe = None;
-        for _ in 0..50 {
-            match std::fs::OpenOptions::new().write(true).open(ELEVATED_PIPE_NAME) {
-                Ok(value) => {
-                    pipe = Some(value);
-                    break;
-                }
-                Err(error) if error.kind() == io::ErrorKind::NotFound => {
-                    std::thread::sleep(Duration::from_millis(100));
-                }
-                Err(error) => return Err(error),
-            }
+        let connected = unsafe { connect_named_pipe(pipe_handle, std::ptr::null_mut()) } != 0;
+        if !connected && unsafe { last_error() } != ERROR_PIPE_CONNECTED {
+            return Err(io::Error::last_os_error());
         }
-        let mut pipe = pipe.ok_or_else(|| {
-            io::Error::new(io::ErrorKind::TimedOut, "elevated launcher pipe did not open")
-        })?;
         serde_json::to_writer(&mut pipe, &hello).map_err(io::Error::other)?;
         pipe.write_all(b"\n")
             .and_then(|_| serde_json::to_writer(&mut pipe, &request).map_err(io::Error::other))?;
@@ -174,16 +171,7 @@ pub fn start_registered_sidecar(
 pub fn run_elevated_launcher() -> io::Result<()> {
     #[cfg(windows)]
     {
-        use std::os::windows::io::FromRawHandle;
-        let (handle, descriptor) = create_secure_pipe()?;
-        let connected = unsafe { connect_named_pipe(handle, std::ptr::null_mut()) } != 0;
-        if !connected && unsafe { last_error() } != ERROR_PIPE_CONNECTED {
-            unsafe { close_handle(handle) };
-            unsafe { free_security_descriptor(descriptor) };
-            return Err(io::Error::last_os_error());
-        }
-        unsafe { free_security_descriptor(descriptor) };
-        let pipe = unsafe { std::fs::File::from_raw_handle(handle as _) };
+        let pipe = open_session_pipe()?;
         let mut reader = BufReader::new(pipe);
         let mut hello_line = String::new();
         reader.read_line(&mut hello_line)?;
@@ -223,6 +211,7 @@ pub fn run_elevated_launcher() -> io::Result<()> {
             &payload.sidecar_sha256,
         )
         .map_err(|error| io::Error::new(io::ErrorKind::PermissionDenied, error))?;
+        ensure_pawnio_service_running()?;
         let mut child =
             super::supervisor::spawn_verified(&payload.sidecar_path, &payload.sidecar_sha256)?;
         let mut control_tail = Vec::new();
@@ -236,6 +225,34 @@ pub fn run_elevated_launcher() -> io::Result<()> {
     {
         Err(io::Error::new(io::ErrorKind::Unsupported, "elevated launcher is Windows-only"))
     }
+}
+
+#[cfg(windows)]
+fn ensure_pawnio_service_running() -> io::Result<()> {
+    let service = r"C:\Windows\System32\sc.exe";
+    let query = Command::new(service).args(["query", "PawnIO"]).output()?;
+    if !query.status.success() {
+        return Ok(());
+    }
+    let state = String::from_utf8_lossy(&query.stdout);
+    if state.contains("RUNNING") {
+        return Ok(());
+    }
+    let start = Command::new(service).args(["start", "PawnIO"]).status()?;
+    if !start.success() {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "PawnIO service could not start",
+        ));
+    }
+    for _ in 0..20 {
+        let query = Command::new(service).args(["query", "PawnIO"]).output()?;
+        if String::from_utf8_lossy(&query.stdout).contains("RUNNING") {
+            return Ok(());
+        }
+        std::thread::sleep(Duration::from_millis(250));
+    }
+    Err(io::Error::new(io::ErrorKind::TimedOut, "PawnIO service did not become running"))
 }
 
 #[cfg(windows)]
@@ -254,7 +271,9 @@ const ERROR_PIPE_CONNECTED: u32 = 535;
 const INVALID_HANDLE_VALUE: *mut std::ffi::c_void = -1_isize as *mut std::ffi::c_void;
 
 #[cfg(windows)]
-fn create_secure_pipe() -> io::Result<(*mut std::ffi::c_void, *mut std::ffi::c_void)> {
+fn create_secure_pipe(
+    pipe_name: &str,
+) -> io::Result<(*mut std::ffi::c_void, *mut std::ffi::c_void)> {
     use std::os::windows::ffi::OsStrExt;
     let sddl: Vec<u16> =
         std::ffi::OsStr::new("D:P(A;;GA;;;OW)(A;;GA;;;SY)").encode_wide().chain([0]).collect();
@@ -265,8 +284,7 @@ fn create_secure_pipe() -> io::Result<(*mut std::ffi::c_void, *mut std::ffi::c_v
     if converted == 0 {
         return Err(io::Error::last_os_error());
     }
-    let name: Vec<u16> =
-        std::ffi::OsStr::new(ELEVATED_PIPE_NAME).encode_wide().chain([0]).collect();
+    let name: Vec<u16> = std::ffi::OsStr::new(pipe_name).encode_wide().chain([0]).collect();
     let mut attributes = SecurityAttributes {
         length: std::mem::size_of::<SecurityAttributes>() as u32,
         descriptor,
@@ -275,7 +293,7 @@ fn create_secure_pipe() -> io::Result<(*mut std::ffi::c_void, *mut std::ffi::c_v
     let handle = unsafe {
         create_named_pipe(
             name.as_ptr(),
-            0x00000003,
+            0x00000003 | FILE_FLAG_FIRST_PIPE_INSTANCE,
             0x00000006,
             1,
             1024 * 1024,
@@ -289,6 +307,38 @@ fn create_secure_pipe() -> io::Result<(*mut std::ffi::c_void, *mut std::ffi::c_v
         return Err(io::Error::last_os_error());
     }
     Ok((handle, descriptor))
+}
+
+#[cfg(windows)]
+fn random_pipe_name() -> io::Result<String> {
+    let mut bytes = [0_u8; 16];
+    if unsafe { system_function_036(bytes.as_mut_ptr(), bytes.len() as u32) } == 0 {
+        return Err(io::Error::other("could not generate pipe name"));
+    }
+    Ok(format!(
+        "{ELEVATED_PIPE_PREFIX}{}",
+        bytes.iter().map(|byte| format!("{byte:02x}")).collect::<String>()
+    ))
+}
+
+#[cfg(windows)]
+fn open_session_pipe() -> io::Result<std::fs::File> {
+    for _ in 0..50 {
+        if let Ok(entries) = std::fs::read_dir(r"\\.\pipe") {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().into_owned();
+                if name.starts_with(ELEVATED_PIPE_PREFIX.trim_start_matches(r"\\.\pipe\")) {
+                    let path = format!(r"\\.\pipe\{name}");
+                    if let Ok(pipe) = std::fs::OpenOptions::new().read(true).write(true).open(path)
+                    {
+                        return Ok(pipe);
+                    }
+                }
+            }
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    Err(io::Error::new(io::ErrorKind::TimedOut, "elevated launcher pipe did not open"))
 }
 
 #[cfg(windows)]
@@ -317,8 +367,6 @@ unsafe extern "system" {
     fn connect_named_pipe(handle: *mut std::ffi::c_void, overlapped: *mut std::ffi::c_void) -> i32;
     #[link_name = "GetLastError"]
     fn last_error() -> u32;
-    #[link_name = "CloseHandle"]
-    fn close_handle(handle: *mut std::ffi::c_void) -> i32;
     #[link_name = "LocalFree"]
     fn free_security_descriptor(descriptor: *mut std::ffi::c_void) -> *mut std::ffi::c_void;
 }
@@ -339,7 +387,7 @@ unsafe extern "system" {
 
 #[cfg(test)]
 mod tests {
-    use super::{ELEVATED_PIPE_NAME, validate_launch_request};
+    use super::{ELEVATED_PIPE_PREFIX, validate_launch_request};
     use std::path::Path;
 
     #[test]
@@ -355,7 +403,7 @@ mod tests {
             )
             .is_err()
         );
-        assert!(ELEVATED_PIPE_NAME.starts_with(r"\\.\pipe\"));
+        assert!(ELEVATED_PIPE_PREFIX.starts_with(r"\\.\pipe\"));
     }
 
     #[test]
@@ -369,5 +417,58 @@ mod tests {
             &"a".repeat(64),
         );
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn rejects_unknown_commands_and_generic_msr_writes() {
+        let prefix = br#"{"protocol_version":1,"session_nonce":"0123456789abcdef","sequence":1,"timestamp_utc":"2026-09-19T10:00:00Z","type":""#;
+        for command in ["unknown", "elevated_write_msr"] {
+            let raw = [prefix, command.as_bytes(), br#"","payload":{}}"#].concat();
+            assert!(
+                validate_launch_request(
+                    &raw,
+                    "0123456789abcdef",
+                    None,
+                    Path::new("C:\\ThrottleWatch\\agent.exe"),
+                    &"a".repeat(64),
+                )
+                .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_reused_sequence_nonce() {
+        let raw = br#"{"protocol_version":1,"session_nonce":"0123456789abcdef","sequence":1,"timestamp_utc":"2026-09-19T10:00:00Z","type":"elevated_start","payload":{"sidecar_path":"C:\\ThrottleWatch\\agent.exe","sidecar_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}"#;
+        assert!(
+            validate_launch_request(
+                raw,
+                "0123456789abcdef",
+                Some(1),
+                Path::new("C:\\ThrottleWatch\\agent.exe"),
+                &"a".repeat(64),
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn pipe_names_are_session_scoped_and_first_instance_is_required() {
+        assert!(ELEVATED_PIPE_PREFIX.ends_with('.'));
+        assert_eq!(super::FILE_FLAG_FIRST_PIPE_INSTANCE, 0x0008_0000);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn rejects_an_occupied_pipe_name() {
+        let name = format!("{ELEVATED_PIPE_PREFIX}occupied-test");
+        let (first, descriptor) = match super::create_secure_pipe(&name) {
+            Ok(value) => value,
+            Err(error) => panic!("first pipe: {error}"),
+        };
+        unsafe { super::free_security_descriptor(descriptor) };
+        assert!(super::create_secure_pipe(&name).is_err());
+        use std::os::windows::io::FromRawHandle;
+        drop(unsafe { std::fs::File::from_raw_handle(first as _) });
     }
 }

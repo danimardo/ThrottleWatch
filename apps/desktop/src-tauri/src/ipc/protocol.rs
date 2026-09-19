@@ -31,6 +31,9 @@ fn is_known_message_type(message_type: &str) -> bool {
             | "shutdown"
             | "error"
             | "elevated_start"
+            | "elevated_heartbeat"
+            | "elevated_recheck_coverage"
+            | "elevated_stop_session"
     )
 }
 

@@ -13,6 +13,8 @@ target/
 
 # .NET (apps/sensor-agent, once the app exists)
 bin/
+!apps/desktop/src-tauri/src/bin/
+!apps/desktop/src-tauri/src/bin/*.rs
 obj/
 *.user
 

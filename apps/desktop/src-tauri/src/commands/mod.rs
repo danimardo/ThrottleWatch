@@ -50,6 +50,10 @@ impl CommandError {
     fn operation_failed() -> Self {
         Self { code: "LOW_LEVEL_ACCESS_OPERATION_FAILED", message_key: "access.operation_failed" }
     }
+
+    fn access_not_installable() -> Self {
+        Self { code: "ACCESS_NOT_INSTALLABLE", message_key: "coverage.access_not_installable" }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -204,12 +208,17 @@ pub fn request_low_level_access(
     request: AccessRequest,
 ) -> Result<AccessRequestResult, CommandError> {
     let manifest = access::manifest().map_err(|_| CommandError::operation_failed())?;
+    let installation = access::detect_installation(&manifest.minimum_version)
+        .map_err(|_| CommandError::operation_failed())?;
+    if !access::action_is_compatible(request.action, &installation) {
+        return Err(CommandError::access_not_installable());
+    }
     let resource_dir = app.path().resource_dir().map_err(|_| CommandError::operation_failed())?;
     let installer = access::installer_path(&resource_dir, &manifest);
     access::verify_installer(&installer, &manifest)
         .map_err(|_| CommandError::operation_failed())?;
     let launcher = std::env::current_exe().map_err(|_| CommandError::operation_failed())?;
-    access::launch_installer_and_register_task(&installer, &launcher)
+    access::launch_installer_and_register_task(&installer, &launcher, request.action)
         .map_err(|_| CommandError::operation_failed())?;
     let guard = state.storage.lock().map_err(|_| CommandError::operation_failed())?;
     guard.set_advanced_access_enabled(true).map_err(|_| CommandError::operation_failed())?;

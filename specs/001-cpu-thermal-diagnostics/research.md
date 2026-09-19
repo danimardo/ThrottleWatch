@@ -331,6 +331,7 @@ reescribir el historial requiere una decisión expresa de la persona propietaria
 ### Dependencias
 
 `T020 → T153`: la decisión de proveedor y su contrato de instalación preceden al empaquetado.
-`T151` define la revisión de amenazas del lanzador elevado; `T153–T155` permanecen bloqueadas
-hasta su aprobación. La regla de vida del `Computer` y la prueba de runner del sidecar se
-implementan independientemente en `T162–T163`.
+`T151` define la revisión de amenazas del lanzador elevado y quedó aceptado con condiciones
+C1–C6 el 2026-09-19; `T153–T155` están desbloqueadas para desarrollo y pruebas locales. La
+regla de vida del `Computer` y la prueba de runner del sidecar se implementan
+independientemente en `T162–T163`.

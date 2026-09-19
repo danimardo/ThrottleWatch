@@ -116,8 +116,8 @@ interfaz vuelva a modo B/C. No detendrá ni desinstalará PawnIO, que es un cont
 
 - Enmienda la prohibición de ADR-0001 contra un servicio privilegiado solo en el sentido de
   permitir un lanzador bajo demanda si esta propuesta es aprobada; no eleva la UI.
-- T153–T155 quedan bloqueadas hasta la aprobación de este ADR y deben conservar sus controles,
-  firma, ACL y pruebas Windows.
+- T153–T155 quedan desbloqueadas tras esta aceptación condicionada y deben conservar sus
+  controles, firma, ACL y pruebas Windows; R7 sigue siendo condición de cierre de T154.
 - T152 sigue siendo una validación de hardware real independiente: debe comprobar el arranque como
   usuario estándar después del reinicio.
 

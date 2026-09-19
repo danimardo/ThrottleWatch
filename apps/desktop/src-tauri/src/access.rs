@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 
 #[cfg(windows)]
 use std::ffi::OsStr;
+#[cfg(windows)]
+use std::process::Command;
 
 const MANIFEST_JSON: &str = include_str!("../resources/pawnio-manifest.json");
 
@@ -42,6 +44,22 @@ pub struct AccessRequestResult {
     pub reboot_may_be_required: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PawnIoInstallation {
+    Missing,
+    Current { version: String },
+    Upgradable { version: String },
+}
+
+pub fn action_is_compatible(action: AccessAction, installation: &PawnIoInstallation) -> bool {
+    matches!(
+        (action, installation),
+        (AccessAction::Install, PawnIoInstallation::Missing)
+            | (AccessAction::Upgrade, PawnIoInstallation::Upgradable { .. })
+            | (AccessAction::Repair, PawnIoInstallation::Current { .. })
+    )
+}
+
 pub fn manifest() -> io::Result<PawnIoManifest> {
     serde_json::from_str(MANIFEST_JSON).map_err(|error| {
         io::Error::new(io::ErrorKind::InvalidData, format!("invalid PawnIO manifest: {error}"))
@@ -62,6 +80,72 @@ pub fn verify_installer(path: &Path, value: &PawnIoManifest) -> io::Result<()> {
         ));
     }
     verify_authenticode(path, &value.publisher_subject)
+}
+
+pub fn detect_installation(minimum_version: &str) -> io::Result<PawnIoInstallation> {
+    #[cfg(windows)]
+    {
+        let library = Path::new(r"C:\Program Files\PawnIO\PawnIOLib.dll");
+        if !library.is_file() {
+            return Ok(PawnIoInstallation::Missing);
+        }
+        let Some(version) = registry_display_version()? else {
+            return Ok(PawnIoInstallation::Missing);
+        };
+        Ok(if compare_versions(&version, minimum_version).is_lt() {
+            PawnIoInstallation::Upgradable { version }
+        } else {
+            PawnIoInstallation::Current { version }
+        })
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = minimum_version;
+        Err(io::Error::new(io::ErrorKind::Unsupported, "PawnIO is Windows-only"))
+    }
+}
+
+fn compare_versions(left: &str, right: &str) -> std::cmp::Ordering {
+    let parse = |value: &str| {
+        value.split('.').map(|part| part.parse::<u64>().unwrap_or(0)).collect::<Vec<_>>()
+    };
+    let left = parse(left);
+    let right = parse(right);
+    let length = left.len().max(right.len());
+    (0..length)
+        .map(|index| {
+            (left.get(index).copied().unwrap_or(0), right.get(index).copied().unwrap_or(0))
+        })
+        .find_map(|(left, right)| (left != right).then_some(left.cmp(&right)))
+        .unwrap_or(std::cmp::Ordering::Equal)
+}
+
+#[cfg(windows)]
+fn registry_display_version() -> io::Result<Option<String>> {
+    let output = Command::new(r"C:\Windows\System32\reg.exe")
+        .args([
+            "query",
+            r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\PawnIO",
+            "/v",
+            "DisplayVersion",
+        ])
+        .output()?;
+    if !output.status.success() {
+        return Ok(None);
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    Ok(text.lines().find_map(parse_display_version_line))
+}
+
+#[cfg(windows)]
+fn parse_display_version_line(line: &str) -> Option<String> {
+    let mut fields = line.split_whitespace();
+    (fields.next() == Some("DisplayVersion"))
+        .then(|| fields.next())
+        .flatten()
+        .and_then(|kind| (kind == "REG_SZ").then(|| fields.next()).flatten())
+        .map(str::to_owned)
 }
 
 pub fn launch_installer(path: &Path) -> io::Result<()> {
@@ -99,37 +183,54 @@ pub fn launch_installer(path: &Path) -> io::Result<()> {
 /// Runs the fixed bootstrap sequence under one UAC consent: PawnIO first and
 /// then the already-installed elevated launcher task. Paths are supplied only
 /// after the installer has passed the pinned hash/signature checks.
-pub fn launch_installer_and_register_task(installer: &Path, launcher: &Path) -> io::Result<()> {
+pub fn launch_installer_and_register_task(
+    installer: &Path,
+    launcher: &Path,
+    action: AccessAction,
+) -> io::Result<()> {
     #[cfg(windows)]
     {
-        use std::os::windows::ffi::OsStrExt;
         let installer_display = installer.display().to_string();
         let launcher_display = launcher.display().to_string();
         let installer = powershell_literal(&installer_display);
         let launcher = powershell_literal(&launcher_display);
         let task_name = powershell_literal(crate::ipc::elevated::ELEVATED_TASK_NAME);
-        let script = format!(
-            "$ErrorActionPreference='Stop'; $p=Start-Process -FilePath '{installer}' -Wait -PassThru; if ($p.ExitCode -ne 0) {{ exit $p.ExitCode }}; & schtasks.exe /Create /TN '{task_name}' /TR ('\"' + '{launcher}' + '\" --elevated-launcher') /SC ONDEMAND /RL HIGHEST /F; exit $LASTEXITCODE"
-        );
-        let parameters =
-            format!("-NoProfile -NonInteractive -WindowStyle Hidden -Command \"{script}\"");
-        let verb: Vec<u16> = OsStr::new("runas").encode_wide().chain([0]).collect();
-        let file: Vec<u16> = OsStr::new("powershell.exe").encode_wide().chain([0]).collect();
-        let parameters: Vec<u16> = OsStr::new(&parameters).encode_wide().chain([0]).collect();
-        let result = unsafe {
-            shell_execute_w(
-                std::ptr::null_mut(),
-                verb.as_ptr(),
-                file.as_ptr(),
-                parameters.as_ptr(),
-                std::ptr::null(),
-                0,
+        let upgrade = matches!(action, AccessAction::Upgrade);
+        let uninstall = powershell_literal(r"C:\Program Files\PawnIO\uninstall.exe");
+        let upgrade_step = if upgrade {
+            format!(
+                "$u='{uninstall}'; if (!(Test-Path -LiteralPath $u)) {{ exit 2 }}; $old=Start-Process -FilePath $u -ArgumentList '-uninstall','-silent' -Wait -PassThru; if ($old.ExitCode -ne 0) {{ exit $old.ExitCode }};"
             )
+        } else {
+            String::new()
         };
-        if result as usize <= 32 {
+        let register_task = format!(
+            "$user=[System.Security.Principal.WindowsIdentity]::GetCurrent().Name; $launcherXml=[System.Security.SecurityElement]::Escape('{launcher}'); $xml='<Task version=\"1.4\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\"><RegistrationInfo><Author>ThrottleWatch</Author><Description>Lanzador elevado bajo demanda del sidecar de ThrottleWatch</Description></RegistrationInfo><Triggers /><Principals><Principal id=\"Author\"><UserId>'+ $user +'</UserId><LogonType>InteractiveToken</LogonType><RunLevel>HighestAvailable</RunLevel></Principal></Principals><Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>false</StopIfGoingOnBatteries><AllowHardTerminate>true</AllowHardTerminate><StartWhenAvailable>true</StartWhenAvailable><ExecutionTimeLimit>PT0S</ExecutionTimeLimit></Settings><Actions Context=\"Author\"><Exec><Command>'+ $launcherXml +'</Command><Arguments>--elevated-launcher</Arguments></Exec></Actions></Task>'; Register-ScheduledTask -TaskName '{task_name}' -Xml $xml -Force | Out-Null; if ($?) {{ exit 0 }}; exit 1"
+        );
+        let diagnostic = std::env::temp_dir().join("ThrottleWatch-pawnio-bootstrap.log");
+        let diagnostic = powershell_literal(&diagnostic.display().to_string());
+        let script = format!(
+            "$ErrorActionPreference='Stop'; try {{ {upgrade_step} $p=Start-Process -FilePath '{installer}' -ArgumentList '-install','-silent' -Wait -PassThru; if (($p.ExitCode -ne 0) -and ($p.ExitCode -ne 183)) {{ exit $p.ExitCode }}; {register_task} }} catch {{ ($_ | Out-String) | Set-Content -LiteralPath '{diagnostic}'; exit 1 }}"
+        );
+        let encoded_script = encode_utf16_base64(&script);
+        let powershell = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe";
+        let elevated_arguments = format!(
+            "$args=@('-NoProfile','-NonInteractive','-EncodedCommand','{encoded_script}'); $p=Start-Process -FilePath '{powershell}' -Verb RunAs -ArgumentList $args -Wait -PassThru; exit $p.ExitCode"
+        );
+        let status = Command::new(powershell)
+            .args(["-NoProfile", "-NonInteractive", "-Command", &elevated_arguments])
+            .status()?;
+        if !status.success() {
+            let details_path = std::env::temp_dir().join("ThrottleWatch-pawnio-bootstrap.log");
+            let details = std::fs::read_to_string(&details_path).unwrap_or_default();
+            let _ = std::fs::remove_file(details_path);
             return Err(io::Error::new(
                 io::ErrorKind::PermissionDenied,
-                "PawnIO bootstrap UAC launch was rejected",
+                format!(
+                    "PawnIO bootstrap UAC launch was rejected (exit code {}): {}",
+                    status.code().unwrap_or(-1),
+                    details.trim()
+                ),
             ));
         }
         Ok(())
@@ -137,7 +238,7 @@ pub fn launch_installer_and_register_task(installer: &Path, launcher: &Path) -> 
 
     #[cfg(not(windows))]
     {
-        let _ = (installer, launcher);
+        let _ = (installer, launcher, action);
         Err(io::Error::new(io::ErrorKind::Unsupported, "advanced access is Windows-only"))
     }
 }
@@ -147,11 +248,36 @@ fn powershell_literal(value: &str) -> String {
     value.replace('\'', "''")
 }
 
+#[cfg(windows)]
+fn encode_utf16_base64(value: &str) -> String {
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let bytes = value.encode_utf16().flat_map(u16::to_le_bytes).collect::<Vec<_>>();
+    let mut encoded = String::new();
+    for chunk in bytes.chunks(3) {
+        let first = chunk.first().copied().unwrap_or(0);
+        let second = chunk.get(1).copied().unwrap_or(0);
+        let third = chunk.get(2).copied().unwrap_or(0);
+        let number = (u32::from(first) << 16) | (u32::from(second) << 8) | u32::from(third);
+        encoded.push(ALPHABET[((number >> 18) & 0x3f) as usize] as char);
+        encoded.push(ALPHABET[((number >> 12) & 0x3f) as usize] as char);
+        encoded.push(if chunk.len() > 1 {
+            ALPHABET[((number >> 6) & 0x3f) as usize] as char
+        } else {
+            '='
+        });
+        encoded.push(if chunk.len() > 2 {
+            ALPHABET[(number & 0x3f) as usize] as char
+        } else {
+            '='
+        });
+    }
+    encoded
+}
+
 fn verify_authenticode(path: &Path, expected_subject: &str) -> io::Result<()> {
     #[cfg(windows)]
     {
         use std::os::windows::ffi::OsStrExt;
-        let _ = expected_subject;
         let path_wide: Vec<u16> = path.as_os_str().encode_wide().chain([0]).collect();
         let mut file_info = WinTrustFileInfo {
             cb_struct: std::mem::size_of::<WinTrustFileInfo>() as u32,
@@ -179,7 +305,19 @@ fn verify_authenticode(path: &Path, expected_subject: &str) -> io::Result<()> {
         data.state_action = 2;
         let _ = unsafe { win_verify_trust(std::ptr::null_mut(), &GENERIC_VERIFY_V2, &mut data) };
         if status == 0 {
-            return Ok(());
+            let path_literal = powershell_literal(&path.display().to_string());
+            let subject_literal = powershell_literal(expected_subject);
+            let script = format!(
+                "$s=Get-AuthenticodeSignature -LiteralPath '{path_literal}'; if ($s.Status -ne 'Valid') {{ exit 1 }}; if ($s.SignerCertificate.Subject -ne '{subject_literal}') {{ exit 2 }}"
+            );
+            let powershell =
+                Path::new(r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe");
+            let checked = Command::new(powershell)
+                .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+                .status()?;
+            if checked.success() {
+                return Ok(());
+            }
         }
         Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
@@ -269,7 +407,10 @@ use ShellExecuteW as shell_execute_w;
 
 #[cfg(test)]
 mod tests {
-    use super::{AccessAction, AccessRequest, manifest};
+    use super::{
+        AccessAction, AccessRequest, PawnIoInstallation, action_is_compatible, compare_versions,
+        manifest,
+    };
 
     #[test]
     fn manifest_pins_the_verified_release() {
@@ -290,5 +431,56 @@ mod tests {
         };
         assert_eq!(request.action, AccessAction::Repair);
         assert!(serde_json::from_str::<AccessRequest>(r#"{"action":"arbitrary"}"#).is_err());
+    }
+
+    #[test]
+    fn version_comparison_treats_missing_components_as_zero() {
+        assert!(compare_versions("2.2.0.0", "2.2.0").is_eq());
+        assert!(compare_versions("2.1.9", "2.2.0").is_lt());
+        assert!(compare_versions("2.3.0", "2.2.0").is_gt());
+    }
+
+    #[test]
+    fn installation_states_are_explicit() {
+        assert_eq!(
+            PawnIoInstallation::Upgradable { version: "2.1.0".to_owned() },
+            PawnIoInstallation::Upgradable { version: "2.1.0".to_owned() }
+        );
+        assert_ne!(
+            PawnIoInstallation::Missing,
+            PawnIoInstallation::Current { version: "2.2.0".to_owned() }
+        );
+    }
+
+    #[test]
+    fn actions_only_apply_to_the_matching_installation_state() {
+        assert!(action_is_compatible(AccessAction::Install, &PawnIoInstallation::Missing));
+        assert!(action_is_compatible(
+            AccessAction::Upgrade,
+            &PawnIoInstallation::Upgradable { version: "2.1.0".to_owned() }
+        ));
+        assert!(action_is_compatible(
+            AccessAction::Repair,
+            &PawnIoInstallation::Current { version: "2.2.0".to_owned() }
+        ));
+        assert!(!action_is_compatible(
+            AccessAction::Install,
+            &PawnIoInstallation::Current { version: "2.2.0".to_owned() }
+        ));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn registry_output_parser_requires_the_pawnio_display_version() {
+        assert_eq!(
+            super::parse_display_version_line("    DisplayVersion    REG_SZ    2.2.0.0"),
+            Some("2.2.0.0".to_owned())
+        );
+        assert_eq!(
+            super::parse_display_version_line(
+                "    InstallLocation    REG_SZ    C:\\Program Files\\PawnIO"
+            ),
+            None
+        );
     }
 }
