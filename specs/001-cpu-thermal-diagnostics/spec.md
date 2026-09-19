@@ -15,6 +15,16 @@ ThrottleWatch ayuda a responder tres preguntas:
 
 La utilidad debe convertir sensores técnicos en una explicación verificable, conservar el detalle para usuarios avanzados y abstenerse de cuantificar cuando no exista evidencia suficiente.
 
+## Aclaraciones
+
+### Sesión 2026-09-19
+
+- Q: Cuando el usuario pulsa la acción explícita «instalar acceso avanzado», ¿quién instala PawnIO? → A: ThrottleWatch empaqueta el instalador oficial de PawnIO (versión fijada, firma verificada) y lo ejecuta desde la acción explícita; una sola petición UAC.
+- Q: Si un proceso de usuario estándar no puede abrir el dispositivo PawnIO, ¿cómo alcanza ThrottleWatch el nivel A sin elevar la interfaz diaria? → A: En la misma instalación por máquina se registra un lanzador elevado solo para el sidecar (tarea programada o servicio mínimo, a decidir en el plan); la interfaz sigue sin privilegios; la decisión se documenta en un ADR con revisión de amenazas.
+- Q: Si ya existe un PawnIO instalado por otra aplicación, ¿ThrottleWatch lo reutiliza o instala el suyo? → A: Lo reutiliza si su versión es igual o superior a la mínima probada; si es anterior, ofrece actualizar por acción explícita; desinstalar ThrottleWatch nunca elimina PawnIO.
+- Q: Cuando el acceso avanzado deja de estar operativo en mitad de una sesión, ¿qué hace ThrottleWatch con la sesión en curso? → A: Continúa la sesión degradando a nivel B/C; registra el cambio de nivel con marca de tiempo; evalúa cada ventana con el nivel vigente; aviso no intrusivo en cobertura con opción de reparar; sin alerta `collector_lost`.
+- Q: Si durante una prueba guiada el acceso avanzado deja de funcionar (nivel A → B/C a mitad), ¿qué hace ThrottleWatch con la prueba y su resultado? → A: La prueba continúa hasta el final; el informe guiado registra el instante del cambio y el nivel final; la cifra de rendimiento y «marcar como referencia» solo se ofrecen si el nivel A se mantuvo durante toda la prueba; si no, el informe lo explica.
+
 ## Escenarios de usuario y pruebas
 
 ### Historia 1 — Comprender el estado térmico actual (Prioridad P1)
@@ -91,6 +101,7 @@ Como usuario quiero una sesión guiada de varios minutos que compare el comporta
 2. **Dado** que se alcanza un límite de parada, desaparece el sensor crítico o falla el auxiliar, **cuando** la prueba está activa, **entonces** la carga se detiene inmediatamente y el informe explica el motivo.
 3. **Dado** que el usuario cancela, **cuando** pulsa detener, **entonces** cesa la carga y los datos parciales se conservan marcados como incompletos.
 4. **Dado** un portátil en batería o modo ahorro, **cuando** se prepara la prueba, **entonces** se advierte que el resultado puede reflejar límites energéticos y el usuario puede cancelar.
+5. **Dado** que el acceso avanzado deja de funcionar a mitad de una prueba guiada, **cuando** la prueba continúa, **entonces** termina con normalidad, el informe muestra el instante del cambio y el nivel final, y la cifra de rendimiento y la opción de marcar como referencia solo aparecen si el nivel A se mantuvo durante toda la prueba; en caso contrario el informe explica por qué no hay cifra.
 
 ---
 
@@ -235,7 +246,7 @@ Como usuario quiero saber si existe una versión nueva y decidir por separado si
 - Suspensión, hibernación, reanudación, cambio de hora o salto del reloj del sistema.
 - Topología híbrida, SMT, núcleos aparcados o cambios de afinidad.
 - Carga parcial, variable o concentrada en pocos núcleos.
-- Sidecar detenido, protocolo incompatible, permisos insuficientes o controlador ausente.
+- Sidecar detenido o protocolo incompatible (`collector_lost`); permisos insuficientes, controlador ausente o proveedor de bajo nivel que falla en mitad de una sesión (degradación a B/C según FR-090).
 - Historial grande, disco lleno, base de datos dañada o exportación cancelada.
 - Onboarding interrumpido, omitido o invalidado por una actualización importante.
 - Locale de Windows ausente, no reconocido o cambiado mientras la aplicación está abierta.
@@ -334,6 +345,10 @@ Como usuario quiero saber si existe una versión nueva y decidir por separado si
 - **FR-084**: Las razones de limitación DEBEN leerse mediante sus bits de registro (log), que se limpian tras cada lectura, para medir si ocurrieron desde la muestra anterior y no solo en el instante de leer.
 - **FR-085**: La prueba guiada NO DEBE detenerse por alcanzar el límite térmico, que es el fenómeno que mide; DEBE detenerse si la temperatura supera el límite efectivo en más de 2 °C durante 3 muestras (el control térmico del procesador no actúa), si permanece en el límite con frecuencia activa inferior al 50 % de la base durante 10 s (refrigeración gravemente insuficiente), si se pierde el sensor crítico o si el generador deja de responder.
 - **FR-086**: Ajustes › Acerca de y ayuda DEBE ofrecer `Registro detallado`, que eleva el registro técnico al nivel `debug` y se desactiva automáticamente a las 24 horas o al reiniciar la aplicación, lo que ocurra antes. Mientras esté activo, su estado DEBE ser visible. El nivel de registro en la versión instalada NO DEBE poder cambiarse por variables de entorno ni argumentos (constitución XV y XVII).
+- **FR-087**: La acción explícita «instalar acceso avanzado» DEBE ejecutar el instalador oficial de PawnIO empaquetado con ThrottleWatch (versión fijada y firma verificada antes de lanzarlo), con una única petición UAC por máquina; ThrottleWatch NO DEBE modificar ni sustituir el controlador ni descargarlo en tiempo de ejecución. La licencia de redistribución DEBE constar en `THIRD-PARTY-NOTICES`.
+- **FR-088**: Si el proveedor de acceso de bajo nivel solo admite procesos elevados, el nivel A DEBE obtenerse mediante un lanzador elevado exclusivo del sidecar, registrado en el mismo paso por máquina de FR-087 (sin UAC adicional); la interfaz DEBE seguir sin privilegios (FR-030) y NO DEBE solicitar UAC en el arranque diario. El mecanismo concreto (tarea programada o servicio mínimo) y su revisión de amenazas DEBEN constar en un ADR antes de implementarse; el usuario DEBE poder desactivar el acceso avanzado desde Ajustes, con vuelta a nivel B/C.
+- **FR-089**: Si ya existe un PawnIO en la máquina con versión igual o superior a la mínima probada por ThrottleWatch (versión fijada junto al instalador empaquetado), el sistema DEBE reutilizarlo sin instalar ni pedir UAC; si la versión es anterior, la cobertura DEBE ofrecer actualizarlo solo mediante acción explícita. Desinstalar ThrottleWatch NUNCA DEBE eliminar PawnIO; el desinstalador DEBE indicar que es un controlador compartido y cómo eliminarlo por separado.
+- **FR-090**: Si el acceso avanzado deja de estar operativo durante una sesión (servicio detenido, lectura denegada o error del proveedor), el sidecar DEBE continuar muestreando en nivel B/C sin interrumpir la sesión; la sesión DEBE registrar cada cambio de nivel de cobertura con su marca de tiempo y el motor DEBE evaluar cada ventana con el nivel vigente en ella (las cifras que exigen nivel A se detienen desde ese instante). La cobertura DEBE mostrar el estado con un aviso no intrusivo y la opción de reparar por acción explícita; la alerta `collector_lost` se reserva a la pérdida completa del sidecar. En una prueba guiada, la prueba continúa hasta el final; el informe guiado DEBE registrar el instante del cambio y el nivel final, y la cifra de rendimiento y la marca de referencia solo DEBEN ofrecerse si el nivel A se mantuvo durante toda la prueba.
 - **FR-075**: Cuando el almacenamiento no esté disponible (disco lleno o base de datos dañada), el muestreo DEBE continuar en memoria, la interfaz DEBE avisar de forma persistente y el sistema DEBE reintentar o recuperar el almacenamiento sin intervención destructiva automática sobre los datos existentes.
 
 ### Requisitos no funcionales
@@ -489,7 +504,7 @@ El detalle por núcleo se mantiene siempre en memoria para la pantalla CPU; el h
 - **Dispositivo CPU**: identidad normalizada, fabricante, familia, topología y capacidades.
 - **Descriptor de sensor**: sensor original, magnitud normalizada, unidad, alcance y calidad.
 - **Muestra**: valores coincidentes en un instante monotónico y su estado de validez.
-- **Sesión**: intervalo de monitorización o prueba, contexto energético y resultado.
+- **Sesión**: intervalo de monitorización o prueba, contexto energético, historial de nivel de cobertura (cambios con marca de tiempo, FR-090) y resultado.
 - **Contexto energético**: fuente de alimentación, plan energético activo y batería, registrados con cada muestra.
 - **Referencia guiada**: resultado medido de un diagnóstico guiado marcado por el usuario, usado solo para comparaciones «antes/después».
 - **Evento de limitación**: tipo, inicio, fin, severidad y evidencias.
@@ -507,6 +522,8 @@ El detalle por núcleo se mantiene siempre en memoria para la pantalla CPU; el h
 - **SC-016**: Con las mismas trazas degradadas artificialmente a nivel B (eliminando razones, límites y TCC offset), el motor coincide con la etiqueta de nivel A en al menos el 80 % de las ventanas en que emite una causa, según esta equivalencia: `thermal_confirmed` → `thermal_probable` y `mixed_limit` → `thermal_probable` cuentan como acierto; `power_limited` → `power_limited` y `platform_limited` → `platform_limited` cuentan como acierto; `indeterminate` no cuenta. Ninguna ventana etiquetada térmica o mixta se clasifica `power_limited` con confianza `media` (inversión térmica → potencia), y ninguna etiquetada potencia se clasifica `thermal_probable` con confianza `media`.
 - **SC-017**: Al menos el 80 % de las trazas etiquetadas como gestión térmica del fabricante se clasifican `platform_limited · chassis_thermal`, y ninguna recibe la recomendación de no mejorar la refrigeración.
 - **SC-018**: La gravedad (`boost` / `below_base`) coincide con la etiqueta en al menos el 95 % de las ventanas limitadas del corpus.
+- **SC-019**: Instalar el acceso avanzado en un equipo sin PawnIO produce exactamente una petición UAC; los 10 arranques siguientes de la aplicación (con inicio con Windows activado) producen cero peticiones UAC y alcanzan el nivel A en menos de 10 s desde el arranque del sidecar.
+- **SC-020**: Al detener el servicio PawnIO durante una sesión pasiva, no se pierde ninguna muestra, el cambio de nivel queda registrado con marca de tiempo dentro de un intervalo de muestreo y la cobertura muestra el aviso con la acción de reparar en menos de 5 s; no se emite `collector_lost`.
 - **SC-006**: El panel mantiene los presupuestos de consumo y latencia definidos en NFR-001 a NFR-003 durante una sesión de una hora.
 - **SC-007**: Todas las funciones principales son utilizables con teclado y en modo de movimiento reducido.
 - **SC-008**: Una exportación anonimizada supera una prueba automática que busca identificadores excluidos.
@@ -522,7 +539,7 @@ El detalle por núcleo se mantiene siempre en memoria para la pantalla CPU; el h
 
 - El producto inicial es para Windows y uso local individual.
 - LibreHardwareMonitor cubre gran parte del hardware, pero no garantiza todos los sensores en todos los equipos.
-- La disponibilidad de PawnIO o equivalente se trata como una capacidad detectable, no como certeza.
+- La disponibilidad de PawnIO o equivalente se trata como una capacidad detectable, no como certeza. PawnIO es un controlador compartido por máquina que otras aplicaciones pueden haber instalado o necesitar (FR-089).
 - El usuario puede aceptar elevación durante instalación/reparación, pero la interfaz diaria no la necesita.
 - La referencia local es más honesta que una base de datos universal de puntuaciones.
 - El nombre definitivo es `ThrottleWatch`; el icono, identidad visual final y modelo de distribución se cerrarán antes del empaquetado público.
@@ -530,8 +547,8 @@ El detalle por núcleo se mantiene siempre en memoria para la pantalla CPU; el h
 - Un perfil de datos por usuario de Windows; no hay sincronización entre usuarios ni equipos.
 - Una única CPU física (un socket); se toma la primera si el sistema expone varias.
 - La temperatura se expresa solo en grados Celsius.
-- ThrottleWatch no se ejecuta como servicio de Windows; en bandeja sigue siendo un proceso del usuario.
-- El sidecar se ejecuta con los mismos privilegios que la interfaz (sin elevación) salvo que el spike de acceso de bajo nivel demuestre otra necesidad y se documente como excepción.
+- La interfaz de ThrottleWatch no se ejecuta como servicio de Windows; en bandeja sigue siendo un proceso del usuario. Solo el sidecar puede ejecutarse elevado mediante el lanzador de FR-088.
+- El sidecar se ejecuta con los mismos privilegios que la interfaz (sin elevación) mientras no exista acceso avanzado; con acceso avanzado instalado se ejecuta elevado mediante el lanzador de FR-088, documentado como excepción en su ADR.
 - Las máquinas virtuales no son un caso principal: se soportan solo con cobertura reducida y estado explícito.
 - `LibreHardwareMonitorLib` no expone la clase de núcleo (P/E/LP); el sidecar la deriva de `GetLogicalProcessorInformationEx` y CPUID (hoja 0x1A en Intel). Cuando no puede, los grupos se marcan `unknown`.
 - Es probable que `LibreHardwareMonitorLib` no exponga frecuencia activa ni razones de limitación; el diseño asume que la frecuencia activa se deriva de los contadores de Windows y que el nivel A (razones, límites de potencia, TCC offset) requiere el acceso avanzado.
@@ -539,7 +556,7 @@ El detalle por núcleo se mantiene siempre en memoria para la pantalla CPU; el h
 - La relación entre frecuencia y potencia se modela como cúbica (P ∝ f·V², con V aproximadamente proporcional a f); es una aproximación de primer orden que el rango `[0,5·g, 1,0·g]` absorbe y que se contrasta con la medición guiada.
 - El idioma del sistema se toma del primer idioma de visualización de Windows; el tema del sistema, del modo de aplicación (`AppsUseLightTheme`).
 - La documentación esencial se empaqueta con la aplicación; «Documentación en línea» abre el navegador del sistema por gesto explícito del usuario y es la única otra acción con red además del actualizador.
-- El instalador es por usuario y sin elevación; el acceso de bajo nivel, si el spike lo aprueba, se instala en un paso separado por máquina. Desinstalar pregunta si conservar los datos.
+- El instalador es por usuario y sin elevación; el acceso de bajo nivel, si el spike lo aprueba, se instala en un paso separado por máquina ejecutando el instalador oficial de PawnIO empaquetado (FR-087). Desinstalar pregunta si conservar los datos.
 
 ## Fuera de alcance del MVP
 
