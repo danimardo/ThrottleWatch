@@ -87,6 +87,7 @@ Formato: `[ID] [P?] [Historia?] Descripción con ruta`. Las tareas de test indic
 - [ ] CHK-L03 Checkpoint: catálogo con hardware falso y arranque real en VM en verde; spikes documentados.
   Registro 2026-09-19: nivel 0 en verde (véase CHK-L00); `dotnet test` (0, 33/33) incluye `HardwareCollectorTests`; spike `docs/spikes/sensor-access.md` con tres ejecuciones (T152 hecha: resultado (b)). **No cerrado:** pendientes T019, T019b, T020, T019c, T019d y T-INT-005; «arranque real en VM» no verificable en local.
   Registro adicional 2026-09-19: T019a cerrada con el spike y ADR-0004 aceptado con condiciones C1–C6; L03 continúa abierto por los demás spikes y la prueba de VM.
+  Progreso 2026-09-19: se añadió `apps/sensor-agent/Tests/Integration/SensorAgentProcessTests.cs`; `dotnet test apps/sensor-agent/SensorAgent.sln --no-restore` (0, 36/36), `--filter-trait Category=Integration` (0, 3/3) y `dotnet format --verify-no-changes --no-restore` (0). La prueba arranca el sidecar real, valida `hello_ack` y cierre por EOF; T-INT-005 sigue pendiente de ejecución en VM `virtualized-no-sensors` y de verificar allí el catálogo degradado.
 
 **Lote L04 — Persistencia, reloj y sesiones** (T022, T023, T047a, T-TEST-002). TDD en la migración v1 y en la partición de sesiones.
 
