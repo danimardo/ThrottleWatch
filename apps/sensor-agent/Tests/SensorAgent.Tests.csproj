@@ -7,6 +7,10 @@
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!-- global.json declares the Microsoft.Testing.Platform runner; without these two
+         properties xunit.v3 keeps its native runner and `dotnet test` discovers 0 tests. -->
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="xunit.v3.mtp-v2" Version="4.0.1" />
