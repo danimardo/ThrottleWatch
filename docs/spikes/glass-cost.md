@@ -48,35 +48,40 @@ transparencia» activados, WebView2 Evergreen **153.0.4234.32**, ventana 1100×7
 Reposo sin contador de fps (`measure=0`): full 2,46 % máquina (29 % núcleo); off 8,47 % máquina
 (**102 % de un núcleo**).
 
-### 2. Aislamiento del fondo animado (reposo, `measure=0`, 15 s)
+### 2. Aislamiento del fondo animado (reposo, `measure=0`, 15 s; dos ejecuciones)
 
-| Configuración | CPU % máquina | CPU % núcleo |
+| Configuración | CPU % máquina (1.ª / 2.ª) | CPU % núcleo (1.ª / 2.ª) |
 |---|---|---|
-| full, `.tw-ambient` animado | 2,46 | 29,5 |
-| full, fondo estático | **0,05** | 0,6 |
-| off, `.tw-ambient` animado | 8,47 | 101,7 |
-| off, fondo estático | **0,05** | 0,6 |
-| full, fondo estático, sin gráfico | 0,07 | 0,8 |
-| off, fondo estático, sin gráfico | 0,01 | 0,1 |
+| full, `.tw-ambient` animado | 2,46 / 3,15 | 29,5 / 37,8 |
+| full, fondo estático | **0,05 / 0,06** | 0,6 / 0,8 |
+| off, `.tw-ambient` animado | 8,47 / 7,07 | 101,7 / 84,9 |
+| off, fondo estático | **0,05 / 0,08** | 0,6 / 1,0 |
+| full, fondo estático, sin gráfico | 0,07 / 0,11 | 0,8 / 1,4 |
+| off, fondo estático, sin gráfico | 0,01 / 0,04 | 0,1 / 0,5 |
 
-### 3. Fondo estático, gráfico actualizándose
+### 3. Fondo estático, gráfico actualizándose (dos ejecuciones)
 
-| Vidrio | Actualización | fps mín/p10/mediana | CPU % máquina | CPU % núcleo |
+| Vidrio | Actualización | fps mín/p10/mediana | CPU % máquina (1.ª / 2.ª) | CPU % núcleo (1.ª / 2.ª) |
 |---|---|---|---|---|
-| full | 1 s | 60/60/60 | 0,80 | 9,6 |
-| reduced | 1 s | 60/60/60 | 0,70 | 8,4 |
-| off | 1 s | 60/60/60 | 0,62 | 7,4 |
-| full | 200 ms | — | 3,09 | 37 |
-| reduced | 200 ms | — | 2,96 | 36 |
-| off | 200 ms | — | 2,68 | 32 |
-| full | reposo, con contador rAF | 60/60/60 | 0,36 | 4,4 |
+| full | 1 s | 60/60/60 | 0,80 / 0,50 | 9,6 / 6,0 |
+| reduced | 1 s | 60/60/60 | 0,70 / 0,68 | 8,4 / 8,1 |
+| off | 1 s | 60/60/60 | 0,62 / 0,58 | 7,4 / 6,9 |
+| full | 200 ms | — | 3,09 / 2,74 | 37 / 33 |
+| reduced | 200 ms | — | 2,96 / 2,75 | 36 / 33 |
+| off | 200 ms | — | 2,68 / 2,73 | 32 / 33 |
+| full | reposo, con contador rAF | 60/60/60 | 0,36 / 0,37 | 4,4 / 4,4 |
+
+Los JSON de la tabla 1 están en `glass-bench/results/ryzen-5-2600x/`; los de la segunda
+ejecución de las tablas 2 y 3 en `…/static-and-idle/` (la primera solo se conserva en estas
+tablas: el guion sobrescribió sus ficheros).
 
 ## Conclusiones
 
-1. **El desenfoque no es el coste.** Con el fondo estático, el vidrio `full` añade ≈ 0,2 puntos
-   de % máquina (≈ 2–5 % de un núcleo) sobre `off` mientras el gráfico se actualiza, y nada en
-   reposo (0,05 % máquina en ambos). En este equipo, degradar de `full` a `reduced` u `off`
-   apenas cambia el consumo.
+1. **El desenfoque no es el coste.** Con el fondo estático, la diferencia entre `full`, `reduced`
+   y `off` queda dentro del ruido entre ejecuciones (±0,3 puntos de % máquina; en la segunda
+   ejecución `full` consumió menos que `off`), tanto en reposo (0,05–0,08 % máquina) como con el
+   gráfico actualizándose. En este equipo, degradar de `full` a `reduced` u `off` no ahorra
+   nada medible.
 2. **La animación `tw-ambient-drift` es el coste dominante**: 30 % de un núcleo en `full` y
    ~100 % de un núcleo en `off` en reposo, de forma continua, porque anima `background-position`
    de tres gradientes radiales con `background-attachment: fixed` a pantalla completa; en `off`
