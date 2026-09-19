@@ -39,7 +39,7 @@ jobs:
       - run: dotnet build apps/sensor-agent/SensorAgent.csproj --no-restore
       - run: dotnet format apps/sensor-agent/Tests/SensorAgent.Tests.csproj --no-restore --verify-no-changes
       - run: dotnet build apps/sensor-agent/Tests/SensorAgent.Tests.csproj --no-restore
-      - run: dotnet apps/sensor-agent/Tests/bin/Debug/net10.0-windows/SensorAgent.Tests.dll -noColor -reporter silent
+      - run: dotnet apps/sensor-agent/Tests/bin/Debug/net10.0-windows/SensorAgent.Tests.dll --no-progress
       - name: Show degraded catalog of the virtualized runner (T-INT-005)
         run: Get-Content apps/sensor-agent/Tests/bin/Debug/net10.0-windows/degraded-catalog.txt
       - run: dotnet tool install --global nuget-license --version 4.0.17
