@@ -54,6 +54,8 @@ jobs:
           cargo install cargo-llvm-cov --version 0.9.1 --locked
           cargo install cargo-deny --version 0.20.2 --locked
           cargo install cargo-about --version 0.8.2 --locked
+      - name: Fetch the official PawnIO installer (not versioned; hash and Authenticode verified)
+        run: node scripts/fetch-pawnio.mjs
       - run: cargo fmt --all -- --check
         working-directory: apps/desktop/src-tauri
       - run: cargo check --locked

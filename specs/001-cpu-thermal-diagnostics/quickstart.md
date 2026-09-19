@@ -57,6 +57,7 @@ Una vez completado el setup:
 
 ```powershell
 pnpm install --frozen-lockfile
+node scripts/fetch-pawnio.mjs   # instalador oficial de PawnIO (no se versiona): descarga, SHA-256 y Authenticode
 pnpm dev
 pnpm test
 pnpm lint

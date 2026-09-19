@@ -313,6 +313,19 @@ release 2.2.0 junto al artefacto y a completar la revisión legal del paquete an
 No se atribuye a ThrottleWatch una licencia de PawnIO, no se modifica el controlador y el
 desinstalador nunca lo elimina. La fuente consultada queda registrada en `THIRD-PARTY-NOTICES`.
 
+### Enmienda 2026-09-19: el instalador no se versiona
+
+Mientras se resuelve la consulta a namazso sobre redistribución, el binario del instalador sale del
+control de versiones: `scripts/fetch-pawnio.mjs` lo descarga de la release oficial en tiempo de
+compilación (desarrollo y CI), exige que el SHA-256 coincida con `pawnio-manifest.json` y que
+Authenticode sea `Valid` con el firmante esperado, y no escribe nada si falla una comprobación. El
+recurso sigue empaquetándose en el instalador NSIS (FR-087, T153): la aplicación nunca descarga PawnIO
+en ejecución y la regla de red de la constitución no cambia. **No** se ha adoptado la variante en la que
+el instalador de la aplicación lo descarga en el equipo de la persona usuaria: exigiría enmendar la
+constitución (única red permitida: el actualizador y el *bootstrapper* de WebView2), FR-087 y ADR-0004
+R5, y rompería la instalación sin conexión. El binario sigue en el historial de git (commit `8edd153`);
+reescribir el historial requiere una decisión expresa de la persona propietaria.
+
 ### Dependencias
 
 `T020 → T153`: la decisión de proveedor y su contrato de instalación preceden al empaquetado.

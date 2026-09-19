@@ -16,6 +16,10 @@ bin/
 obj/
 *.user
 
+# PawnIO installer: fetched at build time by scripts/fetch-pawnio.mjs (hash and Authenticode
+# verified against resources/pawnio-manifest.json); the repository does not host the binary.
+apps/desktop/src-tauri/resources/pawnio/*.exe
+
 # Local logs and runtime artifacts
 .logs/
 logs/
