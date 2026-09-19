@@ -28,6 +28,9 @@ tracing-appender = "0.2.5"
 jiff = "0.2.37"
 windows = { version = "0.62.2", features = ["Win32_System_Threading"] }
 
+[dev-dependencies]
+tauri = { version = "2.11.5", features = ["test"] }
+
 [lints.clippy]
 print_stdout = "deny"
 print_stderr = "deny"
