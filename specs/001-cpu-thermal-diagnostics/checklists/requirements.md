@@ -67,7 +67,7 @@
 - [x] Ninguna cifra de rendimiento sin método físico explícito o medición guiada (FR-013, constitución III).
 - [x] La prueba guiada puede observar la limitación térmica (FR-085).
 - [x] Los criterios de acierto tienen verdad de referencia objetiva (corpus etiquetado, `research.md` § 15).
-- [ ] Pendiente: puerta de viabilidad del nivel A (T019a) antes de la fase 3.
+- [x] Puerta de viabilidad del nivel A (T019a) cerrada el 2026-09-19 con resultado (b): evidencia en `docs/spikes/sensor-access.md` y decisión en ADR-0004, aceptado con condiciones C1–C6.
 
 ## Notas
 
