@@ -62,19 +62,29 @@ function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
+// Drop the PowerShell 7 module path inherited from the CI shell so 5.1 uses its own defaults.
+function windowsPowerShellEnvironment() {
+  const environment = { ...process.env };
+  delete environment.PSModulePath;
+  return environment;
+}
+
 function verifySignature(file) {
   if (process.platform !== 'win32') {
     fail('the Authenticode signature can only be verified on Windows');
   }
   // `powershell -Command` does not forward extra arguments as $args: embed the escaped path.
   const literal = file.replaceAll("'", "''");
+  // Explicit import from $PSHOME: on the CI runner this script is launched from PowerShell 7 and
+  // the inherited PSModulePath makes Windows PowerShell 5.1 fail to autoload the module.
   const script =
+    "Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Security') -ErrorAction Stop; " +
     `$s = Get-AuthenticodeSignature -LiteralPath '${literal}'; ` +
     '[pscustomobject]@{ status = "$($s.Status)"; subject = $s.SignerCertificate.Subject } | ConvertTo-Json -Compress';
   const raw = execFileSync(
     'powershell.exe',
     ['-NoProfile', '-NonInteractive', '-Command', script],
-    { encoding: 'utf8' }
+    { encoding: 'utf8', env: windowsPowerShellEnvironment() }
   );
   const result = JSON.parse(raw);
   if (result.status !== 'Valid') {
