@@ -1,0 +1,7 @@
+{
+  "manifest_version": 1,
+  "version": "0.0.0-fixture",
+  "files": [
+    { "path": "SensorAgent.exe", "sha256": "4bf6d1d0f1230a52dc845fee3d64243bd32fd2feffe6dcfe3097f2f93b27ffc4" }
+  ]
+}

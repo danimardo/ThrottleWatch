@@ -6,6 +6,7 @@ mod export;
 pub mod ipc;
 pub mod logging;
 pub mod ports;
+pub mod release_manifest;
 pub mod storage;
 pub mod telemetry;
 mod test_support;

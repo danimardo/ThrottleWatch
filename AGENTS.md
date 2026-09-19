@@ -24,7 +24,7 @@ código de aplicación** (`apps/`, `packages/`). El primer lote de trabajo es L0
 
 ## Fuentes de verdad (por orden de prioridad)
 
-1. `.specify/memory/constitution.md` — marco innegociable (versión 1.5.2). Manda sobre todo lo demás.
+1. `.specify/memory/constitution.md` — marco innegociable (versión 1.5.3). Manda sobre todo lo demás.
 2. `specs/001-cpu-thermal-diagnostics/spec.md` — requisitos, parámetros del motor y criterios de éxito.
 3. `specs/001-cpu-thermal-diagnostics/plan.md` — arquitectura, excepciones registradas, estrategia de pruebas.
 4. `specs/001-cpu-thermal-diagnostics/tasks.md` — tareas agrupadas en lotes L00–L21 con checkpoints `CHK-Lxx`.

@@ -66,7 +66,7 @@ speckit:
   scripts: powershell
   state: "VERIFICADO"
 documentation:
-  normative: [".specify/memory/constitution.md (1.5.2)"]
+  normative: [".specify/memory/constitution.md (1.5.3)"]
   descriptive:
     - "specs/001-cpu-thermal-diagnostics/{spec,plan,research,data-model,ux-visual-spec,quickstart}.md"
     - "specs/001-cpu-thermal-diagnostics/contracts/"
