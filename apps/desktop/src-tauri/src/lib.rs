@@ -4,7 +4,7 @@ mod config;
 pub mod diagnostics;
 mod export;
 pub mod ipc;
-mod logging;
+pub mod logging;
 pub mod ports;
 pub mod storage;
 pub mod telemetry;
@@ -26,9 +26,11 @@ pub fn run() {
                 .app_data_dir()
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
             std::fs::create_dir_all(&data_dir)?;
+            let log_guard = logging::init(data_dir.join("logs"), false)?;
             let database = data_dir.join("throttlewatch.db");
             let storage = storage::Storage::open(database)
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
+            app.manage(log_guard);
             app.manage(storage::AppState::new(storage));
             Ok(())
         })

@@ -1,6 +1,6 @@
 use sha2::{Digest, Sha256};
 use std::fs::File;
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, BufReader};
 use std::path::Path;
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
 use std::time::{Duration, Instant};
@@ -77,6 +77,16 @@ impl Supervisor {
         self.child.as_mut().and_then(|child| child.stderr.take()).ok_or_else(|| {
             io::Error::new(io::ErrorKind::NotConnected, "sidecar stderr is unavailable")
         })
+    }
+
+    pub fn read_validated_stderr(&mut self) -> io::Result<Option<crate::logging::LogEvent>> {
+        let mut stderr = BufReader::new(self.take_stderr()?);
+        let Some(line) = read_line_or_eof(&mut stderr)? else {
+            return Ok(None);
+        };
+        crate::logging::validate_collector_stderr(&line)
+            .map(Some)
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
     }
 
     pub fn start(&mut self) -> io::Result<()> {
@@ -218,9 +228,25 @@ pub fn watchdog_expired(last_sample: Instant, now: Instant, expected_interval: D
     now.duration_since(last_sample) > expected_interval.saturating_mul(3)
 }
 
+#[cfg(windows)]
+pub fn parent_process_alive(parent_pid: u32) -> bool {
+    use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
+
+    // SAFETY: OpenProcess only queries a handle for the supplied PID and the
+    // returned handle is owned by the temporary result and closed on drop.
+    unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, parent_pid).is_ok() }
+}
+
+#[cfg(not(windows))]
+pub fn parent_process_alive(parent_pid: u32) -> bool {
+    parent_pid != 0
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{RestartPolicy, read_line_or_eof, sha256_hex, watchdog_expired};
+    use super::{
+        RestartPolicy, parent_process_alive, read_line_or_eof, sha256_hex, watchdog_expired,
+    };
     use std::io::Cursor;
     use std::time::{Duration, Instant};
 
@@ -267,5 +293,10 @@ mod tests {
         let mut reader = Cursor::new(b"sample\r\n".to_vec());
         assert_eq!(read_line_or_eof(&mut reader).ok(), Some(Some("sample".to_owned())));
         assert_eq!(read_line_or_eof(&mut reader).ok(), Some(None));
+    }
+
+    #[test]
+    fn treats_a_missing_parent_pid_as_dead() {
+        assert!(!parent_process_alive(0));
     }
 }
