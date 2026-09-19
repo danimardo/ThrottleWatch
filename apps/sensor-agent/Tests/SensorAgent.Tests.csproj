@@ -23,5 +23,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="../../../packages/contracts/fixtures/*.json" Link="Fixtures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../../packages/contracts/schemas/log-event.schema.json" Link="Schemas/log-event.schema.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

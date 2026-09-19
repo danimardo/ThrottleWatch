@@ -1,5 +1,5 @@
 // Build scripts talk to cargo through stdout; the crate-wide clippy denial
-// targets application code, not this file.
+// targets application code, not this file (plan.md, scope clarification A2).
 #[allow(clippy::print_stdout, clippy::disallowed_macros)]
 fn main() {
     let windows = tauri_build::WindowsAttributes::new_without_app_manifest();

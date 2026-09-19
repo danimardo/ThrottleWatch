@@ -15,6 +15,9 @@
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="SensorAgent.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <Compile Remove="Tests/**/*.cs" />
     <None Remove="Tests/**/*.cs" />
   </ItemGroup>

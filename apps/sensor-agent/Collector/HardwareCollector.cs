@@ -26,7 +26,21 @@ public interface ICollectorSession
     LowLevelAccessProbeReport RecheckCoverage();
 }
 
-public sealed class HardwareCollector : ICollectorSession, IDisposable
+/// <summary>
+/// Seam over LibreHardwareMonitor's <see cref="Computer"/> so the collector can be tested
+/// without hardware (constitution XIII): the production source wraps the real computer;
+/// tests provide fake <see cref="IHardware"/> instances.
+/// </summary>
+public interface IHardwareSource : IDisposable
+{
+    void Open();
+
+    void Close();
+
+    IEnumerable<IHardware> CpuHardware();
+}
+
+internal sealed class ComputerHardwareSource : IHardwareSource
 {
     private readonly Computer computer = new()
     {
@@ -42,10 +56,35 @@ public sealed class HardwareCollector : ICollectorSession, IDisposable
         IsPsuEnabled = false
     };
 
-    private readonly ILogger logger = Log.Create("sensor-agent.collector");
+    public void Open() => computer.Open();
+
+    public void Close() => computer.Close();
+
+    public IEnumerable<IHardware> CpuHardware() => computer.Hardware.Where(hardware => hardware.HardwareType == HardwareType.Cpu);
+
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class HardwareCollector : ICollectorSession, IDisposable
+{
+    private readonly IHardwareSource source;
+    private readonly ILogger logger;
     private readonly HashSet<string> failedUpdates = [];
     private bool opened;
     private bool catalogRead;
+
+    public HardwareCollector()
+        : this(new ComputerHardwareSource(), Log.Create("sensor-agent.collector"))
+    {
+    }
+
+    internal HardwareCollector(IHardwareSource source, ILogger logger)
+    {
+        this.source = source;
+        this.logger = logger;
+    }
 
     public bool IsOpen => opened;
 
@@ -56,14 +95,14 @@ public sealed class HardwareCollector : ICollectorSession, IDisposable
             return;
         }
 
-        computer.Open();
+        source.Open();
         opened = true;
     }
 
     public IReadOnlyList<SensorDescriptor> ReadCatalog()
     {
         EnsureOpened();
-        var catalog = CpuHardware()
+        var catalog = source.CpuHardware()
             .SelectMany(hardware => hardware.Sensors.Select(sensor =>
                 new SensorDescriptor(
                     $"{hardware.Identifier}/{sensor.Name}",
@@ -96,7 +135,7 @@ public sealed class HardwareCollector : ICollectorSession, IDisposable
     {
         EnsureOpened();
         var readings = new List<SensorReading>();
-        foreach (var hardware in CpuHardware())
+        foreach (var hardware in source.CpuHardware())
         {
             // A host without readable sensors (virtualized CI runner, no low-level access)
             // makes the library throw from inside Update(); the sidecar must keep running
@@ -123,7 +162,8 @@ public sealed class HardwareCollector : ICollectorSession, IDisposable
     {
         if (opened)
         {
-            computer.Close();
+            source.Close();
+            source.Dispose();
             opened = false;
             catalogRead = false;
         }
@@ -151,6 +191,7 @@ public sealed class HardwareCollector : ICollectorSession, IDisposable
         try
         {
             hardware.Update();
+            failedUpdates.Remove(hardware.Identifier.ToString());
             return true;
         }
         catch (Exception exception) when (exception is not OutOfMemoryException)
@@ -163,8 +204,6 @@ public sealed class HardwareCollector : ICollectorSession, IDisposable
             return false;
         }
     }
-
-    private IEnumerable<IHardware> CpuHardware() => computer.Hardware.Where(hardware => hardware.HardwareType == HardwareType.Cpu);
 
     private void EnsureOpened()
     {

@@ -121,9 +121,11 @@ public sealed class SensorAgentProcessTests
             .WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
         process.ExitCode.ShouldBe(0);
 
-        // Unhandled exceptions in the sidecar are reported on stderr before exiting.
+        // Unhandled exceptions in the sidecar are reported on stderr with these codes before exiting;
+        // controlled warnings (SENSOR_UPDATE_FAILED) are allowed on hosts without sensors.
         var errors = await stderr.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
-        errors.ShouldNotContain("Exception", customMessage: errors);
+        errors.ShouldNotContain("AGENT_UNHANDLED_EXCEPTION", customMessage: errors);
+        errors.ShouldNotContain("AGENT_UNOBSERVED_TASK", customMessage: errors);
     }
 
     private static string DescribeCatalog(

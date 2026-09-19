@@ -54,10 +54,23 @@ internal sealed class JsonStderrLoggerProvider : ILoggerProvider
     }
 }
 
-internal sealed class JsonStderrLogger(string target) : ILogger, IDisposable
+internal sealed class JsonStderrLogger : ILogger, IDisposable
 {
     private static readonly object Gate = new();
-    private readonly StandardErrorWriter writer = new();
+    private readonly string target;
+    private readonly TextWriter writer;
+
+    public JsonStderrLogger(string target)
+        : this(target, new StandardErrorWriter())
+    {
+    }
+
+    /// <summary>Seam for tests: writes the same JSON lines to any writer.</summary>
+    internal JsonStderrLogger(string target, TextWriter writer)
+    {
+        this.target = target;
+        this.writer = writer;
+    }
 
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => NullScope.Instance;
 
@@ -77,7 +90,7 @@ internal sealed class JsonStderrLogger(string target) : ILogger, IDisposable
         var payload = new
         {
             ts = DateTimeOffset.UtcNow,
-            level = logLevel.ToString().ToLowerInvariant(),
+            level = SchemaLevel(logLevel),
             component = "agent",
             target,
             code,
@@ -85,7 +98,8 @@ internal sealed class JsonStderrLogger(string target) : ILogger, IDisposable
             session_id = (string?)null,
             protocol_version = 1,
             fields = new Dictionary<string, object?> { ["event_id"] = eventId.Id },
-            err = exception is null ? null : new { code = "UNHANDLED_EXCEPTION", message_key = exception.GetType().Name, path = (string?)null, context = (object?)null }
+            // err.code carries the event code: the exception's meaning depends on the event that reports it.
+            err = exception is null ? null : new { code, message_key = exception.GetType().Name, path = (string?)null, context = (object?)null }
         };
         var json = JsonSerializer.Serialize(payload);
         lock (Gate)
@@ -93,6 +107,17 @@ internal sealed class JsonStderrLogger(string target) : ILogger, IDisposable
             writer.WriteLine(json);
         }
     }
+
+    /// <summary>Maps the runtime levels to the five levels of the log-event contract (XVII).
+    /// Critical has no counterpart and is reported as error.</summary>
+    internal static string SchemaLevel(LogLevel level) => level switch
+    {
+        LogLevel.Trace => "trace",
+        LogLevel.Debug => "debug",
+        LogLevel.Information => "info",
+        LogLevel.Warning => "warn",
+        _ => "error"
+    };
 
     private sealed class NullScope : IDisposable
     {
@@ -103,13 +128,24 @@ internal sealed class JsonStderrLogger(string target) : ILogger, IDisposable
     public void Dispose() => writer.Dispose();
 }
 
-internal sealed class StandardErrorWriter : IDisposable
+internal sealed class StandardErrorWriter : TextWriter
 {
 #pragma warning disable RS0030
     private readonly StreamWriter writer = new(Console.OpenStandardError(), new System.Text.UTF8Encoding(false)) { AutoFlush = true };
 #pragma warning restore RS0030
 
-    public void WriteLine(string value) => writer.WriteLine(value);
+    public override System.Text.Encoding Encoding => writer.Encoding;
 
-    public void Dispose() => writer.Dispose();
+    public override void Write(char value) => writer.Write(value);
+
+    public override void WriteLine(string? value) => writer.WriteLine(value);
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            writer.Dispose();
+        }
+        base.Dispose(disposing);
+    }
 }
