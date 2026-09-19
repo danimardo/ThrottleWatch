@@ -121,12 +121,15 @@ flowchart TD
 - La aplicación intenta primero modo estándar. La cobertura reducida es un estado soportado.
 - El MVP no elevará silenciosamente la UI ni ejecutará comandos arbitrarios.
 - El lanzador elevado bajo demanda y la tubería autenticada quedan definidos por
-  `docs/adr/0004-lanzador-elevado-del-sidecar.md`, aceptado el 2026-09-19. Su implementación debe
-  añade un servicio privilegiado persistente.
+  `docs/adr/0004-lanzador-elevado-del-sidecar.md`, aceptado con condiciones C1–C6 el 2026-09-19.
+  Su implementación queda limitada por R1–R7 y no añade un servicio privilegiado persistente.
 
 ## Flujo de datos
 
-1. Rust genera un nonce efímero, verifica el hash del ejecutable empaquetado (`bundle.externalBin`) y lanza el sidecar desde esa ruta fija con `std::process::Command`, con `stdin`, `stdout` y `stderr` canalizados. No se usa `tauri-plugin-shell`: la WebView no tiene ningún permiso para lanzar procesos.
+1. Rust genera un nonce efímero, solicita el lanzador aprobado y este verifica la firma
+   Authenticode/editor permitido o el manifiesto de release firmado del ejecutable en la ruta fija
+   (`bundle.externalBin`) antes de iniciarlo. No se usa `tauri-plugin-shell`: la WebView no tiene
+   ningún permiso para lanzar procesos.
 2. Ambos negocian versión de protocolo y capacidades.
 3. El sidecar envía catálogo de sensores y después una muestra normalizada por segundo.
 4. Rust valida, marca calidad/lag, almacena en búfer y publica un snapshot agregado a la UI.

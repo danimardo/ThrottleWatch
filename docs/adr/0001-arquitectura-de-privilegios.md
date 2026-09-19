@@ -19,7 +19,7 @@ pero la aplicación debe seguir siendo útil en niveles B/C cuando ese acceso no
    registros avanzados; nunca eleva la interfaz automáticamente.
 4. La instalación o reparación de un proveedor firmado de bajo nivel es una acción explícita del
    usuario y requiere UAC una sola vez. No se introduce un servicio privilegiado persistente en el
-   MVP.
+   MVP; el lanzador bajo demanda queda condicionado a ADR-0004, aceptado con condiciones C1–C6.
 5. El nivel A queda condicionado a T019a: si solo funciona mediante un servicio persistente, ese
    servicio requiere una revisión de amenazas y una decisión posterior; si no es viable, el
    producto conserva las conclusiones prudentes de niveles B/C y retira cifras no demostrables.

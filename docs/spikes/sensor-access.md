@@ -1,6 +1,6 @@
 # Spike T019/T019a: acceso a sensores y nivel de cobertura
 
-- Estado: abierto
+- Estado: cerrado para T019a (2026-09-19); quedan abiertas las matrices y spikes posteriores de L03
 - Fecha de inicio: 2026-09-19
 - Proveedor previsto: PawnIO mediante \`LibreHardwareMonitorLib\` 0.9.6
 - Ejecutable de prueba: \`apps/sensor-agent/bin/Debug/net10.0-windows/SensorAgent.exe\`
@@ -50,7 +50,7 @@ registros de una máquina real. No registrar números de serie, nombres de usuar
 
 | Equipo | CPU/familia | Windows/build | Alimentación | PawnIO antes | Lectura sin proveedor | PawnIO instalado una vez | Tras reinicio sin UAC | Resultado A/B/C | Evidencia |
 |---|---|---|---|---|---|---|---|---|---|
-| Desarrollo | AMD Ryzen 5 2600X / Zen+ (Pinnacle Ridge, Family 17h Model 8) | Windows 11 Pro / 26200 | CA (sin batería detectada) | no instalado | \`missing\`, sin acceso avanzado | \`available\` (elevado): SMU \`0x002B1800\`; tabla PM no fiable | pendiente | nivel A no demostrado (sin limpieza de bits) | probes 2026-09-19 |
+| Desarrollo | AMD Ryzen 5 2600X / Zen+ (Pinnacle Ridge, Family 17h Model 8) | Windows 11 Pro / 26200 | CA (sin batería detectada) | no instalado | \`missing\`, sin acceso avanzado | \`available\` (elevado): SMU \`0x002B1800\`; tabla PM no fiable | \`denied\` (usuario estándar): SMU \`0x00000000\`, \`SMU_VERSION_ZERO\` → resultado **(b)** | nivel A solo elevado; sin limpieza de bits | probes 2026-09-19 |
 | Intel híbrido | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente | salida JSON |
 | Intel anterior | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente | salida JSON |
 | Portátil OEM | pendiente | pendiente | batería/CA | pendiente | pendiente | pendiente | pendiente | pendiente | salida JSON |
@@ -163,3 +163,37 @@ Observaciones:
   obtiene con un lanzador elevado exclusivo del sidecar registrado en ese paso (ADR con
   revisión de amenazas pendiente, T019a); se reutiliza un PawnIO ya instalado y nunca se
   desinstala; si el acceso falla en sesión se degrada a B/C sin interrumpir.
+
+### 2026-09-19 — equipo de desarrollo, usuario estándar tras reiniciar (T152)
+
+Reinicio completo del equipo; PowerShell **sin** elevar (`IsInRole(Administrator)` → `False`);
+compilación limpia y ejecución de la sonda corregida:
+
+\`\`\`json
+{
+  "cpu_vendor": "amd",
+  "state": "denied",
+  "provider": "pawnio",
+  "provider_version": "2.2.0.0",
+  "registers": [],
+  "smu_version": "0x00000000",
+  "log_clear_supported": false,
+  "details_code": "SMU_VERSION_ZERO",
+  "error": null
+}
+\`\`\`
+
+Lectura: el dispositivo PawnIO se abre y el módulo carga sin excepción como usuario estándar,
+pero la comunicación con el SMU devuelve cero. Comparado con la ejecución elevada del mismo día
+(\`0x002B1800\`), el nivel A solo es alcanzable con el sidecar elevado. Queda confirmado el
+resultado **(b)** de \`plan.md\` § Fase 0: continuar solo con un lanzador elevado exclusivo del
+sidecar que supere la revisión de amenazas (ADR-0004, pendiente de aprobación por el
+propietario del proyecto).
+
+### Cierre T019a — 2026-09-19
+
+T152 confirmó el resultado **(b)**: el SMU devuelve `0x00000000` como usuario estándar tras
+reiniciar y `0x002B1800` en el proceso elevado. ADR-0004 queda aceptado con condiciones C1–C6;
+por tanto T019a queda cerrada con resultado parcial y la implementación continúa por T153 → T154
+→ T155, manteniendo B/C para cuentas estándar. El resto de la matriz de hardware y los demás
+spikes de L03 permanecen abiertos.
