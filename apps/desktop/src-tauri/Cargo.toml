@@ -5,9 +5,12 @@ description = "Diagnóstico térmico de CPU"
 authors = ["ThrottleWatch contributors"]
 edition = "2024"
 license = "GPL-3.0-only"
+default-run = "throttlewatch"
 
 [features]
 e2e = []
+# Embeds the built interface (`../dist`) instead of loading the dev server; `tauri build` enables it.
+custom-protocol = ["tauri/custom-protocol"]
 
 [lib]
 name = "throttlewatch_lib"

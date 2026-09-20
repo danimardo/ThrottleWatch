@@ -7,6 +7,16 @@ export type AdvancedAccess =
   'not_needed' | 'available' | 'installable' | 'denied' | 'error';
 export type Translate = (key: string) => string;
 
+/** Catalog key of every collector state the backend can report (`collector_state`). */
+export const COLLECTOR_LABEL_KEYS: Readonly<Record<string, string>> = {
+  starting: 'dashboard.collectorStarting',
+  running: 'dashboard.collectorRunning',
+  degraded: 'dashboard.collectorDegraded',
+  restarting: 'dashboard.collectorRestarting',
+  stopped: 'dashboard.collectorStopped',
+  failed: 'dashboard.collectorFailed'
+};
+
 export interface DashboardSnapshot {
   cpuLabel: string;
   topologyLabel: string;

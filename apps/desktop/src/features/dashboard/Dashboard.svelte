@@ -19,6 +19,7 @@
   import { createTranslator } from '../../lib/i18n';
   import { toStatusHeroView } from './adapter';
   import {
+    COLLECTOR_LABEL_KEYS,
     createDemoSnapshot,
     formatNumber,
     fromLiveSnapshot,
@@ -33,14 +34,8 @@
   const numberLocale = locale === 'es' ? 'es-ES' : 'en-US';
 
   function localizedCollectorLabel(value: string): string {
-    const keys: Record<string, string> = {
-      running: 'dashboard.collectorRunning',
-      degraded: 'dashboard.collectorDegraded',
-      restarting: 'dashboard.collectorRestarting',
-      stopped: 'dashboard.collectorStopped',
-      failed: 'dashboard.collectorFailed'
-    };
-    return keys[value] === undefined ? value : t(keys[value]);
+    const key = COLLECTOR_LABEL_KEYS[value];
+    return key === undefined ? value : t(key);
   }
 
   interface Props {
