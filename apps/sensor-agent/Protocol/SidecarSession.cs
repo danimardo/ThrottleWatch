@@ -46,7 +46,6 @@ public sealed class SidecarSession
     public const int MinIntervalMs = 250;
     public const int MaxIntervalMs = 10_000;
     public const int DefaultIntervalMs = 1_000;
-    public const string Detail = "representative";
 
     private readonly object gate = new();
     private readonly ISensorSource source;
@@ -57,6 +56,8 @@ public sealed class SidecarSession
     private long sequence;
     private long? lastReceived;
     private NormalizedCatalog? catalog;
+    private IReadOnlyList<SensorDescriptor> rawCatalog = [];
+    private string detail = CatalogNormalizer.DetailRepresentative;
     private bool sampling;
     private int intervalMs = DefaultIntervalMs;
 
@@ -143,7 +144,8 @@ public sealed class SidecarSession
         nonce = document.RootElement.GetProperty("session_nonce").GetString();
         lastReceived = document.RootElement.GetProperty("sequence").GetInt64();
         sequence = 1; // hello_ack used sequence 0
-        catalog = CatalogNormalizer.Build(source.ReadCatalog());
+        rawCatalog = source.ReadCatalog();
+        catalog = CatalogNormalizer.Build(rawCatalog, detail);
         return [Encoding.UTF8.GetString(ack), Envelope("capabilities", BuildCapabilities())];
     }
 
@@ -190,13 +192,27 @@ public sealed class SidecarSession
     {
         intervalMs = ClampInterval(payload);
         sampling = true;
-        return [Envelope("started", new StartedPayload(intervalMs, Detail))];
+        var requested = payload.TryGetProperty("detail", out var value) && value.GetString() == CatalogNormalizer.DetailPerCore
+            ? CatalogNormalizer.DetailPerCore
+            : CatalogNormalizer.DetailRepresentative; // per_group is not offered: the effective detail is reported
+        var lines = new List<string>();
+        var changed = requested != detail;
+        detail = requested;
+        lines.Add(Envelope("started", new StartedPayload(intervalMs, detail)));
+        if (changed)
+        {
+            // The contract re-emits capabilities after a start with a different detail.
+            catalog = CatalogNormalizer.Build(rawCatalog, detail);
+            lines.Add(Envelope("capabilities", BuildCapabilities()));
+        }
+
+        return lines;
     }
 
     private List<string> SetRate(JsonElement payload)
     {
         intervalMs = ClampInterval(payload);
-        return [Envelope("started", new StartedPayload(intervalMs, Detail))];
+        return [Envelope("started", new StartedPayload(intervalMs, detail))];
     }
 
     private List<string> Stop()

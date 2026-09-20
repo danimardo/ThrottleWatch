@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using System.Text.Json.Serialization;
 using ThrottleWatch.SensorAgent.Collector;
 
@@ -31,19 +32,22 @@ public sealed class NormalizedCatalog
     private readonly string? loadRawId;
     private readonly string? powerRawId;
     private readonly IReadOnlyList<string> clockRawIds;
+    private readonly IReadOnlyList<CoreSource> cores;
 
     internal NormalizedCatalog(
         IReadOnlyList<SensorInfo> sensors,
         IReadOnlyList<TemperatureSource> temperatures,
         string? loadRawId,
         string? powerRawId,
-        IReadOnlyList<string> clockRawIds)
+        IReadOnlyList<string> clockRawIds,
+        IReadOnlyList<CoreSource> cores)
     {
         Sensors = sensors;
         this.temperatures = temperatures;
         this.loadRawId = loadRawId;
         this.powerRawId = powerRawId;
         this.clockRawIds = clockRawIds;
+        this.cores = cores;
     }
 
     public IReadOnlyList<SensorInfo> Sensors { get; }
@@ -62,7 +66,7 @@ public sealed class NormalizedCatalog
                 CatalogNormalizer.LoadId => MapSingle(sensor.Id, loadRawId, byId),
                 CatalogNormalizer.PowerId => MapSingle(sensor.Id, powerRawId, byId),
                 CatalogNormalizer.ClockId => MapClock(byId),
-                _ => new SampleValue(sensor.Id, null, "missing")
+                _ => MapCore(sensor.Id, byId)
             });
         }
 
@@ -132,7 +136,27 @@ public sealed class NormalizedCatalog
         return new SampleValue(CatalogNormalizer.ClockId, null, readable.Length > 0 ? "invalid" : "missing");
     }
 
+    private SampleValue MapCore(string id, Dictionary<string, SensorReading> byId)
+    {
+        var core = cores.FirstOrDefault(candidate => candidate.Id == id);
+        if (core is null || !byId.TryGetValue(core.RawId, out var reading))
+        {
+            return new SampleValue(id, null, "missing");
+        }
+
+        if (reading is { Status: "ok", Number: { } number })
+        {
+            return core.Metric == "load" || IsMeasurement(number)
+                ? new SampleValue(id, number, "ok")
+                : new SampleValue(id, null, "invalid");
+        }
+
+        return new SampleValue(id, null, reading.Status == "ok" ? "invalid" : reading.Status);
+    }
+
     internal sealed record TemperatureSource(string RawId, string Name, string Scope);
+
+    internal sealed record CoreSource(string Id, string RawId, string Metric);
 }
 
 public static class CatalogNormalizer
@@ -142,7 +166,15 @@ public static class CatalogNormalizer
     public const string PowerId = "cpu.package.power";
     public const string ClockId = "cpu.package.clock";
 
-    public static NormalizedCatalog Build(IReadOnlyList<SensorDescriptor> raw)
+    public const string DetailRepresentative = "representative";
+    public const string DetailPerCore = "per_core";
+
+    private static readonly Regex CoreName = new(
+        @"^(?:(?<kind>P|E|LPE|LP-E)-)?(?:CPU )?Core #(?<n>\d+)$",
+        RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture,
+        TimeSpan.FromSeconds(1));
+
+    public static NormalizedCatalog Build(IReadOnlyList<SensorDescriptor> raw, string detail = DetailRepresentative)
     {
         var sensors = new List<SensorInfo>();
 
@@ -185,7 +217,53 @@ public static class CatalogNormalizer
             sensors.Add(new SensorInfo(ClockId, "selection", "Highest core clock", "clock", "package", null, "megahertz", "substitute"));
         }
 
-        return new NormalizedCatalog(sensors, temperatures, load?.Id, power?.Id, clocks);
+        var cores = new List<NormalizedCatalog.CoreSource>();
+        if (detail == DetailPerCore)
+        {
+            AddPerCore(raw, sensors, cores);
+        }
+
+        return new NormalizedCatalog(sensors, temperatures, load?.Id, power?.Id, clocks, cores);
+    }
+
+    /// <summary>
+    /// Per-core detail: one load, temperature and clock sensor per physical core. The core key is the
+    /// number in the LibreHardwareMonitorLib name; hybrid CPUs prefix the kind (p1, e3) so the host can
+    /// place the core in its P/E/LP-E group.
+    /// </summary>
+    private static void AddPerCore(
+        IReadOnlyList<SensorDescriptor> raw,
+        List<SensorInfo> sensors,
+        List<NormalizedCatalog.CoreSource> cores)
+    {
+        foreach (var descriptor in raw)
+        {
+            var (suffix, unit, quality) = descriptor.Metric switch
+            {
+                "load" => ("load", "percent", "direct"),
+                "temperature" => ("temp", "celsius", "direct"),
+                "clock" => ("clock", "megahertz", "substitute"),
+                _ => (null, null, null)
+            };
+            if (suffix is null)
+            {
+                continue;
+            }
+
+            var match = CoreName.Match(descriptor.SourceName);
+            if (!match.Success)
+            {
+                continue;
+            }
+
+            var kind = match.Groups["kind"].Success
+                ? match.Groups["kind"].Value.Replace("-", string.Empty, StringComparison.Ordinal).ToLower(CultureInfo.InvariantCulture)
+                : string.Empty;
+            var key = kind + match.Groups["n"].Value;
+            var id = $"cpu.core.{key}.{suffix}";
+            sensors.Add(new SensorInfo(id, descriptor.Id, descriptor.SourceName, descriptor.Metric, "core", key, unit!, quality!));
+            cores.Add(new NormalizedCatalog.CoreSource(id, descriptor.Id, descriptor.Metric));
+        }
     }
 
     /// <summary>Scope classes understood by <see cref="SensorNormalizer.SelectRepresentative"/>; null = not a CPU temperature to use.</summary>
