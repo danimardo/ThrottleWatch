@@ -52,8 +52,8 @@ internal sealed class FakeHardware(string identifier, bool throwOnUpdate = false
     public IDictionary<string, string> Properties { get; } = new Dictionary<string, string>();
     public ISensor[] Sensors { get; } =
     [
-        new FakeSensor("CPU Package", SensorType.Temperature, 61f),
-        new FakeSensor("CPU Total", SensorType.Load, 12f)
+        new FakeSensor("CPU Package", SensorType.Temperature, 61f, 0),
+        new FakeSensor("CPU Total", SensorType.Load, 12f, 1)
     ];
     public IHardware[] SubHardware => [];
     public event SensorEventHandler? SensorAdded { add { } remove { } }
@@ -70,11 +70,11 @@ internal sealed class FakeHardware(string identifier, bool throwOnUpdate = false
     }
 }
 
-internal sealed class FakeSensor(string name, SensorType type, float value) : ISensor
+internal sealed class FakeSensor(string name, SensorType type, float value, int index) : ISensor
 {
     public IControl? Control => null;
     public IHardware Hardware => null!;
-    public Identifier Identifier { get; } = new Identifier(name);
+    public Identifier Identifier { get; } = new Identifier("amdcpu", "0", type.ToString().ToLowerInvariant(), index.ToString(System.Globalization.CultureInfo.InvariantCulture));
     public int Index => 0;
     public bool IsDefaultHidden => false;
     public float? Max => value;

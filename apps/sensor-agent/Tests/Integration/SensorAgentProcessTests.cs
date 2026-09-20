@@ -117,6 +117,80 @@ public sealed class SensorAgentProcessTests
         errors.ShouldNotContain("AGENT_UNOBSERVED_TASK", customMessage: errors);
     }
 
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task RealSidecarStreamsCapabilitiesAndSamplesUntilStopped()
+    {
+        var sidecarPath = Path.Combine(AppContext.BaseDirectory, "SensorAgent.exe");
+        using var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = sidecarPath,
+                WorkingDirectory = AppContext.BaseDirectory,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            }
+        };
+        process.Start().ShouldBeTrue();
+        var token = TestContext.Current.CancellationToken;
+        var stderr = process.StandardError.ReadToEndAsync(token);
+
+        async Task<JsonElement> NextAsync()
+        {
+            var line = await process.StandardOutput.ReadLineAsync(token).AsTask().WaitAsync(TimeSpan.FromSeconds(15), token);
+            line.ShouldNotBeNullOrWhiteSpace();
+            return JsonDocument.Parse(line!).RootElement;
+        }
+
+        async Task SendAsync(string type, string payload, int sequence)
+        {
+            await process.StandardInput.WriteLineAsync(
+                "{\"protocol_version\":1,\"session_nonce\":\"live-nonce\",\"sequence\":" + sequence
+                + ",\"timestamp_utc\":\"2026-09-20T10:00:00.000Z\",\"type\":\"" + type + "\",\"payload\":" + payload + "}");
+            await process.StandardInput.FlushAsync(token);
+        }
+
+        await SendAsync("hello", "{\"app_version\":\"integration\",\"supported_protocols\":[1]}", 0);
+        (await NextAsync()).GetProperty("type").GetString().ShouldBe("hello_ack");
+        var capabilities = await NextAsync();
+        capabilities.GetProperty("type").GetString().ShouldBe("capabilities");
+        var sensors = capabilities.GetProperty("payload").GetProperty("sensors").EnumerateArray()
+            .Select(sensor => sensor.GetProperty("id").GetString()).ToArray();
+        // Load is available on every host, virtualized or not; physical sensors only on real hardware.
+        sensors.ShouldContain("cpu.package.load");
+        capabilities.GetProperty("payload").GetProperty("cpu").GetProperty("virtualized").GetBoolean().ShouldBe(HypervisorPresent);
+
+        await SendAsync("start", "{\"interval_ms\":250,\"detail\":\"representative\"}", 1);
+        (await NextAsync()).GetProperty("type").GetString().ShouldBe("started");
+        var first = await NextAsync();
+        var second = await NextAsync();
+        first.GetProperty("type").GetString().ShouldBe("sample");
+        second.GetProperty("payload").GetProperty("monotonic_ms").GetInt64()
+            .ShouldBeGreaterThan(first.GetProperty("payload").GetProperty("monotonic_ms").GetInt64());
+        var load = first.GetProperty("payload").GetProperty("values").EnumerateArray()
+            .First(value => value.GetProperty("sensor_id").GetString() == "cpu.package.load");
+        load.GetProperty("status").GetString().ShouldBe("ok");
+        load.GetProperty("number").GetDouble().ShouldBeInRange(0, 100);
+
+        await SendAsync("stop", "{}", 2);
+        JsonElement reply;
+        do
+        {
+            reply = await NextAsync(); // a sample may still be in flight before `stopped`
+        }
+        while (reply.GetProperty("type").GetString() == "sample");
+        reply.GetProperty("type").GetString().ShouldBe("stopped");
+
+        await process.StandardInput.DisposeAsync();
+        await process.WaitForExitAsync(token).WaitAsync(TimeSpan.FromSeconds(10), token);
+        process.ExitCode.ShouldBe(0);
+        (await stderr).ShouldNotContain("AGENT_UNHANDLED_EXCEPTION");
+    }
+
     private static string DescribeCatalog(
         System.Collections.Generic.IReadOnlyList<SensorDescriptor> catalog,
         System.Collections.Generic.IReadOnlyList<SensorReading> sample,

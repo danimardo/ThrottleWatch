@@ -34,7 +34,7 @@ public sealed class HostVirtualizationTests
         var sample = collector.ReadSample();
 
         catalog.Select(descriptor => descriptor.Metric).ShouldBe(["load"]);
-        sample.Select(reading => reading.SensorId).ShouldBe(["/amdcpu/0/CPU Total"]);
+        sample.Select(reading => reading.SensorId).ShouldBe(["/amdcpu/0/load/1"]);
         logger.Entries.Count(entry => entry.Contains("HOST_VIRTUALIZED")).ShouldBe(1);
     }
 

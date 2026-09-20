@@ -34,19 +34,63 @@ internal static class Program
 
         using var collector = new HardwareCollector();
         collector.Open();
-        var processor = new HandshakeProcessor(collector);
+        var session = new SidecarSession(collector);
         var logger = Log.Create("sensor-agent");
         Log.AttachUnhandledExceptionHandlers(logger);
-        while (await streams.ReadLineAsync(CancellationToken.None) is { } line)
-        {
-            if (!processor.TryProcess(System.Text.Encoding.UTF8.GetBytes(line), out var response))
-            {
-                continue;
-            }
 
-            await streams.WriteLineAsync(System.Text.Encoding.UTF8.GetString(response));
+        // Two writers share stdout: the reader task (replies) and the sampling timer.
+        using var writeGate = new SemaphoreSlim(1, 1);
+        async Task WriteAsync(IReadOnlyList<string> lines)
+        {
+            await writeGate.WaitAsync();
+            try
+            {
+                foreach (var line in lines)
+                {
+                    await streams.WriteLineAsync(line);
+                }
+            }
+            finally
+            {
+                writeGate.Release();
+            }
         }
 
+        using var stop = new CancellationTokenSource();
+        var sampler = Task.Run(async () =>
+        {
+            while (!stop.IsCancellationRequested)
+            {
+                try
+                {
+                    await Task.Delay(session.IntervalMs, stop.Token);
+                    if (session.NextSample() is { } sample)
+                    {
+                        await WriteAsync([sample]);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (Exception exception) when (exception is not OutOfMemoryException)
+                {
+                    logger.SamplingFailed("SAMPLING_FAILED", exception.GetType().Name, exception);
+                }
+            }
+        });
+
+        while (await streams.ReadLineAsync(CancellationToken.None) is { } line)
+        {
+            await WriteAsync(session.Handle(line));
+            if (session.ShutdownRequested)
+            {
+                break;
+            }
+        }
+
+        await stop.CancelAsync();
+        await sampler;
         return 0;
     }
 }

@@ -27,7 +27,7 @@ public sealed class HardwareCollectorUpdateFailureTests
         var first = collector.ReadSample();
         var second = collector.ReadSample();
 
-        first.Select(reading => reading.SensorId).ShouldBe(["/amdcpu/0/CPU Package", "/amdcpu/0/CPU Total"]);
+        first.Select(reading => reading.SensorId).ShouldBe(["/amdcpu/0/temperature/0", "/amdcpu/0/load/1"]);
         first.ShouldAllBe(reading => reading.Status == "missing" && reading.Number == null);
         second.ShouldAllBe(reading => reading.Status == "missing");
         logger.Entries.Count(entry => entry.Contains("SENSOR_UPDATE_FAILED")).ShouldBe(1);
@@ -50,7 +50,7 @@ public sealed class HardwareCollectorUpdateFailureTests
         hardware.ThrowOnUpdate = true;
         _ = collector.ReadSample();
 
-        recovered.First(reading => reading.SensorId == "/amdcpu/0/CPU Package").Status.ShouldBe("ok");
+        recovered.First(reading => reading.SensorId == "/amdcpu/0/temperature/0").Status.ShouldBe("ok");
         logger.Entries.Count(entry => entry.Contains("SENSOR_UPDATE_FAILED")).ShouldBe(2);
     }
 

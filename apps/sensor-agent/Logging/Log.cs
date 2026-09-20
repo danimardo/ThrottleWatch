@@ -27,6 +27,9 @@ public static partial class Log
     [LoggerMessage(EventId = 1004, Level = LogLevel.Warning, Message = "{Code}: hardware could not be opened ({ExceptionType})")]
     public static partial void HardwareOpenFailed(this ILogger logger, string Code, string ExceptionType, Exception exception);
 
+    [LoggerMessage(EventId = 1005, Level = LogLevel.Warning, Message = "{Code}: a sample could not be produced ({ExceptionType})")]
+    public static partial void SamplingFailed(this ILogger logger, string Code, string ExceptionType, Exception exception);
+
     public static void AttachUnhandledExceptionHandlers(ILogger logger)
     {
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>

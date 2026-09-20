@@ -17,6 +17,14 @@ public sealed record SensorDescriptor(
 
 public sealed record SensorReading(string SensorId, float? Number, string Status);
 
+/// <summary>What the protocol server needs from the hardware layer (a fake in tests).</summary>
+public interface ISensorSource : ICollectorSession
+{
+    string CpuDisplayName { get; }
+
+    IReadOnlyList<SensorReading> ReadSample();
+}
+
 public interface ICollectorSession
 {
     IReadOnlyList<SensorDescriptor> ReadCatalog();
@@ -67,7 +75,7 @@ internal sealed class ComputerHardwareSource : IHardwareSource
     }
 }
 
-public sealed class HardwareCollector : ICollectorSession, IDisposable
+public sealed class HardwareCollector : ISensorSource, IDisposable
 {
     private readonly IHardwareSource source;
     private readonly ILogger logger;
@@ -91,6 +99,20 @@ public sealed class HardwareCollector : ICollectorSession, IDisposable
     }
 
     public bool IsOpen => opened;
+
+    public string CpuDisplayName
+    {
+        get
+        {
+            if (openFailed)
+            {
+                return "CPU";
+            }
+
+            var name = source.CpuHardware().FirstOrDefault()?.Name;
+            return string.IsNullOrWhiteSpace(name) ? "CPU" : name;
+        }
+    }
 
     public void Open()
     {
@@ -132,7 +154,7 @@ public sealed class HardwareCollector : ICollectorSession, IDisposable
         var catalog = source.CpuHardware()
             .SelectMany(hardware => hardware.Sensors.Where(sensor => !IsHiddenOnThisHost(sensor.SensorType)).Select(sensor =>
                 new SensorDescriptor(
-                    $"{hardware.Identifier}/{sensor.Name}",
+                    SensorId(sensor),
                     hardware.Identifier.ToString(),
                     sensor.Name,
                     MapMetric(sensor.SensorType),
@@ -175,7 +197,7 @@ public sealed class HardwareCollector : ICollectorSession, IDisposable
             var updated = TryUpdate(hardware);
             foreach (var sensor in hardware.Sensors.Where(sensor => !IsHiddenOnThisHost(sensor.SensorType)))
             {
-                var id = $"{hardware.Identifier}/{sensor.Name}";
+                var id = SensorId(sensor);
                 if (!updated)
                 {
                     readings.Add(new SensorReading(id, null, "missing"));
@@ -204,6 +226,12 @@ public sealed class HardwareCollector : ICollectorSession, IDisposable
             catalogRead = false;
         }
     }
+
+    /// <summary>
+    /// LibreHardwareMonitor's own sensor identifier (for example /amdcpu/0/clock/1) is unique per sensor;
+    /// hardware id plus name is not: "Core #1" exists as a clock and as a multiplier factor.
+    /// </summary>
+    private static string SensorId(ISensor sensor) => sensor.Identifier.ToString();
 
     /// <summary>Guests report physical sensors from virtual MSRs; those are not measurements (see HostVirtualization).</summary>
     private bool IsHiddenOnThisHost(SensorType type) =>
