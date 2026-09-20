@@ -237,9 +237,49 @@ pub fn parent_process_alive(parent_pid: u32) -> bool {
     unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, parent_pid).is_ok() }
 }
 
+/// Returns the process that launched the current process, when Windows exposes it in a snapshot.
+/// The guided watchdog uses this as a best-effort liveness signal; a missing parent is never
+/// treated as a reason to keep a diagnostic running indefinitely.
+#[cfg(windows)]
+pub fn current_parent_process_id() -> Option<u32> {
+    use std::mem::size_of;
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::Diagnostics::ToolHelp::{
+        CreateToolhelp32Snapshot, PROCESSENTRY32, Process32First, Process32Next, TH32CS_SNAPPROCESS,
+    };
+    use windows::Win32::System::Threading::GetCurrentProcessId;
+
+    // SAFETY: the snapshot is read-only, initialized with the documented entry size, and its
+    // handle is closed on every successful path before returning.
+    let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0).ok()? };
+    let current_pid = unsafe { GetCurrentProcessId() };
+    let mut entry =
+        PROCESSENTRY32 { dwSize: size_of::<PROCESSENTRY32>() as u32, ..Default::default() };
+    // SAFETY: `entry` is a valid writable PROCESSENTRY32 with its required size set, and the
+    // snapshot handle came from CreateToolhelp32Snapshot.
+    let mut found = unsafe { Process32First(snapshot, &mut entry).is_ok() };
+    let mut parent = None;
+    while found {
+        if entry.th32ProcessID == current_pid {
+            parent = Some(entry.th32ParentProcessID);
+            break;
+        }
+        // SAFETY: the same valid snapshot and entry are reused for the documented enumeration.
+        found = unsafe { Process32Next(snapshot, &mut entry).is_ok() };
+    }
+    // SAFETY: `snapshot` is the handle returned by CreateToolhelp32Snapshot and is closed once.
+    let _ = unsafe { CloseHandle(snapshot) };
+    parent.filter(|pid| *pid != 0)
+}
+
 #[cfg(not(windows))]
 pub fn parent_process_alive(parent_pid: u32) -> bool {
     parent_pid != 0
+}
+
+#[cfg(not(windows))]
+pub fn current_parent_process_id() -> Option<u32> {
+    None
 }
 
 #[cfg(test)]

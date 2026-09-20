@@ -10,6 +10,7 @@
     listenValidated,
     parseEvent
   } from '../../lib/bridge';
+  import { createTranslator } from '../../lib/i18n';
   import {
     percentRemaining,
     preflightChecks,
@@ -24,6 +25,10 @@
   let guidedState = $state<GuidedPhase | null>(null);
   let checks = $state<ReturnType<typeof preflightChecks>>([]);
   let error = $state<string | undefined>();
+  const { t } = createTranslator(
+    'system',
+    typeof navigator === 'undefined' ? 'en-US' : navigator.language
+  );
 
   async function loadPreflight(): Promise<void> {
     const result = await invokeValidated(
@@ -93,21 +98,21 @@
   let temperatureLabel = $derived(
     guidedState?.temperature_c === null ||
       guidedState?.temperature_c === undefined
-      ? '—'
-      : `${guidedState.temperature_c.toFixed(0)} °C`
+      ? t('common.noValue')
+      : `${guidedState.temperature_c.toFixed(0)} ${t('dashboard.celsius')}`
   );
   let limitLabel = $derived(
     guidedState?.thermal_limit_c === null ||
       guidedState?.thermal_limit_c === undefined
-      ? '—'
-      : `${guidedState.thermal_limit_c.toFixed(0)} °C`
+      ? t('common.noValue')
+      : `${guidedState.thermal_limit_c.toFixed(0)} ${t('dashboard.celsius')}`
   );
   let headroomLabel = $derived(
     guidedState?.temperature_c !== null &&
       guidedState?.temperature_c !== undefined &&
       guidedState?.thermal_limit_c !== null &&
       guidedState?.thermal_limit_c !== undefined
-      ? `${(guidedState.thermal_limit_c - guidedState.temperature_c).toFixed(0)} °C`
+      ? `${(guidedState.thermal_limit_c - guidedState.temperature_c).toFixed(0)} ${t('dashboard.celsius')}`
       : undefined
   );
   let reading = $derived({
@@ -119,61 +124,60 @@
       guidedState?.remaining_ms === null ||
       guidedState?.remaining_ms === undefined
         ? undefined
-        : `${Math.ceil(guidedState.remaining_ms / 1000)} s`
+        : `${Math.ceil(guidedState.remaining_ms / 1000)} ${t('common.seconds')}`
   });
 </script>
 
 <GuidedDiagnosticScreen
   phase={currentPhase}
-  title="Diagnóstico guiado"
+  title={t('guided.title')}
   stepLabels={[
-    'Comprobación',
-    'Reposo',
-    'Calentamiento',
-    'Carga sostenida',
-    'Recuperación',
-    'Resultado'
+    t('guided.steps.check'),
+    t('guided.steps.rest'),
+    t('guided.steps.warming'),
+    t('guided.steps.load'),
+    t('guided.steps.recovery'),
+    t('guided.steps.result')
   ]}
-  stepperLabel="Fases del diagnóstico"
+  stepperLabel={t('guided.phasesLabel')}
   preflightChecks={checks}
-  preflightFailedTitle={error ?? 'Revisa las condiciones antes de empezar'}
-  preflightCheckingLabel="Comprobando sensores"
-  readyTitle="Listo para empezar"
-  readyBody="El diagnóstico usa un generador sin escrituras de hardware."
-  introTitle="Diagnóstico guiado"
-  introBody={error ??
-    'Mide el rendimiento sostenido del equipo bajo sus condiciones actuales.'}
-  whatWillHappenTitle="Qué va a pasar"
+  preflightFailedTitle={error ?? t('guided.reviewConditions')}
+  preflightCheckingLabel={t('guided.checkingSensors')}
+  readyTitle={t('guided.readyTitle')}
+  readyBody={t('guided.readyBody')}
+  introTitle={t('guided.title')}
+  introBody={error ?? t('guided.introBody')}
+  whatWillHappenTitle={t('guided.whatWillHappen')}
   whatWillHappen={[
-    { label: 'Carga', value: 'Bucle fijo sin AVX-512' },
-    { label: 'Duración', value: 'Perfil estándar' }
+    { label: t('guided.load'), value: t('guided.fixedLoop') },
+    { label: t('guided.duration'), value: t('guided.standardProfile') }
   ]}
-  introDisclaimer="No es un benchmark homologado; sirve para comparar este equipo consigo mismo."
-  startLabel="Iniciar"
+  introDisclaimer={t('guided.disclaimer')}
+  startLabel={t('guided.start')}
   onStart={() => void start()}
-  restTitle="Reposo"
-  restDescription="Estabiliza el equipo antes de la carga."
-  skipRestLabel="Omitir reposo"
+  restTitle={t('guided.steps.rest')}
+  restDescription={t('guided.restDescription')}
+  skipRestLabel={t('guided.skipRest')}
   onSkipRest={() => void start(true)}
-  stopLabel="Detener ahora"
+  stopLabel={t('guided.stop')}
   onStop={stop}
-  phaseTitle="Diagnóstico en curso"
-  phaseDescription="Las lecturas se actualizan durante la prueba."
-  temperatureStatLabel="Temperatura"
-  limitStatLabel="Límite efectivo"
-  headroomStatLabel="Margen"
+  phaseTitle={t('guided.running')}
+  phaseDescription={t('guided.runningDescription')}
+  temperatureStatLabel={t('guided.temperature')}
+  limitStatLabel={t('guided.effectiveLimit')}
+  headroomStatLabel={t('guided.headroom')}
   {reading}
-  cancellingLabel="Cancelando…"
-  cancelledTitle="Prueba incompleta"
-  cancelledDescription="La sesión se ha detenido y queda registrada como incompleta."
-  safetyStopTitle="Parada de seguridad"
-  safetyStopDescription="La prueba se detuvo al detectar una condición de seguridad."
-  sensorLostTitle="Sensor perdido"
-  sensorLostDescription="No se pudo mantener la cobertura necesaria."
-  errorTitle="No se pudo iniciar"
+  cancellingLabel={t('guided.cancelling')}
+  cancelledTitle={t('guided.cancelledTitle')}
+  cancelledDescription={t('guided.cancelledDescription')}
+  safetyStopTitle={t('guided.safetyStopTitle')}
+  safetyStopDescription={t('guided.safetyStopDescription')}
+  sensorLostTitle={t('guided.sensorLostTitle')}
+  sensorLostDescription={t('guided.sensorLostDescription')}
+  errorTitle={t('guided.errorTitle')}
   errorDescription={error}
-  closeLabel="Cerrar"
-  restartLabel="Repetir"
+  closeLabel={t('guided.close')}
+  restartLabel={t('guided.restart')}
   onRestart={() => void start()}
   onClose={() => undefined}
 />

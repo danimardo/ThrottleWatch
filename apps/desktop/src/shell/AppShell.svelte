@@ -32,11 +32,12 @@
   } from '../lib/bridge/window';
   import {
     advanceToSlide,
-    CURRENT_NOTICE_VERSION,
     initialStepFor,
     markNoticesSeen,
+    repeatOnboarding,
     resolveOnboarding
   } from '../features/onboarding/model';
+  import { pendingNoticeDefinitions } from '../features/onboarding/notices';
   import {
     loadOnboardingState,
     saveOnboardingState
@@ -84,10 +85,13 @@
   const overflowDestinations = destinations.slice(3);
 
   let onboardingActive = $derived(onboardingState?.status === 'pending');
+  let pendingNotices = $derived(
+    onboardingState === null
+      ? []
+      : pendingNoticeDefinitions(onboardingState.last_seen_notice_version)
+  );
   let noticesVisible = $derived(
-    onboardingState !== null &&
-      !onboardingActive &&
-      onboardingState.last_seen_notice_version < CURRENT_NOTICE_VERSION
+    onboardingState !== null && !onboardingActive && pendingNotices.length > 0
   );
 
   onMount(() => {
@@ -235,6 +239,14 @@
     if (onboardingState === null) return;
     persist(markNoticesSeen(onboardingState));
   }
+
+  function repeatIntroduction(): void {
+    if (onboardingState === null) return;
+    detectionStarted = false;
+    detectionStatus = 'detecting';
+    coverage = null;
+    persist(repeatOnboarding(onboardingState));
+  }
 </script>
 
 {#snippet nowIcon()}<NavIcon kind="now" />{/snippet}
@@ -315,30 +327,42 @@
         {#if noticesVisible}
           <WhatsNewCards
             title={t('notices.title')}
-            cards={[
-              {
-                id: 'low-level-access',
-                title: t('notices.lowLevel.title'),
-                body: t('notices.lowLevel.body')
-              }
-            ]}
+            cards={pendingNotices.map((notice) => ({
+              id: notice.id,
+              title: t(notice.titleKey),
+              body: t(notice.bodyKey)
+            }))}
             dismissLabel={t('notices.dismiss')}
             onDismiss={dismissNotice}
           />
         {/if}
         <Dashboard />
       {:else if active === 'guided'}
-        <main aria-label="Diagnóstico guiado">
+        <main aria-label={t('guided.ariaLabel')}>
           <GuidedDiagnostic />
         </main>
       {:else if active === 'analysis'}
-        <main aria-label="Análisis">
+        <main aria-label={t('nav.analysis')}>
           <Analysis />
         </main>
       {:else if active === 'cpu'}
-        <main aria-label="CPU">
+        <main aria-label={t('cpu.title')}>
           <CpuOverview />
         </main>
+      {:else if active === 'settings'}
+        <EmptyState
+          icon={settingsIcon}
+          title={t('screens.comingSoon')}
+          description={t('screens.notAvailable')}
+        >
+          {#snippet action()}
+            <Button
+              variant="secondary"
+              label={t('settings.repeatIntroduction')}
+              onclick={repeatIntroduction}
+            />
+          {/snippet}
+        </EmptyState>
       {:else}
         <EmptyState
           icon={active === 'sessions'
@@ -355,10 +379,10 @@
 
   {#if guidedRunning && active !== 'guided'}
     <div class="guided-session-banner" role="status">
-      <span>Diagnóstico guiado en curso</span>
+      <span>{t('guided.inProgress')}</span>
       <Button
         variant="secondary"
-        label="Detener ahora"
+        label={t('guided.stop')}
         onclick={() => void stopGuidedSession()}
       />
     </div>
@@ -367,10 +391,10 @@
   <CloseBlockedDialog
     bind:open={closeBlockedOpen}
     reason="guided"
-    title="Diagnóstico guiado en curso"
-    description="La prueba debe detenerse antes de cerrar la ventana."
-    confirmLabel="Detener y salir"
-    cancelLabel="Cancelar"
+    title={t('guided.inProgress')}
+    description={t('guided.closeDescription')}
+    confirmLabel={t('guided.closeAndStop')}
+    cancelLabel={t('guided.cancel')}
     onConfirm={() => void stopGuidedAndClose()}
     onCancel={() => (closeBlockedOpen = false)}
   />

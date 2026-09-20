@@ -127,6 +127,8 @@ fn finish_bucket(points: &[RawPoint]) -> AnalysisPoint {
 
 #[cfg(test)]
 mod tests {
+    use proptest::prelude::*;
+
     use super::*;
     fn sample(t_ms: u64, value: f64) -> RawPoint {
         RawPoint { t_ms, value: Some(value), quality: PointQuality::Complete, gap: false }
@@ -180,5 +182,27 @@ mod tests {
         let points: Vec<_> = (0..5000).map(|value| sample(value, value as f64)).collect();
         let result = aggregate_track(&points, 0, 5000, 10_000, &[]);
         assert!(result.len() <= 3_000);
+    }
+
+    proptest! {
+        #[test]
+        fn aggregation_preserves_extremes_and_stays_within_the_target(
+            values in prop::collection::vec(-10_000.0_f64..10_000.0, 1..100),
+            target in 1_usize..20,
+        ) {
+            let points: Vec<_> = values
+                .iter()
+                .enumerate()
+                .map(|(index, value)| sample(index as u64 * 10, *value))
+                .collect();
+            let result = aggregate_track(&points, 0, 1_000, target, &[]);
+            prop_assert!(result.len() <= target.min(3_000));
+            let expected_min = values.iter().copied().fold(f64::INFINITY, f64::min);
+            let expected_max = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+            let actual_min = result.iter().filter_map(|point| point.min).fold(f64::INFINITY, f64::min);
+            let actual_max = result.iter().filter_map(|point| point.max).fold(f64::NEG_INFINITY, f64::max);
+            prop_assert_eq!(actual_min, expected_min);
+            prop_assert_eq!(actual_max, expected_max);
+        }
     }
 }

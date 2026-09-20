@@ -7,8 +7,11 @@ use crate::diagnostics::guided::{
     GuidedStopReason, ThreadedGenerator, is_over_limit, is_severely_throttled, safety_limits,
 };
 use crate::diagnostics::{AdvancedAccess, ConfidenceCeiling, CoverageTier};
-use crate::storage::{AppState, OnboardingState, OnboardingStatus, WindowState};
-use crate::telemetry::power_context::PowerSource;
+use crate::storage::{
+    AppState, GuidedCheckpoint, OnboardingState, OnboardingStatus, StoredSampleValue, WindowState,
+};
+use crate::telemetry::live::CollectorState;
+use crate::telemetry::power_context::{PowerContextTracker, PowerSource, PowerTransition};
 use crate::telemetry::snapshot::Freshness;
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -24,6 +27,20 @@ pub use live::{LiveHandle, TauriObserver};
 pub struct GuidedController {
     pub machine: Arc<Mutex<Option<GuidedMachine>>>,
     pub stop_requested: Arc<AtomicBool>,
+}
+
+/// Requests a guided run to stop because the native window lifecycle changed. This is deliberately
+/// idempotent: a close event can arrive after a hide/minimize event, and the watchdog still owns the
+/// phase transition and the final generator join.
+pub fn cancel_guided_for_lifecycle(app: &AppHandle, reason: GuidedStopReason) {
+    let Some(state) = app.try_state::<GuidedController>() else { return };
+    state.stop_requested.store(true, Ordering::Release);
+    let Ok(mut guard) = state.machine.lock() else { return };
+    let Some(machine) = guard.as_mut() else { return };
+    if machine.request_cancel(reason) {
+        machine.tick(1);
+        let _ = app.emit("guided:phase", guided_phase_dto(machine));
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -149,6 +166,14 @@ fn guided_phase_name(phase: GuidedPhase) -> &'static str {
     }
 }
 
+fn guided_profile_name(profile: GuidedProfile) -> &'static str {
+    match profile {
+        GuidedProfile::Short => "short",
+        GuidedProfile::Standard => "standard",
+        GuidedProfile::Long => "long",
+    }
+}
+
 fn guided_phase_dto(machine: &GuidedMachine) -> GuidedPhaseDto {
     GuidedPhaseDto {
         phase: guided_phase_name(machine.phase).to_owned(),
@@ -165,8 +190,8 @@ fn guided_phase_dto(machine: &GuidedMachine) -> GuidedPhaseDto {
 }
 
 fn guided_session_id() -> String {
-    let millis = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis();
-    format!("guided-{millis}")
+    let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
+    format!("guided-{nanos}")
 }
 
 /// Readings taken directly from the live collector state, as they are during the guided test:
@@ -188,6 +213,47 @@ fn guided_readings(live: &LiveHandle) -> GuidedReadings {
             base_clock_mhz: input.as_ref().and_then(|input| input.base_clock_mhz),
         }
     })
+}
+
+fn persist_guided_tick(
+    app: &AppHandle,
+    live: &LiveHandle,
+    session_id: &str,
+    sequence: u64,
+    machine: &GuidedMachine,
+) {
+    let Some(sequence) = i64::try_from(sequence).ok() else { return };
+    let (monotonic_ms, values) = live.read(|live| {
+        let captured_at_ms = live.snapshot_input().map(|input| input.captured_at_ms);
+        let values = live
+            .analysis_values()
+            .into_iter()
+            .map(|value| StoredSampleValue {
+                sensor_id: value.sensor_id,
+                value: value.value,
+                boolean: value.boolean,
+                quality: value.quality,
+            })
+            .collect::<Vec<_>>();
+        (captured_at_ms, values)
+    });
+    let monotonic_ms = monotonic_ms
+        .and_then(|value| i64::try_from(value).ok())
+        .unwrap_or_else(|| i64::try_from(machine.elapsed_ms).unwrap_or(i64::MAX));
+    let Some(state) = app.try_state::<AppState>() else { return };
+    let Ok(storage) = state.storage.lock() else { return };
+    if storage.insert_sample(session_id, sequence, monotonic_ms, 1_000, &values).is_err() {
+        return;
+    }
+    let checkpoint = GuidedCheckpoint {
+        session_id: session_id.to_owned(),
+        phase: guided_phase_name(machine.phase).to_owned(),
+        profile: guided_profile_name(machine.profile).to_owned(),
+        elapsed_ms: i64::try_from(machine.elapsed_ms).unwrap_or(i64::MAX),
+        reason: machine.reason.map(|reason| reason.key().to_owned()),
+        updated_at: jiff::Timestamp::now().to_string(),
+    };
+    let _ = storage.save_guided_checkpoint(&checkpoint);
 }
 
 /// Runs on its own thread, independent from anything the interface does (T057/T166): it is the
@@ -214,6 +280,9 @@ fn run_guided_loop(
     let mut generator: Option<ThreadedGenerator> = None;
     let mut generator_ops_at_last_tick: u64 = 0;
     let mut safety = GuidedSafetyState::ZERO;
+    let mut sequence = 0_u64;
+    let mut power_tracker = PowerContextTracker::default();
+    let parent_pid = crate::ipc::supervisor::current_parent_process_id();
 
     loop {
         thread::sleep(Duration::from_millis(1_000));
@@ -231,6 +300,24 @@ fn run_guided_loop(
                 | GuidedPhase::SensorLost
         ) {
             break;
+        }
+
+        if parent_pid.is_some_and(|pid| !crate::ipc::supervisor::parent_process_alive(pid)) {
+            current.request_cancel(GuidedStopReason::ParentMissing);
+        }
+
+        if let Some(power) = crate::telemetry::power_context::read_windows_power_context()
+            && power_tracker.observe(crate::commands::live::epoch_ms(), power.source, power.resumed)
+                == PowerTransition::Resumed
+        {
+            current.suspend();
+        }
+
+        let collector_failed = live.read(|live| {
+            matches!(live.collector(), CollectorState::Stopped | CollectorState::Failed)
+        });
+        if collector_failed {
+            current.request_cancel(GuidedStopReason::CriticalSensorLost);
         }
 
         // Losing AC mid-run stops the test outright when it was required to start it (independent
@@ -295,6 +382,8 @@ fn run_guided_loop(
             progress_percent: current.progress_percent(),
         };
         let terminal = current.phase == GuidedPhase::Result;
+        persist_guided_tick(&app, &live, &session_id, sequence, current);
+        sequence = sequence.saturating_add(1);
         drop(guard);
         if app.emit("guided:phase", &dto).is_err() {
             break;
@@ -506,6 +595,7 @@ pub fn get_guided_preflight(app: AppHandle, live: State<'_, LiveHandle>) -> Guid
 pub fn start_guided(
     app: AppHandle,
     state: State<'_, GuidedController>,
+    storage_state: State<'_, AppState>,
     live: State<'_, LiveHandle>,
     request: StartGuidedRequest,
 ) -> Result<GuidedPhaseDto, CommandError> {
@@ -534,11 +624,13 @@ pub fn start_guided(
         machine.skip_rest();
     }
     let dto = guided_phase_dto(&machine);
+    let session_id = guided_session_id();
+    let storage = storage_state.storage.lock().map_err(|_| CommandError::operation_failed())?;
+    storage.create_guided_session(&session_id).map_err(|_| CommandError::operation_failed())?;
     state.stop_requested.store(false, Ordering::Release);
     state.machine.lock().map_err(|_| CommandError::operation_failed())?.replace(machine);
     let machine_ref = Arc::clone(&state.machine);
     let stop_requested = Arc::clone(&state.stop_requested);
-    let session_id = guided_session_id();
     let loop_app = app.clone();
     let loop_live = live.inner().clone();
     let _ = thread::Builder::new().name("guided-watchdog".to_owned()).spawn(move || {
@@ -577,15 +669,30 @@ pub fn get_analysis_window(
         return Err(CommandError::operation_failed());
     }
     let guard = state.storage.lock().map_err(|_| CommandError::operation_failed())?;
+    let session_id = if request.session_id == "latest" {
+        guard
+            .latest_session_id()
+            .map_err(|_| CommandError::operation_failed())?
+            .ok_or_else(CommandError::operation_failed)?
+    } else {
+        request.session_id.clone()
+    };
+    let start_ms = i64::try_from(request.start_ms).map_err(|_| CommandError::operation_failed())?;
+    let end_ms = i64::try_from(request.end_ms).map_err(|_| CommandError::operation_failed())?;
     let source_points = guard
-        .analysis_points(&request.session_id, request.start_ms as i64, request.end_ms as i64)
+        .analysis_points(&session_id, start_ms, end_ms)
         .map_err(|_| CommandError::operation_failed())?;
     let source_events = guard
-        .analysis_events(&request.session_id, request.start_ms as i64, request.end_ms as i64)
+        .analysis_events(&session_id, start_ms, end_ms)
         .map_err(|_| CommandError::operation_failed())?;
     let boundaries: Vec<_> = source_events
         .iter()
-        .map(|event| EventBoundary { at_ms: event.start_ms.max(0) as u64 })
+        .flat_map(|event| {
+            [event.start_ms, event.end_ms]
+                .into_iter()
+                .filter_map(|at_ms| u64::try_from(at_ms).ok())
+                .map(|at_ms| EventBoundary { at_ms })
+        })
         .collect();
     let track_kinds = ["temperature", "clock", "load", "power"];
     let mut tracks = Vec::new();
@@ -593,9 +700,9 @@ pub fn get_analysis_window(
     for kind in track_kinds {
         let raw: Vec<_> = source_points
             .iter()
-            .filter(|point| point.sensor_id.contains(kind))
+            .filter(|point| analysis_track_for_sensor_id(&point.sensor_id) == Some(kind))
             .map(|point| RawPoint {
-                t_ms: point.monotonic_ms.max(0) as u64,
+                t_ms: u64::try_from(point.monotonic_ms).unwrap_or(0),
                 value: point.value,
                 quality: match point.quality.as_str() {
                     "complete" | "direct" => PointQuality::Complete,
@@ -653,13 +760,25 @@ pub fn get_analysis_window(
         })
         .collect();
     Ok(AnalysisWindowDto {
-        session_id: request.session_id,
+        session_id,
         start_ms: request.start_ms,
         end_ms: request.end_ms,
         is_aggregated: source_count > request.target_points_per_track as usize,
         tracks,
         events,
     })
+}
+
+/// Stable catalog IDs are the only source of chart membership. Do not replace this with a
+/// substring check: a future `cpu.package.power_limit` must not become a power track by accident.
+fn analysis_track_for_sensor_id(sensor_id: &str) -> Option<&'static str> {
+    match sensor_id {
+        "cpu.package.temp" => Some("temperature"),
+        "cpu.package.clock" => Some("clock"),
+        "cpu.package.load" => Some("load"),
+        "cpu.package.power" => Some("power"),
+        _ => None,
+    }
 }
 
 #[tauri::command]

@@ -8,10 +8,16 @@
     CoreTableRow
   } from '../../design-system/components/CpuAdvancedTable.svelte';
   import { invokeValidated } from '../../lib/bridge';
+  import { createTranslator } from '../../lib/i18n';
   import {
     commandResponseSchemas,
     type CpuTopology
   } from '../../lib/bridge/schemas';
+
+  const { t } = createTranslator(
+    'system',
+    typeof navigator === 'undefined' ? 'en-US' : navigator.language
+  );
 
   let topology = $state<CpuTopology['cores']>([]);
   let selectedCoreId = $state<string | undefined>();
@@ -27,7 +33,9 @@
   });
 
   function label(value: number | null, suffix: string): string {
-    return value === null ? '—' : `${Math.round(value)}${suffix}`;
+    return value === null
+      ? t('common.noValue')
+      : `${Math.round(value)}${suffix}`;
   }
 
   let cores = $derived<CoreReading[]>(
@@ -36,8 +44,8 @@
       index: core.index,
       group: core.group === 'ungrouped' ? undefined : core.group,
       tone: core.temperature_c === null ? 'unknown' : 'warm',
-      temperatureLabel: label(core.temperature_c, ' °C'),
-      clockLabel: label(core.clock_mhz, ' MHz'),
+      temperatureLabel: label(core.temperature_c, ` ${t('dashboard.celsius')}`),
+      clockLabel: label(core.clock_mhz, ` ${t('dashboard.mhz')}`),
       throttling: core.throttling === true,
       unavailable: core.temperature_c === null && core.clock_mhz === null
     }))
@@ -58,13 +66,18 @@
         id: core.id,
         index: core.index,
         groupLabel: core.group?.toUpperCase() ?? '',
-        temperatureLabel: core.temperatureLabel ?? '—',
+        temperatureLabel: core.temperatureLabel ?? t('common.noValue'),
         temperatureValue: source?.temperature_c ?? undefined,
-        clockLabel: core.clockLabel ?? '—',
+        clockLabel: core.clockLabel ?? t('common.noValue'),
         clockValue: source?.clock_mhz ?? undefined,
-        loadLabel: label(source?.load_percent ?? null, ' %'),
+        loadLabel: label(
+          source?.load_percent ?? null,
+          ` ${t('dashboard.percent')}`
+        ),
         loadValue: source?.load_percent ?? undefined,
-        throttlingLabel: source?.throttling ? 'Sí' : '—',
+        throttlingLabel: source?.throttling
+          ? t('common.yes')
+          : t('common.noValue'),
         unavailable: core.unavailable
       };
     })
@@ -73,37 +86,41 @@
     cores.length === 0 || cores.every((core) => core.unavailable)
   );
   const columnLabels: CoreTableColumnLabels = {
-    index: 'Núcleo',
-    group: 'Grupo',
-    temperature: 'Temperatura',
-    clock: 'Frecuencia',
-    load: 'Carga',
-    throttling: 'Limitación'
+    index: t('cpu.core'),
+    group: t('cpu.group'),
+    temperature: t('cpu.temperature'),
+    clock: t('cpu.clock'),
+    load: t('cpu.load'),
+    throttling: t('cpu.throttling')
   };
 </script>
 
 <CpuScreen
-  title="CPU"
-  topologyLabel="Mapa por núcleo"
-  tableLabel="Tabla avanzada"
+  title={t('cpu.title')}
+  topologyLabel={t('cpu.topology')}
+  tableLabel={t('cpu.table')}
   {groups}
-  metricModeLabel="Métrica"
-  temperatureModeLabel="Temperatura"
-  clockModeLabel="Frecuencia"
+  metricModeLabel={t('cpu.metric')}
+  temperatureModeLabel={t('cpu.temperatureMode')}
+  clockModeLabel={t('cpu.clockMode')}
   tooltipLabel={(core) =>
     core.unavailable
-      ? `Núcleo ${core.index}: datos no disponibles`
-      : `Núcleo ${core.index}: ${core.temperatureLabel ?? '—'} · ${core.clockLabel ?? '—'}`}
+      ? t('cpu.unavailableCore').replace('{index}', String(core.index))
+      : t('cpu.coreSummary')
+          .replace('{index}', String(core.index))
+          .replace(
+            '{temperature}',
+            core.temperatureLabel ?? t('common.noValue')
+          )
+          .replace('{clock}', core.clockLabel ?? t('common.noValue'))}
   {selectedCoreId}
   onSelectCore={(id) => (selectedCoreId = id)}
   coverageTone={noReadings ? 'warning' : undefined}
-  coverageTitle={noReadings ? 'Esperando datos del colector' : undefined}
-  coverageDescription={noReadings
-    ? 'Los núcleos se mantienen visibles aunque no haya una lectura válida.'
-    : undefined}
+  coverageTitle={noReadings ? t('cpu.waiting') : undefined}
+  coverageDescription={noReadings ? t('cpu.waitingDescription') : undefined}
   tableRows={rows}
   tableColumnLabels={columnLabels}
-  tableFilterLabel="Filtrar núcleos"
-  tableFilterPlaceholder="Número o grupo"
-  tableEmptyFilterMessage="No hay núcleos que coincidan."
+  tableFilterLabel={t('cpu.filter')}
+  tableFilterPlaceholder={t('cpu.filterPlaceholder')}
+  tableEmptyFilterMessage={t('cpu.emptyFilter')}
 />

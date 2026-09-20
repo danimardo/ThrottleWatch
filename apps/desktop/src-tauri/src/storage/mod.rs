@@ -70,6 +70,14 @@ pub struct AnalysisSourcePoint {
     pub quality: String,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct StoredSampleValue {
+    pub sensor_id: String,
+    pub value: Option<f64>,
+    pub boolean: Option<bool>,
+    pub quality: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AnalysisSourceEvent {
     pub id: String,
@@ -269,6 +277,64 @@ impl Storage {
             params![id, cpu_id, split_reason],
         )?;
         Ok(())
+    }
+
+    pub fn create_guided_session(&self, id: &str) -> Result<()> {
+        self.connection.execute_batch(
+            "INSERT OR IGNORE INTO cpu_device
+                 (id, vendor, display_name, logical_processors, hybrid, fingerprint_version, first_seen_at, last_seen_at)
+             VALUES ('runtime', 'unknown', 'Runtime CPU', 1, 0, 1, '1970-01-01T00:00:00Z', '1970-01-01T00:00:00Z');",
+        )?;
+        self.connection.execute(
+            "INSERT INTO monitoring_session
+                 (id, cpu_id, kind, status, started_at, protocol_version, ruleset_version, coverage_tier, split_reason)
+             VALUES (?1, 'runtime', 'guided', 'running', '1970-01-01T00:00:00Z', 1, 'ruleset-v1', 'C', 'guided')",
+            params![id],
+        )?;
+        Ok(())
+    }
+
+    pub fn latest_session_id(&self) -> Result<Option<String>> {
+        self.connection
+            .query_row(
+                "SELECT id FROM monitoring_session
+                 ORDER BY rowid DESC LIMIT 1",
+                [],
+                |row| row.get(0),
+            )
+            .optional()
+    }
+
+    pub fn insert_sample(
+        &self,
+        session_id: &str,
+        sequence: i64,
+        monotonic_ms: i64,
+        duration_ms: i64,
+        values: &[StoredSampleValue],
+    ) -> Result<()> {
+        let transaction = self.connection.unchecked_transaction()?;
+        transaction.execute(
+            "INSERT INTO sample_frame (session_id, sequence, monotonic_ms, duration_ms, quality)
+             VALUES (?1, ?2, ?3, ?4, 'complete')",
+            params![session_id, sequence, monotonic_ms, duration_ms.max(0)],
+        )?;
+        for value in values {
+            transaction.execute(
+                "INSERT INTO sample_value
+                     (session_id, sequence, sensor_id, value_real, value_bool, quality)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![
+                    session_id,
+                    sequence,
+                    value.sensor_id,
+                    value.value,
+                    value.boolean.map(i64::from),
+                    value.quality
+                ],
+            )?;
+        }
+        transaction.commit()
     }
 
     pub fn insert_frame(&self, session_id: &str, sequence: i64, monotonic_ms: i64) -> Result<()> {
@@ -718,6 +784,39 @@ mod tests {
         let events = storage.analysis_events("session-1", 0, 3000)?;
         assert_eq!(events[0].start_ms, 1000);
         assert_eq!(events[0].end_ms, 2000);
+        Ok(())
+    }
+
+    #[test]
+    fn writes_guided_samples_checkpoints_and_resolves_latest_session() -> rusqlite::Result<()> {
+        let storage = Storage::in_memory()?;
+        storage.create_guided_session("guided-1")?;
+        storage.insert_sample(
+            "guided-1",
+            0,
+            1_000,
+            1_000,
+            &[super::StoredSampleValue {
+                sensor_id: "cpu.package.temp".to_owned(),
+                value: Some(65.0),
+                boolean: None,
+                quality: "direct".to_owned(),
+            }],
+        )?;
+        assert_eq!(storage.latest_session_id()?.as_deref(), Some("guided-1"));
+        assert_eq!(storage.analysis_points("guided-1", 0, 2_000)?.len(), 1);
+        storage.save_guided_checkpoint(&super::GuidedCheckpoint {
+            session_id: "guided-1".to_owned(),
+            phase: "warming".to_owned(),
+            profile: "standard".to_owned(),
+            elapsed_ms: 1_000,
+            reason: None,
+            updated_at: "2026-09-20T12:00:00Z".to_owned(),
+        })?;
+        assert_eq!(
+            storage.guided_checkpoint("guided-1")?.map(|value| value.phase),
+            Some("warming".to_owned())
+        );
         Ok(())
     }
 }

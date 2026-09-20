@@ -32,6 +32,24 @@ pub fn run() {
     }
     let _dev_config = config::DevConfig::load();
     tauri::Builder::default()
+        .on_window_event(|window, event| match event {
+            tauri::WindowEvent::Focused(false)
+                if window.is_minimized().unwrap_or(false)
+                    || window.is_visible().is_ok_and(|visible| !visible) =>
+            {
+                commands::cancel_guided_for_lifecycle(
+                    window.app_handle(),
+                    diagnostics::guided::GuidedStopReason::WindowHidden,
+                );
+            }
+            tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed => {
+                commands::cancel_guided_for_lifecycle(
+                    window.app_handle(),
+                    diagnostics::guided::GuidedStopReason::WindowHidden,
+                );
+            }
+            _ => {}
+        })
         .setup(|app| {
             let window_config = app.config().app.windows.first().cloned().ok_or_else(|| {
                 std::io::Error::other("tauri.conf.json must declare the main window")

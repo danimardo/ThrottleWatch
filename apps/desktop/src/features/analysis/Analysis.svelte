@@ -8,7 +8,13 @@
     type AnalysisWindow
   } from '../../lib/bridge/schemas';
   import { invokeValidated } from '../../lib/bridge';
+  import { createTranslator } from '../../lib/i18n';
   import { toAnalysisView } from './model';
+
+  const { t } = createTranslator(
+    'system',
+    typeof navigator === 'undefined' ? 'en-US' : navigator.language
+  );
 
   let status = $state<'noHistory' | 'loading' | 'ready'>('loading');
   let window = $state<AnalysisWindow | null>(null);
@@ -49,18 +55,20 @@
   let selectedEventEvidence = $derived(
     selectedEventId
       ? {
-          title: 'Evento seleccionado',
+          title: t('analysis.selectedEvent'),
           description: selectedEventId,
-          items: [{ label: 'Origen', value: 'limit_event' }]
+          items: [
+            { label: t('analysis.source'), value: t('analysis.limitEvent') }
+          ]
         }
       : undefined
   );
   let rangeEvidence = $derived(
     selectedRange
       ? {
-          title: 'Rango seleccionado',
+          title: t('analysis.selectedRange'),
           description: `${selectedRange[0]}–${selectedRange[1]} ms`,
-          items: [{ label: 'Resolución', value: 'alta' }]
+          items: [{ label: t('common.resolution'), value: t('common.high') }]
         }
       : undefined
   );
@@ -74,7 +82,7 @@
 <div class="analysis-actions">
   <Button
     variant="secondary"
-    label="Exportar rango"
+    label={t('analysis.exportRange')}
     disabled={!selectedRange}
     onclick={() => (exportOpen = true)}
   />
@@ -82,9 +90,9 @@
 
 <AnalysisScreen
   {status}
-  loadingLabel="Cargando análisis"
-  noHistoryTitle="No hay historial suficiente"
-  noHistoryDescription="Completa una sesión para poder analizarla."
+  loadingLabel={t('analysis.loading')}
+  noHistoryTitle={t('analysis.noHistory')}
+  noHistoryDescription={t('analysis.noHistoryDescription')}
   tracks={view.tracks}
   events={view.events}
   {selectedEventId}
@@ -92,44 +100,49 @@
   onRangeSelect={selectRange}
   valueLabel={(point) =>
     point?.value === null || point === undefined
-      ? 'Sin datos'
+      ? t('analysis.noData')
       : String(point.value)}
   timeLabel={(time) => `${Math.round(time / 1000)} s`}
-  legendLabel="Pistas del análisis"
-  cursorLabel="Cursor temporal"
-  rangeSummaryLabel={(range) => `Rango ${range[0]}–${range[1]}`}
-  resetRangeLabel="Borrar rango"
+  legendLabel={t('analysis.tracksLabel')}
+  cursorLabel={t('analysis.cursorLabel')}
+  rangeSummaryLabel={(range) =>
+    `${t('analysis.range')} ${range[0]}–${range[1]}`}
+  resetRangeLabel={t('analysis.clearRange')}
   {selectedEventEvidence}
   {rangeEvidence}
-  idleHint="Selecciona un evento o un rango para ver la evidencia."
-  evidenceTitle="Evidencia"
+  idleHint={t('analysis.selectEvidence')}
+  evidenceTitle={t('analysis.evidence')}
 />
 
 <ExportDialog
   bind:open={exportOpen}
-  title="Exportar análisis"
+  title={t('analysis.export')}
   scopeLabel={selectedRange
-    ? `Rango ${selectedRange[0]}–${selectedRange[1]} ms`
-    : 'Rango no seleccionado'}
-  formatLabel="Formato"
+    ? `${t('analysis.range')} ${selectedRange[0]}–${selectedRange[1]} ms`
+    : t('common.notSelected')}
+  formatLabel={t('analysis.format')}
   format={exportFormat}
   formatOptions={[
-    { value: 'csv', label: 'CSV' },
-    { value: 'json', label: 'JSON' }
+    { value: 'csv', label: t('analysis.csv') },
+    { value: 'json', label: t('analysis.json') }
   ]}
   onFormatChange={(value) => (exportFormat = value)}
-  anonymizeLabel="Anonimizar"
-  anonymizeDescription="Oculta identificadores del equipo en la exportación."
+  anonymizeLabel={t('analysis.anonymize')}
+  anonymizeDescription={t('analysis.anonymizeDescription')}
   {anonymize}
   onAnonymizeChange={(value) => (anonymize = value)}
-  includedTitle="Incluye"
-  includedFields={['muestras', 'calidad', 'eventos']}
-  excludedTitle="Excluye"
+  includedTitle={t('analysis.included')}
+  includedFields={[
+    t('analysis.samples'),
+    t('analysis.quality'),
+    t('analysis.events')
+  ]}
+  excludedTitle={t('analysis.excluded')}
   excludedFields={[]}
-  sizeLabel="Tamaño estimado: calculado al guardar"
-  fileNameLabel="throttlewatch_analysis.csv"
-  cancelLabel="Cancelar"
-  confirmLabel="Guardar"
+  sizeLabel={t('analysis.estimatedSize')}
+  fileNameLabel={t('analysis.fileName')}
+  cancelLabel={t('analysis.cancel')}
+  confirmLabel={t('analysis.save')}
   onCancel={() => (exportOpen = false)}
   onConfirm={() => (exportOpen = false)}
 />

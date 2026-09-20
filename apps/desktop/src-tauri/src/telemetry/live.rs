@@ -107,6 +107,14 @@ pub struct CoreView {
     pub load_percent: Option<f64>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct AnalysisValue {
+    pub sensor_id: String,
+    pub value: Option<f64>,
+    pub boolean: Option<bool>,
+    pub quality: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct LiveState {
     cpu: Option<CpuInfo>,
@@ -247,6 +255,30 @@ impl LiveState {
             package_power_w: self.number("power", "package"),
             power_limit_w: self.number("power_limit", "package"),
         })
+    }
+
+    /// Returns the catalog IDs and their current values without renaming them. Analysis owns the
+    /// mapping from these stable IDs to tracks; substring matching would make a new sensor silently
+    /// appear in the wrong chart.
+    pub fn analysis_values(&self) -> Vec<AnalysisValue> {
+        self.sensors
+            .iter()
+            .map(|sensor| {
+                let reading = self.readings.get(&sensor.id);
+                AnalysisValue {
+                    sensor_id: sensor.id.clone(),
+                    value: reading.and_then(|reading| reading.number),
+                    boolean: reading.and_then(|reading| reading.boolean),
+                    quality: if reading.is_some_and(|reading| {
+                        reading.number.is_some() || reading.boolean.is_some()
+                    }) {
+                        sensor.quality.clone()
+                    } else {
+                        "missing".to_owned()
+                    },
+                }
+            })
+            .collect()
     }
 
     /// What the collector really delivers right now; drives the A/B/C coverage tier.
