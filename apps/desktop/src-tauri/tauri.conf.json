@@ -17,7 +17,8 @@
       "height": 760,
       "minWidth": 480,
       "minHeight": 600,
-      "decorations": false
+      "decorations": false,
+      "create": false
     }],
     "security": {
       "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'"

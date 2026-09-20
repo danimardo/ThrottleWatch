@@ -17,6 +17,13 @@ use tauri::Manager;
 /// Keeps the collector runtime alive for the life of the application; stopped on exit.
 struct CollectorHandle(Mutex<telemetry::runtime::CollectorRuntime>);
 
+/// Port Playwright's CDP client attaches to in the `e2e` build (T-PLAY-002). `tauri.conf.json`
+/// marks the main window `"create": false` so it is only ever built here, where wry lets us pass
+/// `additional_browser_args`; setting `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` instead has no effect
+/// because wry always calls `SetAdditionalBrowserArguments` itself, which overrides that env var.
+#[cfg(feature = "e2e")]
+const E2E_CDP_PORT: &str = "9222";
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     if std::env::args().any(|argument| argument == "--elevated-launcher") {
@@ -26,6 +33,16 @@ pub fn run() {
     let _dev_config = config::DevConfig::load();
     tauri::Builder::default()
         .setup(|app| {
+            let window_config = app.config().app.windows.first().cloned().ok_or_else(|| {
+                std::io::Error::other("tauri.conf.json must declare the main window")
+            })?;
+            let window_builder = tauri::WebviewWindowBuilder::from_config(app, &window_config)
+                .map_err(|error| std::io::Error::other(error.to_string()))?;
+            #[cfg(feature = "e2e")]
+            let window_builder = window_builder
+                .additional_browser_args(&format!("--remote-debugging-port={E2E_CDP_PORT}"));
+            window_builder.build().map_err(|error| std::io::Error::other(error.to_string()))?;
+
             let data_dir = app
                 .path()
                 .app_data_dir()
