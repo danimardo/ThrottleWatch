@@ -26,10 +26,12 @@
     const result = await invokeValidated(
       'get_analysis_window',
       {
-        session_id: 'latest',
-        start_ms: startMs,
-        end_ms: endMs,
-        target_points_per_track: 3000
+        request: {
+          session_id: 'latest',
+          start_ms: startMs,
+          end_ms: endMs,
+          target_points_per_track: 3000
+        }
       },
       commandResponseSchemas.get_analysis_window
     );

@@ -397,9 +397,11 @@ export const commandArgsSchemas = {
   get_coverage: noCommandArgs,
   recheck_coverage: noCommandArgs,
   get_onboarding_state: noCommandArgs,
-  set_onboarding_state: onboardingStateSchema,
+  // Every command below takes a single Rust parameter literally named `request`: Tauri binds JS
+  // `invoke` args by parameter name, so the payload must be nested under that key, not flattened.
+  set_onboarding_state: z.object({ request: onboardingStateSchema }).strict(),
   get_window_state: noCommandArgs,
-  set_window_state: windowStateSchema,
+  set_window_state: z.object({ request: windowStateSchema }).strict(),
   request_low_level_access: z
     .object({
       request: z
@@ -411,18 +413,26 @@ export const commandArgsSchemas = {
   get_guided_preflight: noCommandArgs,
   start_guided: z
     .object({
-      profile: z.enum(['short', 'standard', 'long']),
-      skip_rest: z.boolean(),
-      require_ac: z.boolean()
+      request: z
+        .object({
+          profile: z.enum(['short', 'standard', 'long']),
+          skip_rest: z.boolean(),
+          require_ac: z.boolean()
+        })
+        .strict()
     })
     .strict(),
   stop_guided: noCommandArgs,
   get_analysis_window: z
     .object({
-      session_id: z.string().min(1),
-      start_ms: z.number().int().nonnegative(),
-      end_ms: z.number().int().nonnegative(),
-      target_points_per_track: z.number().int().min(1).max(3000)
+      request: z
+        .object({
+          session_id: z.string().min(1),
+          start_ms: z.number().int().nonnegative(),
+          end_ms: z.number().int().nonnegative(),
+          target_points_per_track: z.number().int().min(1).max(3000)
+        })
+        .strict()
     })
     .strict(),
   get_cpu_topology: noCommandArgs

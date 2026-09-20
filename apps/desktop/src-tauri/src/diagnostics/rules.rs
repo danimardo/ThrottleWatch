@@ -150,6 +150,7 @@ mod tests {
             "guided.stop_low_freq_s",
             "guided.stop_missing_sensor_samples",
             "guided.stop_generator_timeout_s",
+            "guided.min_free_disk_mb",
             "alerts.min_persistence_s",
             "alerts.cooldown_min",
             "sampling.interval_low_power_ms",

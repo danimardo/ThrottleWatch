@@ -44,7 +44,7 @@ export async function saveOnboardingState(
 ): Promise<void> {
   const result = await invokeValidated(
     'set_onboarding_state',
-    state,
+    { request: state },
     onboardingStateSchema,
     transport
   );

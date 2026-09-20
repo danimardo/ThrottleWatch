@@ -1,7 +1,13 @@
 #![deny(clippy::unwrap_used, clippy::expect_used)]
+// FR-018: the load generator must never touch a hardware write surface (MSR/SMU/PawnIO). Nothing
+// in this module needs `unsafe`, so the compiler proves it instead of a runtime assertion.
+#![forbid(unsafe_code)]
 
 use super::Ruleset;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::thread::{self, JoinHandle};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -93,6 +99,142 @@ pub struct GuidedSafetyState {
     pub consecutive_low_clock_ms: u64,
     pub consecutive_missing_sensor: u8,
     pub generator_silent_ms: u64,
+}
+
+impl GuidedSafetyState {
+    pub const ZERO: Self = Self {
+        consecutive_over_limit: 0,
+        consecutive_low_clock_ms: 0,
+        consecutive_missing_sensor: 0,
+        generator_silent_ms: 0,
+    };
+
+    /// Folds one tick of raw observations into the next state. Every counter accumulates only
+    /// while its condition holds this tick and resets the instant it does not (FR-085: it is
+    /// *staying* past a threshold that is unsafe, not touching it once).
+    pub fn observe(
+        self,
+        elapsed_ms: u64,
+        over_limit: bool,
+        severely_throttled: bool,
+        sensor_missing: bool,
+        generator_progressed: bool,
+    ) -> Self {
+        Self {
+            consecutive_over_limit: if over_limit {
+                self.consecutive_over_limit.saturating_add(1)
+            } else {
+                0
+            },
+            consecutive_low_clock_ms: if severely_throttled {
+                self.consecutive_low_clock_ms.saturating_add(elapsed_ms)
+            } else {
+                0
+            },
+            consecutive_missing_sensor: if sensor_missing {
+                self.consecutive_missing_sensor.saturating_add(1)
+            } else {
+                0
+            },
+            generator_silent_ms: if generator_progressed {
+                0
+            } else {
+                self.generator_silent_ms.saturating_add(elapsed_ms)
+            },
+        }
+    }
+}
+
+/// Whether the reading sits more than `over_limit_c` past the effective limit (FR-085): the
+/// guided test does not stop for *reaching* the limit, which is the phenomenon it measures.
+pub fn is_over_limit(
+    temperature_c: Option<f64>,
+    thermal_limit_c: Option<f64>,
+    over_limit_c: f64,
+) -> bool {
+    match (temperature_c, thermal_limit_c) {
+        (Some(temperature), Some(limit)) => temperature > limit + over_limit_c,
+        _ => false,
+    }
+}
+
+/// Whether the CPU sits at (or past) its limit while its active clock is below `low_freq_ratio`
+/// of its base clock (FR-085): cooling is severely insufficient, not simply throttling as
+/// expected once the limit is reached.
+pub fn is_severely_throttled(
+    temperature_c: Option<f64>,
+    thermal_limit_c: Option<f64>,
+    active_clock_mhz: Option<f64>,
+    base_clock_mhz: Option<f64>,
+    low_freq_ratio: f64,
+) -> bool {
+    let at_limit = matches!(
+        (temperature_c, thermal_limit_c),
+        (Some(temperature), Some(limit)) if temperature >= limit
+    );
+    at_limit
+        && matches!(
+            (active_clock_mhz, base_clock_mhz),
+            (Some(active), Some(base)) if base > 0.0 && active < base * low_freq_ratio
+        )
+}
+
+const GENERATOR_WORK_CHUNK: u64 = 20_000;
+
+/// The real load generator: one OS thread per logical processor, each counting its own completed
+/// operations in an atomic counter so the throughput reported to the interface is measured, not
+/// estimated. The work itself is deterministic floating-point arithmetic with no side effects —
+/// `#![forbid(unsafe_code)]` above proves it never reaches a hardware write surface (FR-018).
+pub struct ThreadedGenerator {
+    running: Arc<AtomicBool>,
+    counters: Vec<Arc<AtomicU64>>,
+    handles: Vec<JoinHandle<()>>,
+}
+
+impl ThreadedGenerator {
+    pub fn start(threads: u16) -> Self {
+        let running = Arc::new(AtomicBool::new(true));
+        let mut counters = Vec::new();
+        let mut handles = Vec::new();
+        for index in 0..threads.max(1) {
+            let counter = Arc::new(AtomicU64::new(0));
+            let counter_ref = Arc::clone(&counter);
+            let running_ref = Arc::clone(&running);
+            if let Ok(handle) = thread::Builder::new()
+                .name(format!("guided-generator-{index}"))
+                .spawn(move || generator_worker(&running_ref, &counter_ref))
+            {
+                handles.push(handle);
+            }
+            counters.push(counter);
+        }
+        Self { running, counters, handles }
+    }
+
+    /// Sum of every worker's completed operations since `start`.
+    pub fn total_ops(&self) -> u64 {
+        self.counters.iter().map(|counter| counter.load(Ordering::Relaxed)).sum()
+    }
+}
+
+impl Drop for ThreadedGenerator {
+    fn drop(&mut self) {
+        self.running.store(false, Ordering::Release);
+        for handle in self.handles.drain(..) {
+            let _ = handle.join();
+        }
+    }
+}
+
+fn generator_worker(running: &AtomicBool, counter: &AtomicU64) {
+    let mut value: f64 = 1.0;
+    while running.load(Ordering::Acquire) {
+        for _ in 0..GENERATOR_WORK_CHUNK {
+            value = (value * 1.000_000_1 + 0.5).fract() + 1.0;
+        }
+        std::hint::black_box(value);
+        counter.fetch_add(GENERATOR_WORK_CHUNK, Ordering::Relaxed);
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -194,6 +336,9 @@ impl GuidedMachine {
             config,
             rest_skipped: false,
         }
+    }
+    pub const fn requires_ac(&self) -> bool {
+        self.config.require_ac
     }
     pub fn complete_preflight(&mut self, checks: &GuidedPreflight) -> bool {
         if !checks.passed(self.config.require_ac) {
@@ -542,6 +687,75 @@ mod tests {
         battery.request_cancel(GuidedStopReason::Battery);
         assert_eq!(battery.reason, Some(GuidedStopReason::Battery));
     }
+    #[test]
+    fn over_limit_needs_strictly_more_than_the_ruleset_margin() {
+        // FR-085 boundary: exactly +2.0 °C does not count, +2.1 °C does.
+        assert!(!is_over_limit(Some(82.0), Some(80.0), 2.0));
+        assert!(is_over_limit(Some(82.1), Some(80.0), 2.0));
+        assert!(!is_over_limit(None, Some(80.0), 2.0));
+        assert!(!is_over_limit(Some(82.1), None, 2.0));
+    }
+
+    #[test]
+    fn severe_throttling_needs_both_the_limit_and_the_ratio_boundary() {
+        // FR-085 boundary: exactly 50 % of the base clock does not count, 49 % does — and only
+        // while the temperature is actually at (or past) the limit.
+        assert!(!is_severely_throttled(Some(80.0), Some(80.0), Some(2000.0), Some(4000.0), 0.5));
+        assert!(is_severely_throttled(Some(80.0), Some(80.0), Some(1960.0), Some(4000.0), 0.5));
+        assert!(!is_severely_throttled(Some(79.0), Some(80.0), Some(1000.0), Some(4000.0), 0.5));
+        assert!(!is_severely_throttled(Some(80.0), Some(80.0), None, Some(4000.0), 0.5));
+    }
+
+    #[test]
+    fn reaching_the_limit_alone_never_looks_unsafe() {
+        // FR-085: the guided test measures reaching the limit; that alone must never register as
+        // either predicate, whatever the exact clock happens to be at that instant.
+        assert!(!is_over_limit(Some(80.0), Some(80.0), 2.0));
+        assert!(!is_severely_throttled(Some(80.0), Some(80.0), Some(3_800.0), Some(4_000.0), 0.5));
+    }
+
+    #[test]
+    fn the_safety_state_resets_the_instant_a_condition_stops_holding() {
+        let state = GuidedSafetyState::ZERO.observe(1_000, true, false, false, true);
+        let state = state.observe(1_000, true, false, false, true);
+        assert_eq!(state.consecutive_over_limit, 2);
+        let state = state.observe(1_000, false, false, false, true);
+        assert_eq!(state.consecutive_over_limit, 0);
+
+        let state = GuidedSafetyState::ZERO.observe(4_000, false, true, false, true);
+        assert_eq!(state.consecutive_low_clock_ms, 4_000);
+        let state = state.observe(1_000, false, false, false, true);
+        assert_eq!(state.consecutive_low_clock_ms, 0);
+
+        let silent = GuidedSafetyState::ZERO.observe(2_000, false, false, false, false);
+        assert_eq!(silent.generator_silent_ms, 2_000);
+        let responded = silent.observe(1_000, false, false, false, true);
+        assert_eq!(responded.generator_silent_ms, 0);
+    }
+
+    #[test]
+    fn the_threaded_generator_counts_real_work_per_thread_and_stops_promptly() {
+        let generator = ThreadedGenerator::start(2);
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        let ops = generator.total_ops();
+        assert!(ops > 0, "the workers must have counted real operations by now");
+
+        let stopping = std::time::Instant::now();
+        drop(generator);
+        assert!(stopping.elapsed() < std::time::Duration::from_secs(2), "drop must join promptly");
+    }
+
+    #[test]
+    fn requires_ac_reflects_the_config_it_was_built_with() {
+        let with_ac = GuidedMachine::new(GuidedProfile::Standard, config());
+        assert!(with_ac.requires_ac());
+        let without_ac = GuidedMachine::new(
+            GuidedProfile::Standard,
+            GuidedConfig { require_ac: false, ..config() },
+        );
+        assert!(!without_ac.requires_ac());
+    }
+
     #[test]
     fn only_compares_results_with_the_same_generation_context() {
         let r = GuidedResult {

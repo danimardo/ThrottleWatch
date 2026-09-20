@@ -39,7 +39,9 @@
   async function start(skipRest = false): Promise<void> {
     const result = await invokeValidated(
       'start_guided',
-      { profile: 'standard', skip_rest: skipRest, require_ac: true },
+      {
+        request: { profile: 'standard', skip_rest: skipRest, require_ac: true }
+      },
       commandResponseSchemas.start_guided
     );
     if (result.ok) {

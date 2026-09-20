@@ -230,7 +230,8 @@ export class FakeBridge implements BridgeTransport {
         case 'get_onboarding_state':
           return onboardingState(this.onboardingStateValue);
         case 'set_onboarding_state': {
-          const next = onboardingStateSchema.parse(args);
+          // Tauri binds this command's one parameter, named `request`: the payload is nested.
+          const next = onboardingStateSchema.parse(args?.request);
           this.onboardingStateValue = next;
           return onboardingState(next);
         }

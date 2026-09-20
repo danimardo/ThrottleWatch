@@ -2,6 +2,7 @@
 
 pub mod analysis;
 pub mod classifier;
+pub mod disk_space;
 pub mod events;
 pub mod guided;
 pub mod platform;

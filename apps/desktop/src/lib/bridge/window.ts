@@ -181,7 +181,11 @@ export function createWindowAdapter(): WindowAdapter {
             display_fingerprint: runtimeMonitor?.fingerprint ?? null,
             updated_at: new Date().toISOString()
           };
-      await invokeValidated('set_window_state', next, windowStateSchema);
+      await invokeValidated(
+        'set_window_state',
+        { request: next },
+        windowStateSchema
+      );
     },
     watchGeometryChanges: async (onChange) => {
       const unlistenMove = await current.listen('tauri://move', () => {

@@ -3,8 +3,8 @@
 use crate::access::{self, AccessRequest, AccessRequestResult};
 use crate::diagnostics::analysis::{EventBoundary, PointQuality, RawPoint, aggregate_track};
 use crate::diagnostics::guided::{
-    FixedLoopGenerator, GuidedConfig, GuidedMachine, GuidedPhase, GuidedPreflight, GuidedProfile,
-    GuidedStopReason, LoadGenerator,
+    GuidedConfig, GuidedMachine, GuidedPhase, GuidedPreflight, GuidedProfile, GuidedSafetyState,
+    GuidedStopReason, ThreadedGenerator, is_over_limit, is_severely_throttled, safety_limits,
 };
 use crate::diagnostics::{AdvancedAccess, ConfidenceCeiling, CoverageTier};
 use crate::storage::{AppState, OnboardingState, OnboardingStatus, WindowState};
@@ -150,13 +150,6 @@ fn guided_phase_name(phase: GuidedPhase) -> &'static str {
 }
 
 fn guided_phase_dto(machine: &GuidedMachine) -> GuidedPhaseDto {
-    guided_phase_dto_with_throughput(machine, None)
-}
-
-fn guided_phase_dto_with_throughput(
-    machine: &GuidedMachine,
-    throughput_ops_s: Option<f64>,
-) -> GuidedPhaseDto {
     GuidedPhaseDto {
         phase: guided_phase_name(machine.phase).to_owned(),
         elapsed_ms: machine.elapsed_ms,
@@ -166,7 +159,7 @@ fn guided_phase_dto_with_throughput(
         thermal_limit_c: None,
         active_clock_mhz: None,
         base_clock_mhz: None,
-        throughput_ops_s,
+        throughput_ops_s: None,
         progress_percent: machine.progress_percent(),
     }
 }
@@ -176,16 +169,52 @@ fn guided_session_id() -> String {
     format!("guided-{millis}")
 }
 
+/// Readings taken directly from the live collector state, as they are during the guided test:
+/// never fabricated, `None` when the sensor is unreadable.
+struct GuidedReadings {
+    temperature_c: Option<f64>,
+    thermal_limit_c: Option<f64>,
+    active_clock_mhz: Option<f64>,
+    base_clock_mhz: Option<f64>,
+}
+
+fn guided_readings(live: &LiveHandle) -> GuidedReadings {
+    live.read(|live| {
+        let input = live.snapshot_input();
+        GuidedReadings {
+            temperature_c: input.as_ref().and_then(|input| input.temperature_c),
+            thermal_limit_c: input.as_ref().and_then(|input| input.thermal_limit_c),
+            active_clock_mhz: input.as_ref().and_then(|input| input.active_clock_mhz),
+            base_clock_mhz: input.as_ref().and_then(|input| input.base_clock_mhz),
+        }
+    })
+}
+
+/// Runs on its own thread, independent from anything the interface does (T057/T166): it is the
+/// one place that may call [`GuidedMachine::observe_safety`], reading the real collector state on
+/// every tick instead of trusting whatever the interface last asked for.
 fn run_guided_loop(
     app: AppHandle,
     machine: Arc<Mutex<Option<GuidedMachine>>>,
     stop_requested: Arc<AtomicBool>,
+    live: LiveHandle,
     session_id: String,
 ) {
-    let mut generator = FixedLoopGenerator::default();
+    let Ok(rules) = crate::diagnostics::Ruleset::v1() else {
+        tracing::error!(component = "core", msg = "guided loop: ruleset failed to parse");
+        return;
+    };
+    let Some(limits) = safety_limits(&rules) else { return };
+    let Some(over_limit_c) = rules.parameter("guided.stop_over_limit_c") else { return };
+    let Some(low_freq_ratio) = rules.parameter("guided.stop_low_freq_ratio") else { return };
     let threads = std::thread::available_parallelism()
         .map(|value| value.get().min(u16::MAX as usize) as u16)
         .unwrap_or(1);
+
+    let mut generator: Option<ThreadedGenerator> = None;
+    let mut generator_ops_at_last_tick: u64 = 0;
+    let mut safety = GuidedSafetyState::ZERO;
+
     loop {
         thread::sleep(Duration::from_millis(1_000));
         if stop_requested.load(Ordering::Acquire) {
@@ -195,14 +224,76 @@ fn run_guided_loop(
         let Some(current) = guard.as_mut() else { break };
         if matches!(
             current.phase,
-            GuidedPhase::Cancelled | GuidedPhase::Result | GuidedPhase::Error
+            GuidedPhase::Cancelled
+                | GuidedPhase::Result
+                | GuidedPhase::Error
+                | GuidedPhase::SafetyStop
+                | GuidedPhase::SensorLost
         ) {
             break;
         }
+
+        // Losing AC mid-run stops the test outright when it was required to start it (independent
+        // of the phase timer): this is a cancellation, not a safety-limit stop.
+        if current.requires_ac() && !ac_power_available() {
+            current.request_cancel(GuidedStopReason::Battery);
+        }
+
         current.tick(1_000);
-        let throughput =
-            (current.phase == GuidedPhase::SteadyLoad).then(|| generator.sample(1_000, threads));
-        let dto = guided_phase_dto_with_throughput(current, throughput);
+
+        let loads = matches!(current.phase, GuidedPhase::Warming | GuidedPhase::SteadyLoad);
+        match (loads, generator.is_some()) {
+            (true, false) => {
+                generator = Some(ThreadedGenerator::start(threads));
+                generator_ops_at_last_tick = 0;
+            }
+            (false, true) => generator = None, // dropping joins the workers before this returns
+            _ => {}
+        }
+
+        let readings = guided_readings(&live);
+        let mut throughput_ops_s = None;
+        if loads {
+            let total_ops = generator.as_ref().map_or(0, ThreadedGenerator::total_ops);
+            let delta = total_ops.saturating_sub(generator_ops_at_last_tick);
+            generator_ops_at_last_tick = total_ops;
+            throughput_ops_s = Some(delta as f64); // one tick = one second
+
+            let over_limit =
+                is_over_limit(readings.temperature_c, readings.thermal_limit_c, over_limit_c);
+            let severely_throttled = is_severely_throttled(
+                readings.temperature_c,
+                readings.thermal_limit_c,
+                readings.active_clock_mhz,
+                readings.base_clock_mhz,
+                low_freq_ratio,
+            );
+            let sensor_missing = readings.temperature_c.is_none();
+            let generator_progressed = delta > 0;
+            safety = safety.observe(
+                1_000,
+                over_limit,
+                severely_throttled,
+                sensor_missing,
+                generator_progressed,
+            );
+            current.observe_safety(safety, over_limit, severely_throttled, sensor_missing, limits);
+        } else {
+            safety = GuidedSafetyState::ZERO;
+        }
+
+        let dto = GuidedPhaseDto {
+            phase: guided_phase_name(current.phase).to_owned(),
+            elapsed_ms: current.elapsed_ms,
+            remaining_ms: current.remaining_ms(),
+            reason_key: current.reason.map(|reason| reason.key().to_owned()),
+            temperature_c: readings.temperature_c,
+            thermal_limit_c: readings.thermal_limit_c,
+            active_clock_mhz: readings.active_clock_mhz,
+            base_clock_mhz: readings.base_clock_mhz,
+            throughput_ops_s,
+            progress_percent: current.progress_percent(),
+        };
         let terminal = current.phase == GuidedPhase::Result;
         drop(guard);
         if app.emit("guided:phase", &dto).is_err() {
@@ -377,22 +468,38 @@ fn ac_power_available() -> bool {
     }
 }
 
-fn guided_preflight_for(live: &LiveHandle, require_ac: bool) -> GuidedPreflightDto {
+/// Whether the volume that holds `app`'s data directory has at least `guided.min_free_disk_mb`
+/// free (T167): the test writes real samples for minutes and must not start if it plausibly
+/// cannot hold them. `None`/unreadable counts as failing the check, never as passing it.
+fn guided_disk_space_ok(app: &AppHandle, rules: &crate::diagnostics::Ruleset) -> bool {
+    let Some(min_free_mb) = rules.parameter("guided.min_free_disk_mb") else { return false };
+    let Ok(data_dir) = app.path().app_data_dir() else { return false };
+    crate::diagnostics::disk_space::free_disk_mb(&data_dir)
+        .is_some_and(|free_mb| free_mb as f64 >= min_free_mb)
+}
+
+fn guided_preflight_for(
+    app: &AppHandle,
+    live: &LiveHandle,
+    require_ac: bool,
+) -> GuidedPreflightDto {
     // Sensors: what the collector delivers right now, not what the catalog advertises.
     let signals = live.read(|live| live.coverage_signals());
+    let rules = crate::diagnostics::Ruleset::v1();
     GuidedPreflightDto {
         sensors: signals.temperature && signals.active_clock,
         ac_power: ac_power_available(),
-        profile: crate::diagnostics::Ruleset::v1().is_ok(),
-        disk_space: std::fs::metadata(".").is_ok(),
-        generator: true,
+        profile: rules.is_ok(),
+        disk_space: rules.as_ref().is_ok_and(|rules| guided_disk_space_ok(app, rules)),
+        // The threads the real generator will spawn: whether the OS can even report this.
+        generator: std::thread::available_parallelism().is_ok(),
         require_ac,
     }
 }
 
 #[tauri::command]
-pub fn get_guided_preflight(live: State<'_, LiveHandle>) -> GuidedPreflightDto {
-    guided_preflight_for(&live, true)
+pub fn get_guided_preflight(app: AppHandle, live: State<'_, LiveHandle>) -> GuidedPreflightDto {
+    guided_preflight_for(&app, &live, true)
 }
 
 #[tauri::command]
@@ -411,7 +518,7 @@ pub fn start_guided(
     let rules = crate::diagnostics::Ruleset::v1().map_err(|_| CommandError::operation_failed())?;
     let config = GuidedConfig::from_ruleset(&rules, profile, request.require_ac)
         .ok_or_else(CommandError::operation_failed)?;
-    let preflight = guided_preflight_for(&live, request.require_ac);
+    let preflight = guided_preflight_for(&app, &live, request.require_ac);
     let checks = GuidedPreflight {
         sensors: preflight.sensors,
         ac_power: preflight.ac_power,
@@ -433,9 +540,10 @@ pub fn start_guided(
     let stop_requested = Arc::clone(&state.stop_requested);
     let session_id = guided_session_id();
     let loop_app = app.clone();
-    let _ = thread::Builder::new()
-        .name("guided-watchdog".to_owned())
-        .spawn(move || run_guided_loop(loop_app, machine_ref, stop_requested, session_id));
+    let loop_live = live.inner().clone();
+    let _ = thread::Builder::new().name("guided-watchdog".to_owned()).spawn(move || {
+        run_guided_loop(loop_app, machine_ref, stop_requested, loop_live, session_id)
+    });
     app.emit("guided:phase", &dto).map_err(|_| CommandError::operation_failed())?;
     Ok(dto)
 }
