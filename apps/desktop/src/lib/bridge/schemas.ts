@@ -192,16 +192,25 @@ export const onboardingStateSchema = z
     flow_version: z.number().int().positive(),
     last_slide: z.number().int().min(1).max(5),
     status: z.enum(['pending', 'completed', 'skipped']),
-    completed_at: z.string().pipe(z.iso.datetime({ offset: true })).nullable(),
+    completed_at: z
+      .string()
+      .pipe(z.iso.datetime({ offset: true }))
+      .nullable(),
     last_seen_notice_version: z.number().int().nonnegative()
   })
   .strict()
   .superRefine((value, context) => {
     if (value.status === 'pending' && value.completed_at !== null) {
-      context.addIssue({ code: 'custom', message: 'Pending onboarding cannot be completed.' });
+      context.addIssue({
+        code: 'custom',
+        message: 'Pending onboarding cannot be completed.'
+      });
     }
     if (value.status !== 'pending' && value.completed_at === null) {
-      context.addIssue({ code: 'custom', message: 'Resolved onboarding needs a completion timestamp.' });
+      context.addIssue({
+        code: 'custom',
+        message: 'Resolved onboarding needs a completion timestamp.'
+      });
     }
   });
 

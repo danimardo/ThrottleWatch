@@ -11,11 +11,17 @@ import {
 
 describe('onboarding state machine', () => {
   it('resumes pending onboarding at the persisted slide', () => {
-    expect(initialStepFor({ ...defaultOnboardingState(), last_slide: 4 })).toBe(3);
+    expect(initialStepFor({ ...defaultOnboardingState(), last_slide: 4 })).toBe(
+      3
+    );
   });
 
   it('does not resume a resolved onboarding flow', () => {
-    const state = resolveOnboarding(defaultOnboardingState(), 'skipped', '2026-09-19T12:00:00Z');
+    const state = resolveOnboarding(
+      defaultOnboardingState(),
+      'skipped',
+      '2026-09-19T12:00:00Z'
+    );
     expect(initialStepFor(state)).toBe(0);
   });
 
@@ -29,9 +35,17 @@ describe('onboarding state machine', () => {
 
   it('repetition resets progress but preserves the resolved state history fields', () => {
     const state = repeatOnboarding(
-      resolveOnboarding(defaultOnboardingState(), 'completed', '2026-09-19T12:00:00Z')
+      resolveOnboarding(
+        defaultOnboardingState(),
+        'completed',
+        '2026-09-19T12:00:00Z'
+      )
     );
-    expect(state).toMatchObject({ last_slide: 1, status: 'pending', completed_at: null });
+    expect(state).toMatchObject({
+      last_slide: 1,
+      status: 'pending',
+      completed_at: null
+    });
   });
 
   it('shows each notice version once and never lowers the watermark', () => {

@@ -70,11 +70,26 @@
   },
   "onboarding": {
     "ariaLabel": "First-run introduction",
-    "slide1": { "title": "Understand your CPU", "body": "ThrottleWatch observes heat, power and performance without changing your equipment." },
-    "slide2": { "title": "What it observes", "body": "Temperature, load, active frequency and package power, with short explanations for technical terms." },
-    "slide3": { "title": "What it can conclude", "body": "It distinguishes high temperature, thermal limits, power limits and insufficient data." },
-    "slide4": { "title": "Privacy and choices", "body": "Everything runs locally. You control language, theme, background operation and notifications." },
-    "slide5": { "title": "This computer", "body": "Passive detection starts here and shows what this equipment can reliably explain." },
+    "slide1": {
+      "title": "Understand your CPU",
+      "body": "ThrottleWatch observes heat, power and performance without changing your equipment."
+    },
+    "slide2": {
+      "title": "What it observes",
+      "body": "Temperature, load, active frequency and package power, with short explanations for technical terms."
+    },
+    "slide3": {
+      "title": "What it can conclude",
+      "body": "It distinguishes high temperature, thermal limits, power limits and insufficient data."
+    },
+    "slide4": {
+      "title": "Privacy and choices",
+      "body": "Everything runs locally. You control language, theme, background operation and notifications."
+    },
+    "slide5": {
+      "title": "This computer",
+      "body": "Passive detection starts here and shows what this equipment can reliably explain."
+    },
     "detecting": "Checking this equipment…",
     "coverage": {
       "completeTitle": "Complete coverage",

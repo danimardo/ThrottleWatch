@@ -16,7 +16,9 @@ describe('window geometry', () => {
   });
 
   it('uses a 500 logical minimum for a 1080p display at 200 percent', () => {
-    expect(resolveGeometry(null, { x: 0, y: 0, width: 960, height: 540 })).toMatchObject({
+    expect(
+      resolveGeometry(null, { x: 0, y: 0, width: 960, height: 540 })
+    ).toMatchObject({
       restored_width: 960,
       restored_height: 540,
       maximized: false,
@@ -26,7 +28,9 @@ describe('window geometry', () => {
   });
 
   it('maximizes when the useful height is below 500 logical pixels', () => {
-    expect(resolveGeometry(null, { x: 0, y: 0, width: 800, height: 480 })).toMatchObject({
+    expect(
+      resolveGeometry(null, { x: 0, y: 0, width: 800, height: 480 })
+    ).toMatchObject({
       restored_width: 800,
       restored_height: 480,
       maximized: true,

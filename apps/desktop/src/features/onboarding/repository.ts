@@ -1,7 +1,4 @@
-import {
-  invokeValidated,
-  type BridgeTransport
-} from '../../lib/bridge';
+import { invokeValidated, type BridgeTransport } from '../../lib/bridge';
 import {
   commandResponseSchemas,
   onboardingStateSchema,

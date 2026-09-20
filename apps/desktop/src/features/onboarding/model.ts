@@ -16,7 +16,10 @@ export function defaultOnboardingState(): OnboardingState {
 
 export function initialStepFor(state: OnboardingState): number {
   if (state.status !== 'pending') return 0;
-  return Math.max(0, Math.min(ONBOARDING_SLIDE_COUNT - 1, state.last_slide - 1));
+  return Math.max(
+    0,
+    Math.min(ONBOARDING_SLIDE_COUNT - 1, state.last_slide - 1)
+  );
 }
 
 export function advanceToSlide(
@@ -26,7 +29,10 @@ export function advanceToSlide(
   return {
     ...state,
     flow_version: ONBOARDING_FLOW_VERSION,
-    last_slide: Math.max(1, Math.min(ONBOARDING_SLIDE_COUNT, zeroBasedStep + 1)),
+    last_slide: Math.max(
+      1,
+      Math.min(ONBOARDING_SLIDE_COUNT, zeroBasedStep + 1)
+    ),
     status: 'pending',
     completed_at: null
   };

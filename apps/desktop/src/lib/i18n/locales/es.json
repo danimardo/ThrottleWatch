@@ -70,11 +70,26 @@
   },
   "onboarding": {
     "ariaLabel": "Introducción inicial",
-    "slide1": { "title": "Entiende tu CPU", "body": "ThrottleWatch observa calor, potencia y rendimiento sin modificar tu equipo." },
-    "slide2": { "title": "Qué observa", "body": "Temperatura, carga, frecuencia activa y potencia de paquete, con aclaraciones breves de los términos técnicos." },
-    "slide3": { "title": "Qué puede concluir", "body": "Distingue temperatura alta, límites térmicos, límites de potencia y datos insuficientes." },
-    "slide4": { "title": "Privacidad y decisiones", "body": "Todo funciona localmente. Tú controlas idioma, tema, segundo plano y notificaciones." },
-    "slide5": { "title": "Este equipo", "body": "La detección pasiva comienza aquí y muestra qué puede explicar este equipo con fiabilidad." },
+    "slide1": {
+      "title": "Entiende tu CPU",
+      "body": "ThrottleWatch observa calor, potencia y rendimiento sin modificar tu equipo."
+    },
+    "slide2": {
+      "title": "Qué observa",
+      "body": "Temperatura, carga, frecuencia activa y potencia de paquete, con aclaraciones breves de los términos técnicos."
+    },
+    "slide3": {
+      "title": "Qué puede concluir",
+      "body": "Distingue temperatura alta, límites térmicos, límites de potencia y datos insuficientes."
+    },
+    "slide4": {
+      "title": "Privacidad y decisiones",
+      "body": "Todo funciona localmente. Tú controlas idioma, tema, segundo plano y notificaciones."
+    },
+    "slide5": {
+      "title": "Este equipo",
+      "body": "La detección pasiva comienza aquí y muestra qué puede explicar este equipo con fiabilidad."
+    },
     "detecting": "Comprobando este equipo…",
     "coverage": {
       "completeTitle": "Cobertura completa",

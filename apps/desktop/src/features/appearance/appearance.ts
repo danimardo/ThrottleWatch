@@ -19,7 +19,10 @@ export function applyTheme(preference: ThemePreference): void {
   const prefersLight =
     typeof window !== 'undefined' &&
     window.matchMedia('(prefers-color-scheme: light)').matches;
-  document.documentElement.dataset.theme = resolveTheme(preference, prefersLight);
+  document.documentElement.dataset.theme = resolveTheme(
+    preference,
+    prefersLight
+  );
 }
 
 export function applyLanguage(locale: string): void {
@@ -40,7 +43,8 @@ export function listenToSystemAppearance(
   theme: ThemePreference,
   onChange: () => void
 ): () => void {
-  if (typeof window === 'undefined' || theme !== 'system') return () => undefined;
+  if (typeof window === 'undefined' || theme !== 'system')
+    return () => undefined;
   const query = window.matchMedia('(prefers-color-scheme: light)');
   query.addEventListener('change', onChange);
   return () => {

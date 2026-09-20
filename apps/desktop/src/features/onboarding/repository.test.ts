@@ -21,12 +21,16 @@ describe('onboarding repository', () => {
     const bridge = new FakeBridge();
     const state = { ...defaultOnboardingState(), last_slide: 3 };
     await saveOnboardingState(state, bridge);
-    await expect(loadOnboardingState(bridge)).resolves.toMatchObject({ last_slide: 3 });
+    await expect(loadOnboardingState(bridge)).resolves.toMatchObject({
+      last_slide: 3
+    });
   });
 
   it('degrades to browser storage without Tauri', async () => {
     const state = { ...defaultOnboardingState(), last_slide: 2 };
     await saveOnboardingState(state);
-    await expect(loadOnboardingState()).resolves.toMatchObject({ last_slide: 2 });
+    await expect(loadOnboardingState()).resolves.toMatchObject({
+      last_slide: 2
+    });
   });
 });

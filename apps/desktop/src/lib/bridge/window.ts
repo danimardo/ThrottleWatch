@@ -7,7 +7,11 @@ import {
   type Monitor
 } from '@tauri-apps/api/window';
 import { invokeValidated } from './index';
-import { commandResponseSchemas, windowStateSchema, type WindowState } from './schemas';
+import {
+  commandResponseSchemas,
+  windowStateSchema,
+  type WindowState
+} from './schemas';
 import {
   resolveGeometry,
   selectMonitor,
@@ -60,7 +64,9 @@ function monitorKey(monitor: Monitor): string {
   ].join(':');
 }
 
-function isRuntimeMonitor(monitor: MonitorSnapshot | null): monitor is RuntimeMonitor {
+function isRuntimeMonitor(
+  monitor: MonitorSnapshot | null
+): monitor is RuntimeMonitor {
   return monitor !== null && 'monitor' in monitor && 'scaleFactor' in monitor;
 }
 
@@ -79,7 +85,9 @@ export function createWindowAdapter(): WindowAdapter {
   const current = getCurrentWindow();
   let lastMonitorKey: string | null = null;
 
-  async function savedMonitor(saved: WindowState): Promise<RuntimeMonitor | null> {
+  async function savedMonitor(
+    saved: WindowState
+  ): Promise<RuntimeMonitor | null> {
     const [currentMonitorValue, monitors] = await Promise.all([
       currentMonitor(),
       availableMonitors().catch(() => [])
@@ -99,7 +107,9 @@ export function createWindowAdapter(): WindowAdapter {
     if (key === lastMonitorKey) return;
     const runtimeMonitor = toRuntimeMonitor(monitor);
     const geometry = resolveGeometry(null, runtimeMonitor.workArea);
-    await current.setMinSize(new LogicalSize(geometry.min_width, geometry.min_height));
+    await current.setMinSize(
+      new LogicalSize(geometry.min_width, geometry.min_height)
+    );
     lastMonitorKey = key;
   }
 
@@ -118,9 +128,15 @@ export function createWindowAdapter(): WindowAdapter {
       height: 1080
     };
     const geometry = resolveGeometry(result.value, workArea);
-    await current.setMinSize(new LogicalSize(geometry.min_width, geometry.min_height));
-    await current.setSize(new LogicalSize(geometry.restored_width, geometry.restored_height));
-    await current.setPosition(new LogicalPosition(geometry.restored_x, geometry.restored_y));
+    await current.setMinSize(
+      new LogicalSize(geometry.min_width, geometry.min_height)
+    );
+    await current.setSize(
+      new LogicalSize(geometry.restored_width, geometry.restored_height)
+    );
+    await current.setPosition(
+      new LogicalPosition(geometry.restored_x, geometry.restored_y)
+    );
     if ((await current.isMaximized()) !== geometry.maximized) {
       await current.toggleMaximize();
     }
@@ -143,14 +159,16 @@ export function createWindowAdapter(): WindowAdapter {
       const maximized = await current.isMaximized();
       const monitor = await currentMonitor();
       const runtimeMonitor = monitor ? toRuntimeMonitor(monitor) : null;
-      const scale = runtimeMonitor?.scaleFactor ?? (await current.scaleFactor());
+      const scale =
+        runtimeMonitor?.scaleFactor ?? (await current.scaleFactor());
       const position = await current.innerPosition();
       const size = await current.innerSize();
       const next: WindowState = maximized
         ? {
             ...previous.value,
             maximized: true,
-            display_fingerprint: runtimeMonitor?.fingerprint ?? previous.value.display_fingerprint,
+            display_fingerprint:
+              runtimeMonitor?.fingerprint ?? previous.value.display_fingerprint,
             updated_at: new Date().toISOString()
           }
         : {

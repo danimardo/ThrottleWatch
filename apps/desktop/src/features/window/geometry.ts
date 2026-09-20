@@ -34,11 +34,20 @@ export function minimumHeightFor(workAreaHeight: number): number {
   return workAreaHeight < MIN_HEIGHT ? FALLBACK_MIN_HEIGHT : MIN_HEIGHT;
 }
 
-export function isUsablyVisible(geometry: SavedGeometry, workArea: WorkArea): boolean {
-  const visibleWidth = Math.min(geometry.restored_x + geometry.restored_width, workArea.x + workArea.width) -
-    Math.max(geometry.restored_x, workArea.x);
-  const visibleHeight = Math.min(geometry.restored_y + geometry.restored_height, workArea.y + workArea.height) -
-    Math.max(geometry.restored_y, workArea.y);
+export function isUsablyVisible(
+  geometry: SavedGeometry,
+  workArea: WorkArea
+): boolean {
+  const visibleWidth =
+    Math.min(
+      geometry.restored_x + geometry.restored_width,
+      workArea.x + workArea.width
+    ) - Math.max(geometry.restored_x, workArea.x);
+  const visibleHeight =
+    Math.min(
+      geometry.restored_y + geometry.restored_height,
+      workArea.y + workArea.height
+    ) - Math.max(geometry.restored_y, workArea.y);
   return visibleWidth >= 80 && visibleHeight >= 40;
 }
 
@@ -91,8 +100,12 @@ export function resolveGeometry(
   );
   const visible = saved !== null && isUsablyVisible(saved, workArea);
   return {
-    restored_x: visible ? saved.restored_x : workArea.x + Math.round((workArea.width - width) / 2),
-    restored_y: visible ? saved.restored_y : workArea.y + Math.round((workArea.height - height) / 2),
+    restored_x: visible
+      ? saved.restored_x
+      : workArea.x + Math.round((workArea.width - width) / 2),
+    restored_y: visible
+      ? saved.restored_y
+      : workArea.y + Math.round((workArea.height - height) / 2),
     restored_width: width,
     restored_height: height,
     maximized: tooShortToRestore || saved?.maximized === true,

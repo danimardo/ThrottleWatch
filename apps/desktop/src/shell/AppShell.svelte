@@ -21,7 +21,10 @@
   } from '../lib/bridge/schemas';
   import { invokeValidated } from '../lib/bridge';
   import { createTranslator } from '../lib/i18n';
-  import { createWindowAdapter, type WindowAdapter } from '../lib/bridge/window';
+  import {
+    createWindowAdapter,
+    type WindowAdapter
+  } from '../lib/bridge/window';
   import {
     advanceToSlide,
     CURRENT_NOTICE_VERSION,
@@ -62,7 +65,8 @@
   let maximized = $state(false);
   let windowAdapter: WindowAdapter = createWindowAdapter();
   let onboardingState = $state<OnboardingState | null>(null);
-  let detectionStatus = $state<OnboardingDetectionContent['status']>('detecting');
+  let detectionStatus =
+    $state<OnboardingDetectionContent['status']>('detecting');
   let coverage = $state<CoverageMatrix | null>(null);
   let detectionStarted = false;
   const compactDestinations = destinations.slice(0, 3);
@@ -134,10 +138,22 @@
               : undefined
     };
     return [
-      { title: t('onboarding.slide1.title'), body: t('onboarding.slide1.body') },
-      { title: t('onboarding.slide2.title'), body: t('onboarding.slide2.body') },
-      { title: t('onboarding.slide3.title'), body: t('onboarding.slide3.body') },
-      { title: t('onboarding.slide4.title'), body: t('onboarding.slide4.body') },
+      {
+        title: t('onboarding.slide1.title'),
+        body: t('onboarding.slide1.body')
+      },
+      {
+        title: t('onboarding.slide2.title'),
+        body: t('onboarding.slide2.body')
+      },
+      {
+        title: t('onboarding.slide3.title'),
+        body: t('onboarding.slide3.body')
+      },
+      {
+        title: t('onboarding.slide4.title'),
+        body: t('onboarding.slide4.body')
+      },
       detection
     ];
   }
@@ -171,12 +187,16 @@
 
   function finishOnboarding(): void {
     if (onboardingState === null) return;
-    persist(resolveOnboarding(onboardingState, 'completed', new Date().toISOString()));
+    persist(
+      resolveOnboarding(onboardingState, 'completed', new Date().toISOString())
+    );
   }
 
   function skipOnboarding(): void {
     if (onboardingState === null) return;
-    persist(resolveOnboarding(onboardingState, 'skipped', new Date().toISOString()));
+    persist(
+      resolveOnboarding(onboardingState, 'skipped', new Date().toISOString())
+    );
   }
 
   function dismissNotice(): void {
@@ -201,7 +221,8 @@
       maximized = !maximized;
       void windowAdapter.toggleMaximize();
     }}
-    onClose={() => void windowAdapter.persistGeometry().then(() => windowAdapter.close())}
+    onClose={() =>
+      void windowAdapter.persistGeometry().then(() => windowAdapter.close())}
     minimizeLabel={t('app.minimize')}
     maximizeLabel={t('app.maximize')}
     restoreLabel={t('app.restore')}
@@ -240,7 +261,9 @@
           <OnboardingFlow
             steps={onboardingSteps()}
             initialStep={initialStepFor(onboardingState!)}
-            resumedNote={onboardingState!.last_slide > 1 ? t('onboarding.resumed') : undefined}
+            resumedNote={onboardingState!.last_slide > 1
+              ? t('onboarding.resumed')
+              : undefined}
             backLabel={t('onboarding.back')}
             nextLabel={t('onboarding.next')}
             finishLabel={t('onboarding.finish')}
@@ -248,14 +271,23 @@
             skipLabel={t('onboarding.skip')}
             onFinish={finishOnboarding}
             onStepChange={onOnboardingStepChange}
-            progressLabel={(step, count) => t('onboarding.progress').replace('{step}', String(step)).replace('{count}', String(count))}
+            progressLabel={(step, count) =>
+              t('onboarding.progress')
+                .replace('{step}', String(step))
+                .replace('{count}', String(count))}
           />
         </main>
       {:else if active === 'now'}
         {#if noticesVisible}
           <WhatsNewCards
             title={t('notices.title')}
-            cards={[{ id: 'low-level-access', title: t('notices.lowLevel.title'), body: t('notices.lowLevel.body') }]}
+            cards={[
+              {
+                id: 'low-level-access',
+                title: t('notices.lowLevel.title'),
+                body: t('notices.lowLevel.body')
+              }
+            ]}
             dismissLabel={t('notices.dismiss')}
             onDismiss={dismissNotice}
           />
