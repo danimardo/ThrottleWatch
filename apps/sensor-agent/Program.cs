@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using ThrottleWatch.SensorAgent.Collector;
 using ThrottleWatch.SensorAgent.Logging;
@@ -21,6 +22,8 @@ internal static class DevConfiguration
 
 internal static class Program
 {
+    private const int SamplerPollMs = 50;
+
     private static async Task<int> Main(string[] args)
     {
         using var streams = new StandardStreams();
@@ -59,13 +62,25 @@ internal static class Program
         using var stop = new CancellationTokenSource();
         var sampler = Task.Run(async () =>
         {
+            // Polls instead of sleeping a whole interval: the interval changes with `start`/`set_rate`,
+            // and the first sample must follow `started` at once, not up to one old interval later.
+            var clock = Stopwatch.StartNew();
+            var due = 0L;
             while (!stop.IsCancellationRequested)
             {
                 try
                 {
-                    await Task.Delay(session.IntervalMs, stop.Token);
-                    if (session.NextSample() is { } sample)
+                    await Task.Delay(SamplerPollMs, stop.Token);
+                    var now = clock.ElapsedMilliseconds;
+                    if (!session.Sampling)
                     {
+                        due = now;
+                        continue;
+                    }
+
+                    if (now >= due && session.NextSample() is { } sample)
+                    {
+                        due = now + session.IntervalMs;
                         await WriteAsync([sample]);
                     }
                 }

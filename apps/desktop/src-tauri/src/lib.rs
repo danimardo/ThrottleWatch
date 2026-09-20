@@ -11,7 +11,11 @@ pub mod storage;
 pub mod telemetry;
 mod test_support;
 
+use std::sync::Mutex;
 use tauri::Manager;
+
+/// Keeps the collector runtime alive for the life of the application; stopped on exit.
+struct CollectorHandle(Mutex<telemetry::runtime::CollectorRuntime>);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -34,6 +38,24 @@ pub fn run() {
             app.manage(log_guard);
             app.manage(storage::AppState::new(storage));
             app.manage(commands::GuidedController::default());
+
+            // The collector runs for the whole life of the application: nothing on screen is real
+            // until this delivers samples.
+            let live = commands::LiveHandle::default();
+            app.manage(live.clone());
+            let rules = diagnostics::Ruleset::v1()
+                .map_err(|error| std::io::Error::other(error.to_string()))?;
+            let config = telemetry::runtime::RuntimeConfig::from_ruleset(&rules)
+                .ok_or_else(|| std::io::Error::other("ruleset lacks the collector parameters"))?;
+            let observer =
+                std::sync::Arc::new(commands::TauriObserver { app: app.handle().clone() });
+            let runtime = telemetry::runtime::CollectorRuntime::start(
+                telemetry::launch::collector_launcher(),
+                live.0,
+                observer,
+                config,
+            )?;
+            app.manage(CollectorHandle(Mutex::new(runtime)));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -52,6 +74,14 @@ pub fn run() {
             commands::get_analysis_window,
             commands::get_cpu_topology
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running ThrottleWatch");
+        .build(tauri::generate_context!())
+        .expect("error while building ThrottleWatch")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event
+                && let Some(collector) = app.try_state::<CollectorHandle>()
+                && let Ok(mut runtime) = collector.0.lock()
+            {
+                runtime.stop();
+            }
+        });
 }

@@ -6,7 +6,7 @@ use crate::diagnostics::guided::{
     FixedLoopGenerator, GuidedConfig, GuidedMachine, GuidedPhase, GuidedPreflight, GuidedProfile,
     GuidedStopReason, LoadGenerator,
 };
-use crate::diagnostics::{AdvancedAccess, ConfidenceCeiling, CoverageSignals, CoverageTier};
+use crate::diagnostics::{AdvancedAccess, ConfidenceCeiling, CoverageTier};
 use crate::storage::{AppState, OnboardingState, OnboardingStatus, WindowState};
 use crate::telemetry::power_context::PowerSource;
 use crate::telemetry::snapshot::Freshness;
@@ -16,6 +16,9 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager, State};
+
+mod live;
+pub use live::{LiveHandle, TauriObserver};
 
 #[derive(Default)]
 pub struct GuidedController {
@@ -125,24 +128,8 @@ pub struct AnalysisWindowRequest {
 }
 
 #[tauri::command]
-pub fn get_cpu_topology() -> CpuTopologyDto {
-    let count = std::thread::available_parallelism()
-        .map(|value| value.get())
-        .unwrap_or(1)
-        .min(u16::MAX as usize) as u16;
-    CpuTopologyDto {
-        cores: (0..count)
-            .map(|index| CpuCoreDto {
-                id: format!("core-{index}"),
-                index,
-                group: "ungrouped",
-                temperature_c: None,
-                clock_mhz: None,
-                load_percent: None,
-                throttling: None,
-            })
-            .collect(),
-    }
+pub fn get_cpu_topology(live: State<'_, LiveHandle>) -> CpuTopologyDto {
+    live.read(live::topology_dto)
 }
 
 fn guided_phase_name(phase: GuidedPhase) -> &'static str {
@@ -354,25 +341,28 @@ pub struct LiveSnapshotDto {
     pub power_limit_w: Option<f64>,
     pub classification: Option<&'static str>,
     pub severity: Option<&'static str>,
-    pub cpu_label: &'static str,
-    pub topology_label: &'static str,
-    pub power_label: &'static str,
+    pub cpu_label: String,
+    pub topology_label: String,
+    pub power_label: String,
     pub collector_state: &'static str,
     pub coverage: CoverageDto,
-    pub confidence_label: &'static str,
+    pub confidence_label: String,
     pub active_cores: Option<u16>,
     pub platform_kind: Option<&'static str>,
     pub in_turbo_window: bool,
 }
 
 #[tauri::command]
-pub fn get_coverage(state: State<'_, AppState>) -> CoverageMatrixDto {
-    let enabled = state
+pub fn get_coverage(state: State<'_, AppState>, live: State<'_, LiveHandle>) -> CoverageMatrixDto {
+    live.read(|live| live::coverage_dto(live, advanced_access_enabled(&state)))
+}
+
+fn advanced_access_enabled(state: &AppState) -> bool {
+    state
         .storage
         .lock()
         .map(|storage| storage.advanced_access_enabled().unwrap_or(true))
-        .unwrap_or(true);
-    coverage_matrix(enabled)
+        .unwrap_or(true)
 }
 
 fn ac_power_available() -> bool {
@@ -387,18 +377,11 @@ fn ac_power_available() -> bool {
     }
 }
 
-fn guided_preflight_for(state: &AppState, require_ac: bool) -> GuidedPreflightDto {
-    let coverage = state
-        .storage
-        .lock()
-        .ok()
-        .and_then(|storage| storage.advanced_access_enabled().ok())
-        .map(coverage_matrix)
-        .unwrap_or_else(|| coverage_matrix(false));
-    let sensors = coverage.rows.iter().any(|row| row.id == "temperature" && row.available)
-        && coverage.rows.iter().any(|row| row.id == "active_clock" && row.available);
+fn guided_preflight_for(live: &LiveHandle, require_ac: bool) -> GuidedPreflightDto {
+    // Sensors: what the collector delivers right now, not what the catalog advertises.
+    let signals = live.read(|live| live.coverage_signals());
     GuidedPreflightDto {
-        sensors,
+        sensors: signals.temperature && signals.active_clock,
         ac_power: ac_power_available(),
         profile: crate::diagnostics::Ruleset::v1().is_ok(),
         disk_space: std::fs::metadata(".").is_ok(),
@@ -408,15 +391,15 @@ fn guided_preflight_for(state: &AppState, require_ac: bool) -> GuidedPreflightDt
 }
 
 #[tauri::command]
-pub fn get_guided_preflight(state: State<'_, AppState>) -> GuidedPreflightDto {
-    guided_preflight_for(&state, true)
+pub fn get_guided_preflight(live: State<'_, LiveHandle>) -> GuidedPreflightDto {
+    guided_preflight_for(&live, true)
 }
 
 #[tauri::command]
 pub fn start_guided(
     app: AppHandle,
     state: State<'_, GuidedController>,
-    app_state: State<'_, AppState>,
+    live: State<'_, LiveHandle>,
     request: StartGuidedRequest,
 ) -> Result<GuidedPhaseDto, CommandError> {
     let profile = match request.profile.as_str() {
@@ -428,7 +411,7 @@ pub fn start_guided(
     let rules = crate::diagnostics::Ruleset::v1().map_err(|_| CommandError::operation_failed())?;
     let config = GuidedConfig::from_ruleset(&rules, profile, request.require_ac)
         .ok_or_else(CommandError::operation_failed)?;
-    let preflight = guided_preflight_for(&app_state, request.require_ac);
+    let preflight = guided_preflight_for(&live, request.require_ac);
     let checks = GuidedPreflight {
         sensors: preflight.sensors,
         ac_power: preflight.ac_power,
@@ -629,93 +612,20 @@ pub fn set_window_state(
     Ok(window_state_dto(value))
 }
 
-fn coverage_matrix(advanced_access_enabled: bool) -> CoverageMatrixDto {
-    let signals = CoverageSignals {
-        temperature: false,
-        active_clock: false,
-        per_core_load: false,
-        package_power: false,
-        power_limit: false,
-        limit_reasons: false,
-    };
-    let summary = signals.summary();
-    CoverageMatrixDto {
-        tier: tier(summary.tier),
-        confidence_ceiling: confidence(summary.confidence_ceiling),
-        advanced_access: if advanced_access_enabled {
-            access(summary.advanced_access)
-        } else {
-            AdvancedAccessDto::Denied
-        },
-        rows: vec![
-            row("temperature", "direct", "Directa", "CPU package", "coverage.temperature_missing"),
-            row("active_clock", "derived", "Derivada", "PDH", "coverage.active_clock_missing"),
-            row("power", "direct", "Directa", "CPU package", "coverage.power_missing"),
-            row(
-                "thermal_flag",
-                "direct",
-                "Directa",
-                "MSR/SMU",
-                "coverage.advanced_access_required",
-            ),
-        ],
-        conclusion_key: "coverage.conclusion.c",
-    }
+#[tauri::command]
+pub fn recheck_coverage(
+    state: State<'_, AppState>,
+    live: State<'_, LiveHandle>,
+) -> CoverageMatrixDto {
+    get_coverage(state, live)
 }
 
 #[tauri::command]
-pub fn recheck_coverage(state: State<'_, AppState>) -> CoverageMatrixDto {
-    get_coverage(state)
-}
-
-#[tauri::command]
-pub fn get_live_snapshot(state: State<'_, AppState>) -> LiveSnapshotDto {
-    let coverage = CoverageSignals {
-        temperature: false,
-        active_clock: false,
-        per_core_load: false,
-        package_power: false,
-        power_limit: false,
-        limit_reasons: false,
-    };
-    let summary = coverage.summary();
-    LiveSnapshotDto {
-        captured_at_ms: 0,
-        freshness: freshness(Freshness::Disconnected),
-        age_ms: 0,
-        temperature_c: None,
-        thermal_limit_c: None,
-        thermal_margin_c: None,
-        load_percent: None,
-        active_clock_mhz: None,
-        base_clock_mhz: None,
-        package_power_w: None,
-        power_limit_w: None,
-        classification: Some("indeterminate"),
-        severity: None,
-        cpu_label: "CPU no detectada todavía",
-        topology_label: "Esperando catálogo del colector",
-        power_label: "Fuente desconocida",
-        collector_state: "stopped",
-        coverage: CoverageDto {
-            tier: tier(summary.tier),
-            confidence_ceiling: confidence(summary.confidence_ceiling),
-            advanced_access: if state
-                .storage
-                .lock()
-                .map(|storage| storage.advanced_access_enabled().unwrap_or(true))
-                .unwrap_or(true)
-            {
-                access(summary.advanced_access)
-            } else {
-                AdvancedAccessDto::Denied
-            },
-        },
-        confidence_label: "Confianza máxima alcanzable: baja",
-        active_cores: None,
-        platform_kind: None,
-        in_turbo_window: false,
-    }
+pub fn get_live_snapshot(
+    state: State<'_, AppState>,
+    live: State<'_, LiveHandle>,
+) -> LiveSnapshotDto {
+    live.read(|live| live::snapshot_dto(live, advanced_access_enabled(&state), live::epoch_ms()))
 }
 
 #[tauri::command]
@@ -749,28 +659,11 @@ pub fn request_low_level_access(
 #[tauri::command]
 pub fn disable_advanced_access(
     state: State<'_, AppState>,
+    live: State<'_, LiveHandle>,
 ) -> Result<CoverageMatrixDto, CommandError> {
     let guard = state.storage.lock().map_err(|_| CommandError::operation_failed())?;
     guard.set_advanced_access_enabled(false).map_err(|_| CommandError::operation_failed())?;
-    Ok(coverage_matrix(false))
-}
-
-fn row(
-    id: &'static str,
-    quality: &'static str,
-    quality_label: &'static str,
-    source: &'static str,
-    reason: &'static str,
-) -> CoverageRowDto {
-    CoverageRowDto {
-        id,
-        label: id,
-        available: false,
-        quality,
-        quality_label,
-        source_label: source,
-        reason_key: Some(reason),
-    }
+    Ok(live.read(|live| live::coverage_dto(live, false)))
 }
 
 fn tier(value: CoverageTier) -> CoverageTierDto {
