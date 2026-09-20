@@ -10,7 +10,15 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [{ "title": "ThrottleWatch", "width": 960, "height": 720 }],
+    "windows": [{
+      "label": "main",
+      "title": "ThrottleWatch",
+      "width": 1100,
+      "height": 760,
+      "minWidth": 480,
+      "minHeight": 600,
+      "decorations": false
+    }],
     "security": {
       "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'"
     }

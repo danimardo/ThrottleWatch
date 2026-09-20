@@ -187,6 +187,36 @@ export const coverageMatrixSchema = z.object({
   conclusion_key: z.string().min(1)
 });
 
+export const onboardingStateSchema = z
+  .object({
+    flow_version: z.number().int().positive(),
+    last_slide: z.number().int().min(1).max(5),
+    status: z.enum(['pending', 'completed', 'skipped']),
+    completed_at: z.string().pipe(z.iso.datetime({ offset: true })).nullable(),
+    last_seen_notice_version: z.number().int().nonnegative()
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.status === 'pending' && value.completed_at !== null) {
+      context.addIssue({ code: 'custom', message: 'Pending onboarding cannot be completed.' });
+    }
+    if (value.status !== 'pending' && value.completed_at === null) {
+      context.addIssue({ code: 'custom', message: 'Resolved onboarding needs a completion timestamp.' });
+    }
+  });
+
+export const windowStateSchema = z
+  .object({
+    restored_x: z.number().int(),
+    restored_y: z.number().int(),
+    restored_width: z.number().int().min(480),
+    restored_height: z.number().int().min(500),
+    maximized: z.boolean(),
+    display_fingerprint: z.string().nullable(),
+    updated_at: z.string().pipe(z.iso.datetime({ offset: true }))
+  })
+  .strict();
+
 export const liveSnapshotSchema = telemetrySnapshotSchema.extend({
   cpu_label: z.string(),
   topology_label: z.string(),
@@ -249,6 +279,10 @@ export const commandResponseSchemas = {
   get_live_snapshot: liveSnapshotSchema,
   get_coverage: coverageMatrixSchema,
   recheck_coverage: coverageMatrixSchema,
+  get_onboarding_state: onboardingStateSchema,
+  set_onboarding_state: onboardingStateSchema,
+  get_window_state: windowStateSchema,
+  set_window_state: windowStateSchema,
   request_low_level_access: z.object({
     state: z.literal('install_requested'),
     action: z.enum(['install', 'upgrade', 'repair']),
@@ -263,6 +297,10 @@ export const commandArgsSchemas = {
   get_live_snapshot: noCommandArgs,
   get_coverage: noCommandArgs,
   recheck_coverage: noCommandArgs,
+  get_onboarding_state: noCommandArgs,
+  set_onboarding_state: onboardingStateSchema,
+  get_window_state: noCommandArgs,
+  set_window_state: windowStateSchema,
   request_low_level_access: z
     .object({
       request: z
@@ -283,6 +321,8 @@ export const eventSchemas = {
 export type TelemetrySnapshot = z.infer<typeof telemetrySnapshotSchema>;
 export type CoverageSnapshot = z.infer<typeof coverageSnapshotSchema>;
 export type CoverageMatrix = z.infer<typeof coverageMatrixSchema>;
+export type OnboardingState = z.infer<typeof onboardingStateSchema>;
+export type WindowState = z.infer<typeof windowStateSchema>;
 export type LiveSnapshot = z.infer<typeof liveSnapshotSchema>;
 export type CollectorStateEvent = z.infer<typeof collectorStateEventSchema>;
 export type PowerContextEvent = z.infer<typeof powerContextEventSchema>;

@@ -53,4 +53,26 @@ public sealed class HardwareCollectorUpdateFailureTests
         recovered.First(reading => reading.SensorId == "/amdcpu/0/CPU Package").Status.ShouldBe("ok");
         logger.Entries.Count(entry => entry.Contains("SENSOR_UPDATE_FAILED")).ShouldBe(2);
     }
+
+    [Fact]
+    [Trait("Category", "Unit")]
+    public void RunsWithNoHardwareWhenTheLibraryThrowsWhileOpening()
+    {
+        var source = new FakeSource(new FakeHardware("/amdcpu/0"), throwOnOpen: true);
+        var logger = new CapturingLogger();
+        var collector = new HardwareCollector(source, logger);
+
+        collector.Open();
+
+        collector.IsOpen.ShouldBeTrue();
+        collector.ReadCatalog().ShouldBeEmpty();
+        collector.ReadSample().ShouldBeEmpty();
+        collector.ProbeLowLevelAfterCatalog().State.ShouldNotBeNullOrWhiteSpace();
+        source.EnumerationCount.ShouldBe(0);
+        logger.Entries.Count(entry => entry.Contains("SENSOR_OPEN_FAILED")).ShouldBe(1);
+        logger.Entries[0].ShouldContain("InvalidOperationException");
+
+        collector.Dispose();
+        source.Closed.ShouldBeFalse();
+    }
 }

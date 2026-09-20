@@ -67,5 +67,39 @@
   "screens": {
     "notAvailable": "This view will be available when the collector and history are ready.",
     "comingSoon": "View in preparation"
+  },
+  "onboarding": {
+    "ariaLabel": "First-run introduction",
+    "slide1": { "title": "Understand your CPU", "body": "ThrottleWatch observes heat, power and performance without changing your equipment." },
+    "slide2": { "title": "What it observes", "body": "Temperature, load, active frequency and package power, with short explanations for technical terms." },
+    "slide3": { "title": "What it can conclude", "body": "It distinguishes high temperature, thermal limits, power limits and insufficient data." },
+    "slide4": { "title": "Privacy and choices", "body": "Everything runs locally. You control language, theme, background operation and notifications." },
+    "slide5": { "title": "This computer", "body": "Passive detection starts here and shows what this equipment can reliably explain." },
+    "detecting": "Checking this equipment…",
+    "coverage": {
+      "completeTitle": "Complete coverage",
+      "completeDescription": "The available signals support the full diagnostic path.",
+      "partialTitle": "Partial coverage",
+      "partialDescription": "The app remains usable and will explain which conclusions need more signals."
+    },
+    "access": {
+      "installable": "Advanced access can improve coverage.",
+      "available": "Advanced access is available.",
+      "denied": "Advanced access is unavailable; the app will continue at a lower coverage level."
+    },
+    "back": "Back",
+    "next": "Next",
+    "finish": "Open Now",
+    "skip": "Skip",
+    "resumed": "Continuing where you left off",
+    "progress": "Step {step} of {count}"
+  },
+  "notices": {
+    "title": "What's new",
+    "dismiss": "Got it",
+    "lowLevel": {
+      "title": "More reliable sensor coverage",
+      "body": "This version makes advanced access explicit and keeps the main interface usable when it is unavailable."
+    }
   }
 }

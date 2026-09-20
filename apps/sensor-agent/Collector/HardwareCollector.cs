@@ -76,6 +76,7 @@ public sealed class HardwareCollector : ICollectorSession, IDisposable
     private bool opened;
     private bool catalogRead;
     private bool virtualizedHost;
+    private bool openFailed;
 
     public HardwareCollector()
         : this(new ComputerHardwareSource(), Log.Create("sensor-agent.collector"), HostVirtualization.IsVirtualized)
@@ -98,7 +99,19 @@ public sealed class HardwareCollector : ICollectorSession, IDisposable
             return;
         }
 
-        source.Open();
+        try
+        {
+            source.Open();
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            // LibreHardwareMonitorLib throws from Computer.Open() on some virtualized hosts
+            // (NullReferenceException in GenericCpu.EstimateTimeStampCounterFrequency). Its state
+            // is undefined afterwards, so the collector runs with no hardware instead of dying.
+            openFailed = true;
+            logger.HardwareOpenFailed("SENSOR_OPEN_FAILED", exception.GetType().Name, exception);
+        }
+
         opened = true;
         virtualizedHost = isVirtualized();
         if (virtualizedHost)
@@ -110,6 +123,12 @@ public sealed class HardwareCollector : ICollectorSession, IDisposable
     public IReadOnlyList<SensorDescriptor> ReadCatalog()
     {
         EnsureOpened();
+        if (openFailed)
+        {
+            catalogRead = true;
+            return [];
+        }
+
         var catalog = source.CpuHardware()
             .SelectMany(hardware => hardware.Sensors.Where(sensor => !IsHiddenOnThisHost(sensor.SensorType)).Select(sensor =>
                 new SensorDescriptor(
@@ -143,6 +162,11 @@ public sealed class HardwareCollector : ICollectorSession, IDisposable
     {
         EnsureOpened();
         var readings = new List<SensorReading>();
+        if (openFailed)
+        {
+            return readings;
+        }
+
         foreach (var hardware in source.CpuHardware())
         {
             // A host without readable sensors (virtualized CI runner, no low-level access)
@@ -170,7 +194,11 @@ public sealed class HardwareCollector : ICollectorSession, IDisposable
     {
         if (opened)
         {
-            source.Close();
+            if (!openFailed)
+            {
+                source.Close();
+            }
+
             source.Dispose();
             opened = false;
             catalogRead = false;

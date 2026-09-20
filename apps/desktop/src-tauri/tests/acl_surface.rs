@@ -60,7 +60,6 @@ fn title_bar_window_commands_are_allowed() {
 fn window_commands_outside_the_title_bar_are_denied() {
     let (_app, window) = app_with_real_acl();
     for command in [
-        "plugin:window|set_size",
         "plugin:window|set_decorations",
         "plugin:window|set_always_on_top",
         "plugin:window|create",

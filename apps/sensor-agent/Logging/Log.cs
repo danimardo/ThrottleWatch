@@ -24,6 +24,9 @@ public static partial class Log
     [LoggerMessage(EventId = 1003, Level = LogLevel.Information, Message = "{Code}: physical sensors are hidden on a virtualized host")]
     public static partial void HostVirtualized(this ILogger logger, string Code);
 
+    [LoggerMessage(EventId = 1004, Level = LogLevel.Warning, Message = "{Code}: hardware could not be opened ({ExceptionType})")]
+    public static partial void HardwareOpenFailed(this ILogger logger, string Code, string ExceptionType, Exception exception);
+
     public static void AttachUnhandledExceptionHandlers(ILogger logger)
     {
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>

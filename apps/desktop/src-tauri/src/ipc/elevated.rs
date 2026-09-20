@@ -7,6 +7,8 @@ use std::time::Duration;
 pub const ELEVATED_TASK_NAME: &str = "ThrottleWatch\\SidecarElevated";
 pub const ELEVATED_PIPE_PREFIX: &str = r"\\.\pipe\ThrottleWatch.ElevatedSidecar.";
 const FILE_FLAG_FIRST_PIPE_INSTANCE: u32 = 0x0008_0000;
+const RELEASE_MANIFEST_NAME: &str = "release-manifest.json";
+const RELEASE_SIGNATURE_NAME: &str = "release-manifest.json.minisig";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -126,7 +128,11 @@ pub fn start_registered_sidecar(
 
         let pipe_name = random_pipe_name()?;
         let (pipe_handle, descriptor) = create_secure_pipe(&pipe_name)?;
+        // SAFETY: `descriptor` was allocated by the Windows security-descriptor API and is
+        // released exactly once after the pipe has copied the pointer into its attributes.
         unsafe { free_security_descriptor(descriptor) };
+        // SAFETY: `pipe_handle` is a valid, owned handle returned by CreateNamedPipeW and the
+        // File takes ownership so it closes the handle exactly once.
         let mut pipe = unsafe { std::fs::File::from_raw_handle(pipe_handle as _) };
         run_registered_task()?;
         let nonce = session_nonce()?;
@@ -146,7 +152,10 @@ pub fn start_registered_sidecar(
             "session_nonce": nonce,
             "type": "hello"
         });
+        // SAFETY: `pipe_handle` is the valid synchronous server handle created above and a null
+        // overlapped pointer requests the documented blocking connection mode.
         let connected = unsafe { connect_named_pipe(pipe_handle, std::ptr::null_mut()) } != 0;
+        // SAFETY: GetLastError is read immediately after the failed ConnectNamedPipe call.
         if !connected && unsafe { last_error() } != ERROR_PIPE_CONNECTED {
             return Err(io::Error::last_os_error());
         }
@@ -203,17 +212,17 @@ pub fn run_elevated_launcher() -> io::Result<()> {
                 "sidecar is outside the installed directory",
             ));
         }
+        let signed_sha256 = verify_signed_sidecar(&install_dir, &payload.sidecar_path)?;
         let _validated = validate_launch_request(
             request_line.as_bytes(),
             nonce,
             None,
             &payload.sidecar_path,
-            &payload.sidecar_sha256,
+            &signed_sha256,
         )
         .map_err(|error| io::Error::new(io::ErrorKind::PermissionDenied, error))?;
         ensure_pawnio_service_running()?;
-        let mut child =
-            super::supervisor::spawn_verified(&payload.sidecar_path, &payload.sidecar_sha256)?;
+        let mut child = super::supervisor::spawn_verified(&payload.sidecar_path, &signed_sha256)?;
         let mut control_tail = Vec::new();
         let _ = reader.read_to_end(&mut control_tail);
         let _ = child.kill();
@@ -228,36 +237,92 @@ pub fn run_elevated_launcher() -> io::Result<()> {
 }
 
 #[cfg(windows)]
-fn ensure_pawnio_service_running() -> io::Result<()> {
-    let service = r"C:\Windows\System32\sc.exe";
-    let query = Command::new(service).args(["query", "PawnIO"]).output()?;
-    if !query.status.success() {
-        return Ok(());
-    }
-    let state = String::from_utf8_lossy(&query.stdout);
-    if state.contains("RUNNING") {
-        return Ok(());
-    }
-    let start = Command::new(service).args(["start", "PawnIO"]).status()?;
-    if !start.success() {
+fn verify_signed_sidecar(install_dir: &Path, sidecar_path: &Path) -> io::Result<String> {
+    let relative = sidecar_path.strip_prefix(install_dir).map_err(|_| {
+        io::Error::new(io::ErrorKind::PermissionDenied, "sidecar is outside the install directory")
+    })?;
+    if relative.components().any(|component| !matches!(component, std::path::Component::Normal(_)))
+    {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
-            "PawnIO service could not start",
+            "sidecar manifest path is not a plain relative path",
         ));
     }
-    for _ in 0..20 {
-        let query = Command::new(service).args(["query", "PawnIO"]).output()?;
-        if String::from_utf8_lossy(&query.stdout).contains("RUNNING") {
-            return Ok(());
+    let public_key = crate::release_manifest::trusted_public_key().ok_or_else(|| {
+        io::Error::new(io::ErrorKind::PermissionDenied, "no release manifest key is trusted")
+    })?;
+    let manifest_bytes = std::fs::read(install_dir.join(RELEASE_MANIFEST_NAME))?;
+    let signature = std::fs::read_to_string(install_dir.join(RELEASE_SIGNATURE_NAME))?;
+    let manifest =
+        crate::release_manifest::ReleaseManifest::verify(&manifest_bytes, &signature, public_key)
+            .map_err(|error| io::Error::new(io::ErrorKind::PermissionDenied, error.to_string()))?;
+    manifest
+        .check_file(install_dir, relative)
+        .map_err(|error| io::Error::new(io::ErrorKind::PermissionDenied, error.to_string()))?;
+    manifest.sha256_for(relative).map(str::to_owned).ok_or_else(|| {
+        io::Error::new(io::ErrorKind::PermissionDenied, "sidecar is not listed in release manifest")
+    })
+}
+
+#[cfg(windows)]
+trait PawnIoServiceController {
+    fn query_running(&self) -> io::Result<Option<bool>>;
+    fn start(&self) -> io::Result<()>;
+}
+
+#[cfg(windows)]
+struct WindowsPawnIoServiceController;
+
+#[cfg(windows)]
+impl PawnIoServiceController for WindowsPawnIoServiceController {
+    fn query_running(&self) -> io::Result<Option<bool>> {
+        let query =
+            Command::new(r"C:\Windows\System32\sc.exe").args(["query", "PawnIO"]).output()?;
+        if !query.status.success() {
+            return Ok(None);
         }
-        std::thread::sleep(Duration::from_millis(250));
+        Ok(Some(String::from_utf8_lossy(&query.stdout).contains("RUNNING")))
     }
-    Err(io::Error::new(io::ErrorKind::TimedOut, "PawnIO service did not become running"))
+
+    fn start(&self) -> io::Result<()> {
+        let status =
+            Command::new(r"C:\Windows\System32\sc.exe").args(["start", "PawnIO"]).status()?;
+        if status.success() {
+            Ok(())
+        } else {
+            Err(io::Error::new(io::ErrorKind::PermissionDenied, "PawnIO service could not start"))
+        }
+    }
+}
+
+#[cfg(windows)]
+fn ensure_pawnio_service_running() -> io::Result<()> {
+    ensure_pawnio_service_running_with(&WindowsPawnIoServiceController)
+}
+
+#[cfg(windows)]
+fn ensure_pawnio_service_running_with<C: PawnIoServiceController>(
+    controller: &C,
+) -> io::Result<()> {
+    match controller.query_running()? {
+        None | Some(true) => Ok(()),
+        Some(false) => {
+            controller.start()?;
+            for _ in 0..20 {
+                if controller.query_running()? == Some(true) {
+                    return Ok(());
+                }
+                std::thread::sleep(Duration::from_millis(250));
+            }
+            Err(io::Error::new(io::ErrorKind::TimedOut, "PawnIO service did not become running"))
+        }
+    }
 }
 
 #[cfg(windows)]
 fn session_nonce() -> io::Result<String> {
     let mut bytes = [0_u8; 16];
+    // SAFETY: the buffer is valid for `bytes.len()` writable bytes and the API only fills it.
     if unsafe { system_function_036(bytes.as_mut_ptr(), bytes.len() as u32) } == 0 {
         return Err(io::Error::other("could not generate session nonce"));
     }
@@ -278,6 +343,8 @@ fn create_secure_pipe(
     let sddl: Vec<u16> =
         std::ffi::OsStr::new("D:P(A;;GA;;;OW)(A;;GA;;;SY)").encode_wide().chain([0]).collect();
     let mut descriptor = std::ptr::null_mut();
+    // SAFETY: `sddl` is a valid nul-terminated UTF-16 string and the output pointer is valid for
+    // the API to initialize; the returned descriptor is freed on every path below.
     let converted = unsafe {
         convert_string_security_descriptor(sddl.as_ptr(), 1, &mut descriptor, std::ptr::null_mut())
     };
@@ -290,6 +357,8 @@ fn create_secure_pipe(
         descriptor,
         inherit: 0,
     };
+    // SAFETY: all pointers reference live, nul-terminated data or initialized security attributes
+    // for the duration of the synchronous CreateNamedPipeW call.
     let handle = unsafe {
         create_named_pipe(
             name.as_ptr(),
@@ -303,6 +372,8 @@ fn create_secure_pipe(
         )
     };
     if handle == INVALID_HANDLE_VALUE {
+        // SAFETY: the descriptor was allocated by the matching conversion API and the pipe was
+        // not created, so this path owns the only allocation.
         unsafe { free_security_descriptor(descriptor) };
         return Err(io::Error::last_os_error());
     }
@@ -312,6 +383,7 @@ fn create_secure_pipe(
 #[cfg(windows)]
 fn random_pipe_name() -> io::Result<String> {
     let mut bytes = [0_u8; 16];
+    // SAFETY: the buffer is valid for `bytes.len()` writable bytes and the API only fills it.
     if unsafe { system_function_036(bytes.as_mut_ptr(), bytes.len() as u32) } == 0 {
         return Err(io::Error::other("could not generate pipe name"));
     }
@@ -351,6 +423,8 @@ struct SecurityAttributes {
 
 #[cfg(windows)]
 #[link(name = "kernel32")]
+// SAFETY: these declarations mirror the stable Windows ABI; each call site documents pointer
+// validity and ownership for the individual operation.
 unsafe extern "system" {
     #[link_name = "CreateNamedPipeW"]
     fn create_named_pipe(
@@ -373,6 +447,8 @@ unsafe extern "system" {
 
 #[cfg(windows)]
 #[link(name = "advapi32")]
+// SAFETY: these declarations mirror the stable Windows ABI; each call site documents pointer
+// validity and ownership for the individual operation.
 unsafe extern "system" {
     #[link_name = "ConvertStringSecurityDescriptorToSecurityDescriptorW"]
     fn convert_string_security_descriptor(
@@ -466,9 +542,42 @@ mod tests {
             Ok(value) => value,
             Err(error) => panic!("first pipe: {error}"),
         };
+        // SAFETY: the descriptor belongs to this test and was allocated by the matching API.
         unsafe { super::free_security_descriptor(descriptor) };
         assert!(super::create_secure_pipe(&name).is_err());
         use std::os::windows::io::FromRawHandle;
+        // SAFETY: `first` is the valid handle returned by the test-created named pipe and is
+        // transferred into File for exactly-once cleanup.
         drop(unsafe { std::fs::File::from_raw_handle(first as _) });
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn starts_pawnio_after_a_stopped_service() {
+        use std::cell::{Cell, RefCell};
+        use std::collections::VecDeque;
+
+        struct FakeService {
+            states: RefCell<VecDeque<Option<bool>>>,
+            starts: Cell<usize>,
+        }
+
+        impl super::PawnIoServiceController for FakeService {
+            fn query_running(&self) -> std::io::Result<Option<bool>> {
+                Ok(self.states.borrow_mut().pop_front().unwrap_or(Some(true)))
+            }
+
+            fn start(&self) -> std::io::Result<()> {
+                self.starts.set(self.starts.get() + 1);
+                Ok(())
+            }
+        }
+
+        let fake = FakeService {
+            states: RefCell::new(VecDeque::from([Some(false), Some(true)])),
+            starts: Cell::new(0),
+        };
+        assert!(super::ensure_pawnio_service_running_with(&fake).is_ok());
+        assert_eq!(fake.starts.get(), 1);
     }
 }

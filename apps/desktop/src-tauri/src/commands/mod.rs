@@ -2,7 +2,7 @@
 
 use crate::access::{self, AccessRequest, AccessRequestResult};
 use crate::diagnostics::{AdvancedAccess, ConfidenceCeiling, CoverageSignals, CoverageTier};
-use crate::storage::AppState;
+use crate::storage::{AppState, OnboardingState, OnboardingStatus, WindowState};
 use crate::telemetry::snapshot::Freshness;
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
@@ -44,6 +44,48 @@ pub enum AdvancedAccessDto {
 pub struct CommandError {
     pub code: &'static str,
     pub message_key: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct OnboardingStateDto {
+    pub flow_version: i64,
+    pub last_slide: i64,
+    pub status: &'static str,
+    pub completed_at: Option<String>,
+    pub last_seen_notice_version: i64,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SetOnboardingStateRequest {
+    pub flow_version: i64,
+    pub last_slide: i64,
+    pub status: String,
+    pub completed_at: Option<String>,
+    pub last_seen_notice_version: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct WindowStateDto {
+    pub restored_x: i64,
+    pub restored_y: i64,
+    pub restored_width: i64,
+    pub restored_height: i64,
+    pub maximized: bool,
+    pub display_fingerprint: Option<String>,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SetWindowStateRequest {
+    pub restored_x: i64,
+    pub restored_y: i64,
+    pub restored_width: i64,
+    pub restored_height: i64,
+    pub maximized: bool,
+    pub display_fingerprint: Option<String>,
+    pub updated_at: String,
 }
 
 impl CommandError {
@@ -110,6 +152,64 @@ pub fn get_coverage(state: State<'_, AppState>) -> CoverageMatrixDto {
         .map(|storage| storage.advanced_access_enabled().unwrap_or(true))
         .unwrap_or(true);
     coverage_matrix(enabled)
+}
+
+#[tauri::command]
+pub fn get_onboarding_state(
+    state: State<'_, AppState>,
+) -> Result<OnboardingStateDto, CommandError> {
+    let guard = state.storage.lock().map_err(|_| CommandError::operation_failed())?;
+    let value = guard.onboarding_state().map_err(|_| CommandError::operation_failed())?;
+    Ok(onboarding_state_dto(value))
+}
+
+#[tauri::command]
+pub fn set_onboarding_state(
+    state: State<'_, AppState>,
+    request: SetOnboardingStateRequest,
+) -> Result<OnboardingStateDto, CommandError> {
+    let status = match request.status.as_str() {
+        "pending" => OnboardingStatus::Pending,
+        "completed" => OnboardingStatus::Completed,
+        "skipped" => OnboardingStatus::Skipped,
+        _ => return Err(CommandError::operation_failed()),
+    };
+    let value = OnboardingState {
+        flow_version: request.flow_version,
+        last_slide: request.last_slide,
+        status,
+        completed_at: request.completed_at,
+        last_seen_notice_version: request.last_seen_notice_version,
+    };
+    let guard = state.storage.lock().map_err(|_| CommandError::operation_failed())?;
+    guard.set_onboarding_state(value.clone()).map_err(|_| CommandError::operation_failed())?;
+    Ok(onboarding_state_dto(value))
+}
+
+#[tauri::command]
+pub fn get_window_state(state: State<'_, AppState>) -> Result<WindowStateDto, CommandError> {
+    let guard = state.storage.lock().map_err(|_| CommandError::operation_failed())?;
+    let value = guard.window_state().map_err(|_| CommandError::operation_failed())?;
+    Ok(window_state_dto(value))
+}
+
+#[tauri::command]
+pub fn set_window_state(
+    state: State<'_, AppState>,
+    request: SetWindowStateRequest,
+) -> Result<WindowStateDto, CommandError> {
+    let value = WindowState {
+        restored_x: request.restored_x,
+        restored_y: request.restored_y,
+        restored_width: request.restored_width,
+        restored_height: request.restored_height,
+        maximized: request.maximized,
+        display_fingerprint: request.display_fingerprint,
+        updated_at: request.updated_at,
+    };
+    let guard = state.storage.lock().map_err(|_| CommandError::operation_failed())?;
+    guard.set_window_state(value.clone()).map_err(|_| CommandError::operation_failed())?;
+    Ok(window_state_dto(value))
 }
 
 fn coverage_matrix(advanced_access_enabled: bool) -> CoverageMatrixDto {
@@ -279,6 +379,32 @@ fn access(value: AdvancedAccess) -> AdvancedAccessDto {
         AdvancedAccess::Installable => AdvancedAccessDto::Installable,
         AdvancedAccess::Denied => AdvancedAccessDto::Denied,
         AdvancedAccess::Error => AdvancedAccessDto::Error,
+    }
+}
+
+fn onboarding_state_dto(value: OnboardingState) -> OnboardingStateDto {
+    OnboardingStateDto {
+        flow_version: value.flow_version,
+        last_slide: value.last_slide,
+        status: match value.status {
+            OnboardingStatus::Pending => "pending",
+            OnboardingStatus::Completed => "completed",
+            OnboardingStatus::Skipped => "skipped",
+        },
+        completed_at: value.completed_at,
+        last_seen_notice_version: value.last_seen_notice_version,
+    }
+}
+
+fn window_state_dto(value: WindowState) -> WindowStateDto {
+    WindowStateDto {
+        restored_x: value.restored_x,
+        restored_y: value.restored_y,
+        restored_width: value.restored_width,
+        restored_height: value.restored_height,
+        maximized: value.maximized,
+        display_fingerprint: value.display_fingerprint,
+        updated_at: value.updated_at,
     }
 }
 

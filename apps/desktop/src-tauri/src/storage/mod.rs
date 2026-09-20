@@ -4,7 +4,79 @@ use rusqlite::{Connection, OptionalExtension, Result, params};
 use std::path::Path;
 use std::sync::Mutex;
 
-const SCHEMA_VERSION: i64 = 2;
+const SCHEMA_VERSION: i64 = 5;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OnboardingStatus {
+    Pending,
+    Completed,
+    Skipped,
+}
+
+impl OnboardingStatus {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Pending => "pending",
+            Self::Completed => "completed",
+            Self::Skipped => "skipped",
+        }
+    }
+
+    fn parse(value: &str) -> Option<Self> {
+        match value {
+            "pending" => Some(Self::Pending),
+            "completed" => Some(Self::Completed),
+            "skipped" => Some(Self::Skipped),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OnboardingState {
+    pub flow_version: i64,
+    pub last_slide: i64,
+    pub status: OnboardingStatus,
+    pub completed_at: Option<String>,
+    pub last_seen_notice_version: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WindowState {
+    pub restored_x: i64,
+    pub restored_y: i64,
+    pub restored_width: i64,
+    pub restored_height: i64,
+    pub maximized: bool,
+    pub display_fingerprint: Option<String>,
+    pub updated_at: String,
+}
+
+impl Default for WindowState {
+    fn default() -> Self {
+        Self {
+            restored_x: 0,
+            restored_y: 0,
+            restored_width: 1100,
+            restored_height: 760,
+            maximized: false,
+            display_fingerprint: None,
+            updated_at: "1970-01-01T00:00:00Z".to_owned(),
+        }
+    }
+}
+
+impl Default for OnboardingState {
+    fn default() -> Self {
+        Self {
+            flow_version: 1,
+            last_slide: 1,
+            status: OnboardingStatus::Pending,
+            completed_at: None,
+            last_seen_notice_version: 0,
+        }
+    }
+}
 
 pub struct Storage {
     connection: Connection,
@@ -87,6 +159,47 @@ impl Storage {
                  UPDATE schema_version SET version = 2 WHERE version = 1;",
             )?;
             version = 2;
+        }
+        if version == 2 {
+            self.connection.execute_batch(
+                "CREATE TABLE IF NOT EXISTS onboarding_state (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    flow_version INTEGER NOT NULL,
+                    last_slide INTEGER NOT NULL,
+                    status TEXT NOT NULL
+                 );
+                 INSERT OR IGNORE INTO onboarding_state (id, flow_version, last_slide, status)
+                     VALUES (1, 1, 1, 'pending');
+                 UPDATE schema_version SET version = 3 WHERE version = 2;",
+            )?;
+            version = 3;
+        }
+        if version == 3 {
+            self.connection.execute_batch(
+                "ALTER TABLE onboarding_state ADD COLUMN completed_at TEXT;
+                 ALTER TABLE onboarding_state ADD COLUMN last_seen_notice_version INTEGER NOT NULL DEFAULT 0;
+                 UPDATE schema_version SET version = 4 WHERE version = 3;",
+            )?;
+            version = 4;
+        }
+        if version == 4 {
+            self.connection.execute_batch(
+                "CREATE TABLE IF NOT EXISTS window_state (
+                    window_key TEXT PRIMARY KEY,
+                    restored_x INTEGER NOT NULL,
+                    restored_y INTEGER NOT NULL,
+                    restored_width INTEGER NOT NULL,
+                    restored_height INTEGER NOT NULL,
+                    maximized INTEGER NOT NULL,
+                    display_fingerprint TEXT,
+                    updated_at TEXT NOT NULL
+                 );
+                 INSERT OR IGNORE INTO window_state
+                     (window_key, restored_x, restored_y, restored_width, restored_height, maximized, updated_at)
+                     VALUES ('main', 0, 0, 1100, 760, 0, '1970-01-01T00:00:00Z');
+                 UPDATE schema_version SET version = 5 WHERE version = 4;",
+            )?;
+            version = 5;
         }
         if version != SCHEMA_VERSION {
             return Err(rusqlite::Error::InvalidQuery);
@@ -174,6 +287,129 @@ impl Storage {
         Ok(())
     }
 
+    pub fn onboarding_state(&self) -> Result<OnboardingState> {
+        let row = self.connection.query_row(
+            "SELECT flow_version, last_slide, status, completed_at, last_seen_notice_version
+             FROM onboarding_state WHERE id = 1",
+            [],
+            |row| {
+                let flow_version: i64 = row.get(0)?;
+                let last_slide: i64 = row.get(1)?;
+                let status: String = row.get(2)?;
+                let completed_at: Option<String> = row.get(3)?;
+                let last_seen_notice_version: i64 = row.get(4)?;
+                Ok((flow_version, last_slide, status, completed_at, last_seen_notice_version))
+            },
+        )?;
+        let (flow_version, last_slide, status, completed_at, last_seen_notice_version) = row;
+        if flow_version < 1 || !(1..=5).contains(&last_slide) || last_seen_notice_version < 0 {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        let status = OnboardingStatus::parse(&status).ok_or(rusqlite::Error::InvalidQuery)?;
+        if matches!(status, OnboardingStatus::Pending) && completed_at.is_some() {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        if !matches!(status, OnboardingStatus::Pending) && completed_at.is_none() {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        Ok(OnboardingState {
+            flow_version,
+            last_slide,
+            status,
+            completed_at,
+            last_seen_notice_version,
+        })
+    }
+
+    pub fn set_onboarding_state(&self, state: OnboardingState) -> Result<()> {
+        if state.flow_version < 1 || !(1..=5).contains(&state.last_slide) {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        if state.last_seen_notice_version < 0 {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        if matches!(state.status, OnboardingStatus::Pending) && state.completed_at.is_some() {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        if !matches!(state.status, OnboardingStatus::Pending) && state.completed_at.is_none() {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        self.connection.execute(
+            "INSERT INTO onboarding_state
+                 (id, flow_version, last_slide, status, completed_at, last_seen_notice_version)
+             VALUES (1, ?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(id) DO UPDATE SET
+                 flow_version = excluded.flow_version,
+                 last_slide = excluded.last_slide,
+                 status = excluded.status,
+                 completed_at = excluded.completed_at,
+                 last_seen_notice_version = excluded.last_seen_notice_version",
+            params![
+                state.flow_version,
+                state.last_slide,
+                state.status.as_str(),
+                state.completed_at,
+                state.last_seen_notice_version
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn window_state(&self) -> Result<WindowState> {
+        let row = self.connection.query_row(
+            "SELECT restored_x, restored_y, restored_width, restored_height, maximized,
+                    display_fingerprint, updated_at
+             FROM window_state WHERE window_key = 'main'",
+            [],
+            |row| {
+                Ok(WindowState {
+                    restored_x: row.get(0)?,
+                    restored_y: row.get(1)?,
+                    restored_width: row.get(2)?,
+                    restored_height: row.get(3)?,
+                    maximized: row.get::<_, i64>(4)? != 0,
+                    display_fingerprint: row.get(5)?,
+                    updated_at: row.get(6)?,
+                })
+            },
+        )?;
+        if row.restored_width < 480 || row.restored_height < 500 || row.updated_at.is_empty() {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        Ok(row)
+    }
+
+    pub fn set_window_state(&self, state: WindowState) -> Result<()> {
+        if state.restored_width < 480 || state.restored_height < 500 || state.updated_at.is_empty()
+        {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        self.connection.execute(
+            "INSERT INTO window_state
+                 (window_key, restored_x, restored_y, restored_width, restored_height, maximized,
+                  display_fingerprint, updated_at)
+             VALUES ('main', ?1, ?2, ?3, ?4, ?5, ?6, ?7)
+             ON CONFLICT(window_key) DO UPDATE SET
+                 restored_x = excluded.restored_x,
+                 restored_y = excluded.restored_y,
+                 restored_width = excluded.restored_width,
+                 restored_height = excluded.restored_height,
+                 maximized = excluded.maximized,
+                 display_fingerprint = excluded.display_fingerprint,
+                 updated_at = excluded.updated_at",
+            params![
+                state.restored_x,
+                state.restored_y,
+                state.restored_width,
+                state.restored_height,
+                if state.maximized { 1 } else { 0 },
+                state.display_fingerprint,
+                state.updated_at,
+            ],
+        )?;
+        Ok(())
+    }
+
     #[cfg(test)]
     fn foreign_keys_enabled(&self) -> Result<bool> {
         self.connection
@@ -189,9 +425,46 @@ mod tests {
     #[test]
     fn migrates_schema_and_enables_foreign_keys() -> rusqlite::Result<()> {
         let storage = Storage::in_memory()?;
-        assert_eq!(storage.schema_version()?, 2);
+        assert_eq!(storage.schema_version()?, 5);
         assert!(storage.foreign_keys_enabled()?);
         assert!(storage.advanced_access_enabled()?);
+        assert_eq!(storage.onboarding_state()?, super::OnboardingState::default());
+        Ok(())
+    }
+
+    #[test]
+    fn persists_onboarding_progress_and_status() -> rusqlite::Result<()> {
+        let storage = Storage::in_memory()?;
+        let state = super::OnboardingState {
+            flow_version: 2,
+            last_slide: 4,
+            status: super::OnboardingStatus::Skipped,
+            completed_at: Some("2026-09-19T12:00:00Z".to_owned()),
+            last_seen_notice_version: 3,
+        };
+        storage.set_onboarding_state(state.clone())?;
+        assert_eq!(storage.onboarding_state()?, state);
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_invalid_onboarding_progress_and_corrupt_status() -> rusqlite::Result<()> {
+        let storage = Storage::in_memory()?;
+        assert!(
+            storage
+                .set_onboarding_state(super::OnboardingState {
+                    flow_version: 1,
+                    last_slide: 6,
+                    status: super::OnboardingStatus::Pending,
+                    completed_at: None,
+                    last_seen_notice_version: 0,
+                })
+                .is_err()
+        );
+        storage
+            .connection
+            .execute("UPDATE onboarding_state SET status = 'corrupt' WHERE id = 1", [])?;
+        assert!(storage.onboarding_state().is_err());
         Ok(())
     }
 
@@ -202,6 +475,27 @@ mod tests {
         assert!(!storage.advanced_access_enabled()?);
         storage.set_advanced_access_enabled(true)?;
         assert!(storage.advanced_access_enabled()?);
+        Ok(())
+    }
+
+    #[test]
+    fn persists_and_validates_window_state() -> rusqlite::Result<()> {
+        let storage = Storage::in_memory()?;
+        assert_eq!(storage.window_state()?, super::WindowState::default());
+        let state = super::WindowState {
+            restored_x: 100,
+            restored_y: 120,
+            restored_width: 840,
+            restored_height: 600,
+            maximized: true,
+            display_fingerprint: Some("display-a".to_owned()),
+            updated_at: "2026-09-19T18:00:00Z".to_owned(),
+        };
+        storage.set_window_state(state.clone())?;
+        assert_eq!(storage.window_state()?, state);
+        assert!(
+            storage.set_window_state(super::WindowState { restored_width: 479, ..state }).is_err()
+        );
         Ok(())
     }
 

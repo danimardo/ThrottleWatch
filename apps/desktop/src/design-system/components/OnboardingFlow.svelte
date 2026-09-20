@@ -84,6 +84,8 @@
     onSkip?: () => void;
     skipLabel?: string;
     onFinish: () => void;
+    /** Notifies the host after navigation; the host owns persistence and detection. */
+    onStepChange?: (step: number) => void;
     /** aria-label for the progress dots, e.g. `(step, count) => `Paso ${step} de ${count}``. Falls back to plain digits. */
     progressLabel?: (step: number, count: number) => string;
   }
@@ -98,6 +100,7 @@
     onSkip,
     skipLabel,
     onFinish,
+    onStepChange,
     progressLabel
   }: Props = $props();
 
@@ -115,13 +118,17 @@
   let detection = $derived(isLastStep ? (currentContent as OnboardingDetectionContent) : null);
 
   function goBack() {
-    if (currentStep > 0) currentStep -= 1;
+    if (currentStep > 0) {
+      currentStep -= 1;
+      onStepChange?.(currentStep);
+    }
   }
   function goNext() {
     if (isLastStep) {
       onFinish();
     } else {
       currentStep += 1;
+      onStepChange?.(currentStep);
     }
   }
 </script>

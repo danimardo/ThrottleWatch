@@ -9,6 +9,7 @@ pnpm-debug.log*
 # Rust (apps/desktop/src-tauri, once the app exists)
 # Cargo.lock is intentionally tracked for a binary crate (reproducible builds).
 target/
+mutants.out/
 .tools/
 
 # .NET (apps/sensor-agent, once the app exists)

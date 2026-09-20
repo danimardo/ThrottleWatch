@@ -218,4 +218,44 @@ mod tests {
         );
         Ok(())
     }
+
+    #[test]
+    fn outward_rounding_properties_hold_for_a_matrix_of_valid_inputs() -> serde_json::Result<()> {
+        let rules = Ruleset::v1()?;
+        let low_factor = rules.parameter("potential.range_low_factor").unwrap_or(0.5);
+        for package_power_w in [35.0, 70.0, 105.0] {
+            for power_limit_w in [package_power_w, package_power_w * 1.1, package_power_w * 1.8] {
+                for active_clock_mhz in [2_000.0, 3_000.0, 3_500.0, 4_000.0] {
+                    let input = PowerHeadroomInput {
+                        package_power_w,
+                        power_limit_w,
+                        active_clock_mhz,
+                        base_clock_mhz: active_clock_mhz * 0.8,
+                        turbo_clock_mhz: active_clock_mhz * 1.25,
+                    };
+                    let result = power_headroom(
+                        input,
+                        Classification::ThermalConfirmed,
+                        CoverageTier::A,
+                        false,
+                        &rules,
+                    );
+                    let PotentialResult::Quantified(band) = result else {
+                        panic!("valid level-A input must produce a quantified band");
+                    };
+                    let power_gain = (power_limit_w / package_power_w).cbrt() - 1.0;
+                    let turbo_cap = input.turbo_clock_mhz / active_clock_mhz - 1.0;
+                    let gain = power_gain.max(0.0).min(turbo_cap.max(0.0));
+                    let raw_low = (gain * 100.0 * low_factor).clamp(0.0, 100.0);
+                    let raw_high = (gain * 100.0).clamp(0.0, 100.0);
+                    assert!(f64::from(band.lower_percent) <= raw_low + f64::EPSILON);
+                    assert!(f64::from(band.upper_percent) + f64::EPSILON >= raw_high);
+                    assert_eq!(band.lower_percent % 5, 0);
+                    assert_eq!(band.upper_percent % 5, 0);
+                    assert!(band.lower_percent <= band.upper_percent);
+                }
+            }
+        }
+        Ok(())
+    }
 }

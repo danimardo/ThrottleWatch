@@ -689,6 +689,7 @@ fixed 5-slide shape — normally you want `OnboardingFlow` itself.
 | `onSkip` | `() => void` | no | omit to hide "Omitir" everywhere; shown on slides 1–4 only (slide 5 has nothing left to skip) |
 | `skipLabel` | `string` | no | required in practice if `onSkip` is set |
 | `onFinish` | `() => void` | yes | fires when the primary button is pressed on slide 5 |
+| `onStepChange` | `(step: number) => void` | no | host callback after moving between slides; receives a 0-based index |
 | `progressLabel` | `(step: number, count: number) => string` | no | `step`/`count` are 1-based here (for display); falls back to plain digits |
 
 `DetectionContent` (slide 5's `steps[4]`, extends the plain `{ title, body }` shape):

@@ -55,6 +55,23 @@ manifest.check_file(&install_dir, Path::new("SensorAgent.exe"))?;               
 - TOCTOU: comprobar el hash y arrancar son dos pasos; el arranque debe partir del fichero ya
   verificado (manejador abierto o copia en un directorio protegido), no de la ruta.
 
+## Procedimiento manual de servicio detenido (T154)
+
+La prueba integrada usa un doble del controlador de servicios porque en el Ryzen 5 2600X
+`sc.exe stop PawnIO` devuelve 1052 (el controlador no admite parada en caliente). Para repetir la
+comprobación completa en un equipo donde el servicio pueda quedar detenido:
+
+1. Reiniciar el equipo y abrir una terminal normal, no elevada; comprobar `whoami /groups` y
+   `sc.exe query PawnIO` antes de iniciar ThrottleWatch.
+2. Confirmar que el estado inicial es `STOPPED` y ejecutar el bootstrap de una sola UAC. El
+   lanzador debe invocar `sc.exe start PawnIO`, esperar a `RUNNING` y solo entonces iniciar el
+   sidecar.
+3. Cerrar la sesión IPC y comprobar que el sidecar termina por EOF/latido; volver a consultar
+   `sc.exe query PawnIO` y conservar la salida junto al informe de la prueba.
+
+No se fuerza la parada ni se desinstala PawnIO en una máquina cuyo controlador no admita esa
+operación; el doble de servicio cubre la secuencia determinista en pruebas.
+
 ## Qué **no** hace
 
 - No firma releases: eso es CI protegida con la clave del actualizador (Tauri signer). Esta clave de

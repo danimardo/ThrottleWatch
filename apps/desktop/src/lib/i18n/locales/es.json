@@ -67,5 +67,39 @@
   "screens": {
     "notAvailable": "Esta vista estará disponible cuando el colector y el historial estén listos.",
     "comingSoon": "Vista en preparación"
+  },
+  "onboarding": {
+    "ariaLabel": "Introducción inicial",
+    "slide1": { "title": "Entiende tu CPU", "body": "ThrottleWatch observa calor, potencia y rendimiento sin modificar tu equipo." },
+    "slide2": { "title": "Qué observa", "body": "Temperatura, carga, frecuencia activa y potencia de paquete, con aclaraciones breves de los términos técnicos." },
+    "slide3": { "title": "Qué puede concluir", "body": "Distingue temperatura alta, límites térmicos, límites de potencia y datos insuficientes." },
+    "slide4": { "title": "Privacidad y decisiones", "body": "Todo funciona localmente. Tú controlas idioma, tema, segundo plano y notificaciones." },
+    "slide5": { "title": "Este equipo", "body": "La detección pasiva comienza aquí y muestra qué puede explicar este equipo con fiabilidad." },
+    "detecting": "Comprobando este equipo…",
+    "coverage": {
+      "completeTitle": "Cobertura completa",
+      "completeDescription": "Las señales disponibles permiten el recorrido completo del diagnóstico.",
+      "partialTitle": "Cobertura parcial",
+      "partialDescription": "La aplicación sigue siendo utilizable y explicará qué conclusiones necesitan más señales."
+    },
+    "access": {
+      "installable": "El acceso avanzado puede mejorar la cobertura.",
+      "available": "El acceso avanzado está disponible.",
+      "denied": "El acceso avanzado no está disponible; la aplicación continuará con menor cobertura."
+    },
+    "back": "Atrás",
+    "next": "Siguiente",
+    "finish": "Abrir Ahora",
+    "skip": "Omitir",
+    "resumed": "Continuando donde lo dejaste",
+    "progress": "Paso {step} de {count}"
+  },
+  "notices": {
+    "title": "Novedades",
+    "dismiss": "Entendido",
+    "lowLevel": {
+      "title": "Cobertura de sensores más fiable",
+      "body": "Esta versión hace explícito el acceso avanzado y mantiene utilizable la interfaz principal cuando no está disponible."
+    }
   }
 }

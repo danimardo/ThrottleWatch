@@ -1,8 +1,10 @@
 import {
   coverageMatrixSchema,
   liveSnapshotSchema,
+  onboardingStateSchema,
   type CoverageMatrix,
-  type LiveSnapshot
+  type LiveSnapshot,
+  type OnboardingState
 } from '../lib/bridge/schemas';
 import type { BridgeTransport } from '../lib/bridge';
 import { z } from 'zod';
@@ -77,6 +79,19 @@ export function coverage(
         source_label: 'CPU package'
       }
     ],
+    ...overrides
+  });
+}
+
+export function onboardingState(
+  overrides: Partial<OnboardingState> = {}
+): OnboardingState {
+  return onboardingStateSchema.parse({
+    flow_version: 1,
+    last_slide: 1,
+    status: 'pending',
+    completed_at: null,
+    last_seen_notice_version: 0,
     ...overrides
   });
 }
@@ -161,13 +176,16 @@ export class FakeBridge implements BridgeTransport {
   private readonly listeners = new Map<string, Set<(value: unknown) => void>>();
   private snapshotValue: LiveSnapshot;
   private coverageValue: CoverageMatrix;
+  private onboardingStateValue: OnboardingState;
 
   public constructor(
     snapshotValue = liveSnapshot(),
-    coverageValue = coverage()
+    coverageValue = coverage(),
+    onboardingStateValue = onboardingState()
   ) {
     this.snapshotValue = snapshotValue;
     this.coverageValue = coverageValue;
+    this.onboardingStateValue = onboardingStateValue;
   }
 
   public getLiveSnapshot(): LiveSnapshot {
@@ -209,6 +227,13 @@ export class FakeBridge implements BridgeTransport {
         case 'recheck_coverage':
         case 'disable_advanced_access':
           return this.getCoverage();
+        case 'get_onboarding_state':
+          return onboardingState(this.onboardingStateValue);
+        case 'set_onboarding_state': {
+          const next = onboardingStateSchema.parse(args);
+          this.onboardingStateValue = next;
+          return onboardingState(next);
+        }
         case 'request_low_level_access': {
           const request = args?.request;
           if (

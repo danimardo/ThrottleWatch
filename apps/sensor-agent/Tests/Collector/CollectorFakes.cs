@@ -6,12 +6,31 @@ using ThrottleWatch.SensorAgent.Collector;
 
 namespace ThrottleWatch.SensorAgent.Tests.Collector;
 
-internal sealed class FakeSource(IHardware hardware) : IHardwareSource
+internal sealed class FakeSource(IHardware hardware, bool throwOnOpen = false) : IHardwareSource
 {
-    public void Open() { }
-    public void Close() { }
-    public IEnumerable<IHardware> CpuHardware() => [hardware];
-    public void Dispose() { }
+    public bool Closed { get; private set; }
+
+    public int EnumerationCount { get; private set; }
+
+    public void Open()
+    {
+        if (throwOnOpen)
+        {
+            throw new InvalidOperationException("simulated library failure while opening");
+        }
+    }
+
+    public void Close() => Closed = true;
+
+    public IEnumerable<IHardware> CpuHardware()
+    {
+        EnumerationCount++;
+        return [hardware];
+    }
+
+    public void Dispose()
+    {
+    }
 }
 
 internal sealed class CapturingLogger : ILogger

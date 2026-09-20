@@ -49,6 +49,14 @@ function argsSchemaFor(command: string): z.ZodType | undefined {
       return commandArgsSchemas.get_coverage;
     case 'recheck_coverage':
       return commandArgsSchemas.recheck_coverage;
+    case 'get_onboarding_state':
+      return commandArgsSchemas.get_onboarding_state;
+    case 'set_onboarding_state':
+      return commandArgsSchemas.set_onboarding_state;
+    case 'get_window_state':
+      return commandArgsSchemas.get_window_state;
+    case 'set_window_state':
+      return commandArgsSchemas.set_window_state;
     case 'request_low_level_access':
       return commandArgsSchemas.request_low_level_access;
     case 'disable_advanced_access':
