@@ -1,0 +1,4 @@
+# Bytes that are signed or hashed are compared byte for byte, so git must not normalize their line
+# endings: actions/checkout on Windows turns LF into CRLF and the minisign signature stops verifying.
+apps/desktop/src-tauri/tests/fixtures/release-manifest/* -text
+apps/desktop/src-tauri/keys/*.pub -text
