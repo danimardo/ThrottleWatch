@@ -1,6 +1,7 @@
 # Node / pnpm / npm
 node_modules/
 dist/
+dist-e2e/
 .vite/
 *.tsbuildinfo
 npm-debug.log*

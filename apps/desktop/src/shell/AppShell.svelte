@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import {
     BottomBar,
+    Button,
+    CloseBlockedDialog,
     EmptyState,
     NavigationItem,
     NavIcon,
@@ -14,6 +16,9 @@
     type OnboardingStepContent
   } from '../design-system/components';
   import Dashboard from '../features/dashboard/Dashboard.svelte';
+  import GuidedDiagnostic from '../features/guided/GuidedDiagnostic.svelte';
+  import Analysis from '../features/analysis/Analysis.svelte';
+  import CpuOverview from '../features/cpu/CpuOverview.svelte';
   import {
     commandResponseSchemas,
     type CoverageMatrix,
@@ -40,6 +45,10 @@
     applyAppearance,
     listenToSystemAppearance
   } from '../features/appearance/appearance';
+  import {
+    stopGuidedSession,
+    subscribeGuidedSession
+  } from '../features/guided/session';
 
   type Destination = {
     id: 'now' | 'analysis' | 'cpu' | 'sessions' | 'guided' | 'settings';
@@ -68,6 +77,8 @@
   let detectionStatus =
     $state<OnboardingDetectionContent['status']>('detecting');
   let coverage = $state<CoverageMatrix | null>(null);
+  let guidedRunning = $state(false);
+  let closeBlockedOpen = $state(false);
   let detectionStarted = false;
   const compactDestinations = destinations.slice(0, 3);
   const overflowDestinations = destinations.slice(3);
@@ -88,6 +99,18 @@
       .watchGeometryChanges(() => void windowAdapter.persistGeometry())
       .then((stop) => (stopGeometryListener = stop));
     applyAppearance('system', 'system', locale);
+    const stopGuidedSessionListener = subscribeGuidedSession((phase) => {
+      guidedRunning =
+        phase !== null &&
+        [
+          'ready',
+          'rest',
+          'warming',
+          'steady_load',
+          'recovery',
+          'cancelling'
+        ].includes(phase.phase);
+    });
     const stopAppearanceListener = listenToSystemAppearance('system', () => {
       applyAppearance('system', 'system', locale);
     });
@@ -100,11 +123,20 @@
     return () => {
       stopAppearanceListener();
       stopGeometryListener();
+      stopGuidedSessionListener();
     };
   });
 
   function select(id: Destination['id']): void {
     active = id;
+  }
+
+  function closeWindow(): void {
+    void windowAdapter.persistGeometry().then(() => windowAdapter.close());
+  }
+
+  async function stopGuidedAndClose(): Promise<void> {
+    if (await stopGuidedSession()) closeWindow();
   }
 
   function onboardingSteps(): [
@@ -221,8 +253,10 @@
       maximized = !maximized;
       void windowAdapter.toggleMaximize();
     }}
-    onClose={() =>
-      void windowAdapter.persistGeometry().then(() => windowAdapter.close())}
+    onClose={() => {
+      if (guidedRunning) closeBlockedOpen = true;
+      else closeWindow();
+    }}
     minimizeLabel={t('app.minimize')}
     maximizeLabel={t('app.maximize')}
     restoreLabel={t('app.restore')}
@@ -293,25 +327,53 @@
           />
         {/if}
         <Dashboard />
+      {:else if active === 'guided'}
+        <main aria-label="Diagnóstico guiado">
+          <GuidedDiagnostic />
+        </main>
+      {:else if active === 'analysis'}
+        <main aria-label="Análisis">
+          <Analysis />
+        </main>
+      {:else if active === 'cpu'}
+        <main aria-label="CPU">
+          <CpuOverview />
+        </main>
       {:else}
         <EmptyState
-          icon={active === 'analysis'
-            ? analysisIcon
-            : active === 'cpu'
-              ? cpuIcon
-              : active === 'sessions'
-                ? sessionsIcon
-                : active === 'guided'
-                  ? guidedIcon
-                  : active === 'settings'
-                    ? settingsIcon
-                    : nowIcon}
+          icon={active === 'sessions'
+            ? sessionsIcon
+            : active === 'settings'
+              ? settingsIcon
+              : nowIcon}
           title={t('screens.comingSoon')}
           description={t('screens.notAvailable')}
         />
       {/if}
     </div>
   </div>
+
+  {#if guidedRunning && active !== 'guided'}
+    <div class="guided-session-banner" role="status">
+      <span>Diagnóstico guiado en curso</span>
+      <Button
+        variant="secondary"
+        label="Detener ahora"
+        onclick={() => void stopGuidedSession()}
+      />
+    </div>
+  {/if}
+
+  <CloseBlockedDialog
+    bind:open={closeBlockedOpen}
+    reason="guided"
+    title="Diagnóstico guiado en curso"
+    description="La prueba debe detenerse antes de cerrar la ventana."
+    confirmLabel="Detener y salir"
+    cancelLabel="Cancelar"
+    onConfirm={() => void stopGuidedAndClose()}
+    onCancel={() => (closeBlockedOpen = false)}
+  />
 
   {#if win.tier === 'compact'}
     <BottomBar
@@ -371,6 +433,23 @@
     min-height: 0;
     flex: 1;
     display: flex;
+  }
+  .guided-session-banner {
+    position: fixed;
+    left: var(--space-4);
+    right: var(--space-4);
+    bottom: var(--space-4);
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    color: var(--text-primary);
+    background: var(--surface-raised);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
   }
   .sidebar {
     width: 196px;

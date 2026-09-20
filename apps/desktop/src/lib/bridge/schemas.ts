@@ -265,6 +265,91 @@ export const liveSnapshotSchema = telemetrySnapshotSchema.extend({
     .optional()
 });
 
+export const guidedPreflightSchema = z.object({
+  sensors: z.boolean(),
+  ac_power: z.boolean(),
+  profile: z.boolean(),
+  disk_space: z.boolean(),
+  generator: z.boolean(),
+  require_ac: z.boolean()
+});
+
+export const guidedPhaseSchema = z.object({
+  phase: z.enum([
+    'preflight',
+    'ready',
+    'rest',
+    'warming',
+    'steady_load',
+    'recovery',
+    'cancelling',
+    'cancelled',
+    'safety_stop',
+    'sensor_lost',
+    'error',
+    'result'
+  ]),
+  elapsed_ms: z.number().int().nonnegative(),
+  remaining_ms: z.number().int().nonnegative().nullable(),
+  reason_key: z.string().nullable(),
+  temperature_c: z.number().nullable(),
+  thermal_limit_c: z.number().nullable(),
+  active_clock_mhz: z.number().nonnegative().nullable(),
+  base_clock_mhz: z.number().nonnegative().nullable(),
+  throughput_ops_s: z.number().nonnegative().nullable(),
+  progress_percent: z.number().min(0).max(100).nullable()
+});
+
+export const guidedFinishedEventSchema = z.object({
+  session_id: z.string().min(1)
+});
+
+const analysisPointSchema = z.object({
+  start_ms: z.number().int().nonnegative(),
+  end_ms: z.number().int().nonnegative(),
+  first: z.number().nullable(),
+  last: z.number().nullable(),
+  min: z.number().nullable(),
+  max: z.number().nullable(),
+  average: z.number().nullable(),
+  quality: z.enum(['complete', 'reduced', 'missing']),
+  gap: z.boolean()
+});
+
+export const analysisWindowSchema = z.object({
+  session_id: z.string().min(1),
+  start_ms: z.number().int().nonnegative(),
+  end_ms: z.number().int().nonnegative(),
+  is_aggregated: z.boolean(),
+  tracks: z.array(
+    z.object({ kind: z.string().min(1), points: z.array(analysisPointSchema) })
+  ),
+  events: z.array(
+    z.object({
+      id: z.string().min(1),
+      kind: z.string().min(1),
+      start_ms: z.number().int().nonnegative(),
+      end_ms: z.number().int().nonnegative(),
+      label: z.string().min(1),
+      informational: z.boolean()
+    })
+  )
+});
+
+export const cpuTopologySchema = z.object({
+  cores: z.array(
+    z.object({
+      id: z.string().min(1),
+      index: z.number().int().nonnegative(),
+      group: z.enum(['p', 'e', 'lp', 'ungrouped']),
+      temperature_c: z.number().nullable(),
+      clock_mhz: z.number().nonnegative().nullable(),
+      load_percent: z.number().min(0).max(100).nullable(),
+      throttling: z.boolean().nullable()
+    })
+  )
+});
+
 export const collectorStateEventSchema = z.object({
   state: z.enum([
     'starting',
@@ -297,7 +382,12 @@ export const commandResponseSchemas = {
     action: z.enum(['install', 'upgrade', 'repair']),
     reboot_may_be_required: z.boolean()
   }),
-  disable_advanced_access: coverageMatrixSchema
+  disable_advanced_access: coverageMatrixSchema,
+  get_guided_preflight: guidedPreflightSchema,
+  start_guided: guidedPhaseSchema,
+  stop_guided: guidedPhaseSchema,
+  get_analysis_window: analysisWindowSchema,
+  get_cpu_topology: cpuTopologySchema
 } as const;
 
 const noCommandArgs = z.undefined();
@@ -317,14 +407,34 @@ export const commandArgsSchemas = {
         .strict()
     })
     .strict(),
-  disable_advanced_access: noCommandArgs
+  disable_advanced_access: noCommandArgs,
+  get_guided_preflight: noCommandArgs,
+  start_guided: z
+    .object({
+      profile: z.enum(['short', 'standard', 'long']),
+      skip_rest: z.boolean(),
+      require_ac: z.boolean()
+    })
+    .strict(),
+  stop_guided: noCommandArgs,
+  get_analysis_window: z
+    .object({
+      session_id: z.string().min(1),
+      start_ms: z.number().int().nonnegative(),
+      end_ms: z.number().int().nonnegative(),
+      target_points_per_track: z.number().int().min(1).max(3000)
+    })
+    .strict(),
+  get_cpu_topology: noCommandArgs
 } as const;
 
 export const eventSchemas = {
   'telemetry:snapshot': liveSnapshotSchema,
   'collector:state': collectorStateEventSchema,
   'coverage:changed': coverageMatrixSchema,
-  'power:context': powerContextEventSchema
+  'power:context': powerContextEventSchema,
+  'guided:phase': guidedPhaseSchema,
+  'guided:finished': guidedFinishedEventSchema
 } as const;
 
 export type TelemetrySnapshot = z.infer<typeof telemetrySnapshotSchema>;
@@ -338,6 +448,11 @@ export type PowerContextEvent = z.infer<typeof powerContextEventSchema>;
 export type AccessRequestResult = z.infer<
   typeof commandResponseSchemas.request_low_level_access
 >;
+export type GuidedPreflight = z.infer<typeof guidedPreflightSchema>;
+export type CpuTopology = z.infer<typeof cpuTopologySchema>;
+export type GuidedFinishedEvent = z.infer<typeof guidedFinishedEventSchema>;
+export type GuidedPhase = z.infer<typeof guidedPhaseSchema>;
+export type AnalysisWindow = z.infer<typeof analysisWindowSchema>;
 
 export function parseIpcEnvelope(value: unknown): IpcEnvelope {
   return ipcEnvelopeSchema.parse(value);

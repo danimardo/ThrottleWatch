@@ -1,5 +1,6 @@
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
+pub mod analysis;
 pub mod classifier;
 pub mod events;
 pub mod guided;

@@ -3,6 +3,12 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { z } from 'zod';
 import { commandArgsSchemas, eventSchemas, parseIpcEnvelope } from './schemas';
 
+declare global {
+  interface Window {
+    __THROTTLEWATCH_FAKE_BRIDGE__?: BridgeTransport;
+  }
+}
+
 export interface BridgeTransport {
   invoke(command: string, args?: Record<string, unknown>): Promise<unknown>;
   listen(
@@ -33,6 +39,27 @@ function hasTauriRuntime(): boolean {
   return '__TAURI_INTERNALS__' in window;
 }
 
+/**
+ * The fake transport that Playwright injects exists only in the `e2e` build mode (and in Vitest).
+ * The build mode is a constant that Vite writes into the bundle, so in a release build the check
+ * is always false and a script running inside the WebView cannot replace the bridge and forge
+ * backend answers (the property name still appears in the bundle; it is never read).
+ */
+export function fakeBridgeAllowed(mode: string): boolean {
+  return mode === 'e2e' || mode === 'test';
+}
+
+function defaultTransport(): BridgeTransport | undefined {
+  if (
+    fakeBridgeAllowed(import.meta.env.MODE) &&
+    typeof window !== 'undefined' &&
+    window.__THROTTLEWATCH_FAKE_BRIDGE__
+  ) {
+    return window.__THROTTLEWATCH_FAKE_BRIDGE__;
+  }
+  return hasTauriRuntime() ? tauriTransport : undefined;
+}
+
 const tauriTransport: BridgeTransport = {
   invoke: (command, args) => invoke<unknown>(command, args),
   listen: (event, handler) =>
@@ -61,6 +88,16 @@ function argsSchemaFor(command: string): z.ZodType | undefined {
       return commandArgsSchemas.request_low_level_access;
     case 'disable_advanced_access':
       return commandArgsSchemas.disable_advanced_access;
+    case 'get_guided_preflight':
+      return commandArgsSchemas.get_guided_preflight;
+    case 'start_guided':
+      return commandArgsSchemas.start_guided;
+    case 'stop_guided':
+      return commandArgsSchemas.stop_guided;
+    case 'get_analysis_window':
+      return commandArgsSchemas.get_analysis_window;
+    case 'get_cpu_topology':
+      return commandArgsSchemas.get_cpu_topology;
     default:
       return undefined;
   }
@@ -109,9 +146,7 @@ export async function invokeValidated<T>(
   command: string,
   args: Record<string, unknown> | undefined,
   responseSchema: z.ZodType<T>,
-  transport: BridgeTransport | undefined = hasTauriRuntime()
-    ? tauriTransport
-    : undefined
+  transport: BridgeTransport | undefined = defaultTransport()
 ): Promise<BridgeResult<T>> {
   if (transport === undefined) {
     return { ok: false, error: TAURI_UNAVAILABLE_ERROR };
@@ -144,6 +179,10 @@ export function parseEvent(
   value: unknown
 ): BridgeResult<import('./schemas').PowerContextEvent>;
 export function parseEvent(
+  event: 'guided:phase',
+  value: unknown
+): BridgeResult<import('./schemas').GuidedPhase>;
+export function parseEvent(
   event: keyof typeof eventSchemas,
   value: unknown
 ): BridgeResult<unknown> {
@@ -157,9 +196,7 @@ export function parseEvent(
 export async function listenValidated(
   event: keyof typeof eventSchemas,
   handler: (value: unknown) => void,
-  transport: BridgeTransport | undefined = hasTauriRuntime()
-    ? tauriTransport
-    : undefined
+  transport: BridgeTransport | undefined = defaultTransport()
 ): Promise<UnlistenFn> {
   if (transport === undefined) {
     return () => undefined;

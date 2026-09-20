@@ -4,7 +4,7 @@ use rusqlite::{Connection, OptionalExtension, Result, params};
 use std::path::Path;
 use std::sync::Mutex;
 
-const SCHEMA_VERSION: i64 = 5;
+const SCHEMA_VERSION: i64 = 6;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OnboardingStatus {
@@ -50,6 +50,32 @@ pub struct WindowState {
     pub maximized: bool,
     pub display_fingerprint: Option<String>,
     pub updated_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GuidedCheckpoint {
+    pub session_id: String,
+    pub phase: String,
+    pub profile: String,
+    pub elapsed_ms: i64,
+    pub reason: Option<String>,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AnalysisSourcePoint {
+    pub sensor_id: String,
+    pub monotonic_ms: i64,
+    pub value: Option<f64>,
+    pub quality: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AnalysisSourceEvent {
+    pub id: String,
+    pub kind: String,
+    pub start_ms: i64,
+    pub end_ms: i64,
 }
 
 impl Default for WindowState {
@@ -200,6 +226,20 @@ impl Storage {
                  UPDATE schema_version SET version = 5 WHERE version = 4;",
             )?;
             version = 5;
+        }
+        if version == 5 {
+            self.connection.execute_batch(
+                "CREATE TABLE IF NOT EXISTS guided_checkpoint (
+                    session_id TEXT PRIMARY KEY,
+                    phase TEXT NOT NULL,
+                    profile TEXT NOT NULL,
+                    elapsed_ms INTEGER NOT NULL CHECK (elapsed_ms >= 0),
+                    reason TEXT,
+                    updated_at TEXT NOT NULL
+                 );
+                 UPDATE schema_version SET version = 6 WHERE version = 5;",
+            )?;
+            version = 6;
         }
         if version != SCHEMA_VERSION {
             return Err(rusqlite::Error::InvalidQuery);
@@ -410,6 +450,111 @@ impl Storage {
         Ok(())
     }
 
+    pub fn save_guided_checkpoint(&self, checkpoint: &GuidedCheckpoint) -> Result<()> {
+        if checkpoint.session_id.is_empty()
+            || checkpoint.phase.is_empty()
+            || checkpoint.profile.is_empty()
+            || checkpoint.elapsed_ms < 0
+            || checkpoint.updated_at.is_empty()
+        {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        self.connection.execute(
+            "INSERT INTO guided_checkpoint
+                 (session_id, phase, profile, elapsed_ms, reason, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(session_id) DO UPDATE SET
+                 phase = excluded.phase,
+                 profile = excluded.profile,
+                 elapsed_ms = excluded.elapsed_ms,
+                 reason = excluded.reason,
+                 updated_at = excluded.updated_at",
+            params![
+                checkpoint.session_id,
+                checkpoint.phase,
+                checkpoint.profile,
+                checkpoint.elapsed_ms,
+                checkpoint.reason,
+                checkpoint.updated_at
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn guided_checkpoint(&self, session_id: &str) -> Result<Option<GuidedCheckpoint>> {
+        self.connection
+            .query_row(
+                "SELECT session_id, phase, profile, elapsed_ms, reason, updated_at
+                 FROM guided_checkpoint WHERE session_id = ?1",
+                params![session_id],
+                |row| {
+                    Ok(GuidedCheckpoint {
+                        session_id: row.get(0)?,
+                        phase: row.get(1)?,
+                        profile: row.get(2)?,
+                        elapsed_ms: row.get(3)?,
+                        reason: row.get(4)?,
+                        updated_at: row.get(5)?,
+                    })
+                },
+            )
+            .optional()
+    }
+
+    pub fn analysis_points(
+        &self,
+        session_id: &str,
+        start_ms: i64,
+        end_ms: i64,
+    ) -> Result<Vec<AnalysisSourcePoint>> {
+        let mut statement = self.connection.prepare(
+            "SELECT value.sensor_id, frame.monotonic_ms, value.value_real, value.quality
+             FROM sample_value AS value
+             JOIN sample_frame AS frame
+               ON frame.session_id = value.session_id AND frame.sequence = value.sequence
+             WHERE value.session_id = ?1 AND frame.monotonic_ms BETWEEN ?2 AND ?3
+             ORDER BY frame.monotonic_ms, value.sensor_id",
+        )?;
+        let rows = statement.query_map(params![session_id, start_ms, end_ms], |row| {
+            Ok(AnalysisSourcePoint {
+                sensor_id: row.get(0)?,
+                monotonic_ms: row.get(1)?,
+                value: row.get(2)?,
+                quality: row.get(3)?,
+            })
+        })?;
+        rows.collect()
+    }
+
+    pub fn analysis_events(
+        &self,
+        session_id: &str,
+        start_ms: i64,
+        end_ms: i64,
+    ) -> Result<Vec<AnalysisSourceEvent>> {
+        let mut statement = self.connection.prepare(
+            "SELECT event.id, event.kind, start_frame.monotonic_ms, end_frame.monotonic_ms
+             FROM limit_event AS event
+             JOIN sample_frame AS start_frame
+               ON start_frame.session_id = event.session_id AND start_frame.sequence = event.start_sequence
+             JOIN sample_frame AS end_frame
+               ON end_frame.session_id = event.session_id AND end_frame.sequence = event.end_sequence
+             WHERE event.session_id = ?1
+               AND end_frame.monotonic_ms >= ?2
+               AND start_frame.monotonic_ms <= ?3
+             ORDER BY start_frame.monotonic_ms",
+        )?;
+        let rows = statement.query_map(params![session_id, start_ms, end_ms], |row| {
+            Ok(AnalysisSourceEvent {
+                id: row.get(0)?,
+                kind: row.get(1)?,
+                start_ms: row.get(2)?,
+                end_ms: row.get(3)?,
+            })
+        })?;
+        rows.collect()
+    }
+
     #[cfg(test)]
     fn foreign_keys_enabled(&self) -> Result<bool> {
         self.connection
@@ -425,7 +570,7 @@ mod tests {
     #[test]
     fn migrates_schema_and_enables_foreign_keys() -> rusqlite::Result<()> {
         let storage = Storage::in_memory()?;
-        assert_eq!(storage.schema_version()?, 5);
+        assert_eq!(storage.schema_version()?, 6);
         assert!(storage.foreign_keys_enabled()?);
         assert!(storage.advanced_access_enabled()?);
         assert_eq!(storage.onboarding_state()?, super::OnboardingState::default());
@@ -532,6 +677,47 @@ mod tests {
             assert_eq!(count, 0, "cascade failed for {table}");
         }
         assert!(!storage.session_exists("session-1")?);
+        Ok(())
+    }
+
+    #[test]
+    fn persists_partial_guided_state_for_resume_or_incomplete_report() -> rusqlite::Result<()> {
+        let storage = Storage::in_memory()?;
+        let checkpoint = super::GuidedCheckpoint {
+            session_id: "guided-1".to_owned(),
+            phase: "steady_load".to_owned(),
+            profile: "standard".to_owned(),
+            elapsed_ms: 12_345,
+            reason: None,
+            updated_at: "2026-09-20T10:00:00Z".to_owned(),
+        };
+        storage.save_guided_checkpoint(&checkpoint)?;
+        assert_eq!(storage.guided_checkpoint("guided-1")?, Some(checkpoint));
+        Ok(())
+    }
+
+    #[test]
+    fn reads_analysis_points_and_event_edges_from_sqlite() -> rusqlite::Result<()> {
+        let storage = Storage::in_memory()?;
+        storage.create_cpu("cpu-1", "unknown", "Test CPU")?;
+        storage.create_session("session-1", "cpu-1", "start")?;
+        storage.insert_frame("session-1", 1, 1000)?;
+        storage.insert_frame("session-1", 2, 2000)?;
+        storage.connection.execute(
+            "INSERT INTO sample_value (session_id, sequence, sensor_id, value_real, quality)
+             VALUES ('session-1', 1, 'temperature', 60.0, 'complete'),
+                    ('session-1', 2, 'temperature', 70.0, 'reduced')",
+            [],
+        )?;
+        storage.connection.execute(
+            "INSERT INTO limit_event (id, session_id, kind, start_sequence, end_sequence)
+             VALUES ('event-1', 'session-1', 'thermal', 1, 2)",
+            [],
+        )?;
+        assert_eq!(storage.analysis_points("session-1", 0, 3000)?.len(), 2);
+        let events = storage.analysis_events("session-1", 0, 3000)?;
+        assert_eq!(events[0].start_ms, 1000);
+        assert_eq!(events[0].end_ms, 2000);
         Ok(())
     }
 }

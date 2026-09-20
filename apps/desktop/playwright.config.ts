@@ -4,7 +4,7 @@ export default defineConfig({
   testDir: './e2e',
   webServer: {
     command:
-      'node ./node_modules/vite/bin/vite.js build && node ./node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 4173',
+      'node ./node_modules/vite/bin/vite.js build --mode e2e --outDir dist-e2e && node ./node_modules/vite/bin/vite.js preview --outDir dist-e2e --host 127.0.0.1 --port 4173',
     port: 4173,
     reuseExistingServer: true,
     env: { FORCE_COLOR: '0', NO_COLOR: '1' }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createBridge,
+  fakeBridgeAllowed,
   invokeValidated,
   listenValidated,
   validateEnvelope
@@ -17,6 +18,16 @@ const validEnvelope = {
   type: 'hello',
   payload: { app_version: '0.1.0', supported_protocols: [1] }
 };
+
+describe('fake bridge gate', () => {
+  it('allows the injected fake bridge only in the e2e and test build modes', () => {
+    expect(fakeBridgeAllowed('e2e')).toBe(true);
+    expect(fakeBridgeAllowed('test')).toBe(true);
+    expect(fakeBridgeAllowed('production')).toBe(false);
+    expect(fakeBridgeAllowed('development')).toBe(false);
+    expect(fakeBridgeAllowed('')).toBe(false);
+  });
+});
 
 describe('bridge envelope validation', () => {
   it('accepts the canonical envelope shape', () => {

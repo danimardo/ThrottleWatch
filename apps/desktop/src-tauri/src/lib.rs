@@ -33,6 +33,7 @@ pub fn run() {
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
             app.manage(log_guard);
             app.manage(storage::AppState::new(storage));
+            app.manage(commands::GuidedController::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -44,7 +45,12 @@ pub fn run() {
             commands::get_window_state,
             commands::set_window_state,
             commands::request_low_level_access,
-            commands::disable_advanced_access
+            commands::disable_advanced_access,
+            commands::get_guided_preflight,
+            commands::start_guided,
+            commands::stop_guided,
+            commands::get_analysis_window,
+            commands::get_cpu_topology
         ])
         .run(tauri::generate_context!())
         .expect("error while running ThrottleWatch");
