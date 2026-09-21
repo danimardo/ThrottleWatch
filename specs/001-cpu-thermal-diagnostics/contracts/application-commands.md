@@ -13,6 +13,7 @@ El backend valida claves, tipos y dependencias. En particular, `startup.mode=tra
 ## Onboarding
 
 - `get_onboarding_state() -> OnboardingState`
+- `set_onboarding_state({ flow_version, last_slide, status, completed_at, last_seen_notice_version }) -> OnboardingState`
 - `set_onboarding_slide({ flow_version, slide: 1..5 }) -> void`
 - `resolve_onboarding({ flow_version, outcome: "completed" | "skipped" }) -> void`
 - `acknowledge_whats_new({ notice_version }) -> void`
@@ -24,6 +25,8 @@ Repetir el recorrido desde Ayuda es un estado de UI y no revierte `completed`/`s
 Las operaciones minimizar, maximizar/restaurar, cerrar, arrastrar y consultar estado usan exclusivamente las API tipadas oficiales de ventana mediante un adaptador único. Rust intercepta el cierre cuando `lifecycle.close_action=unset` y emite `lifecycle:close-decision-required`; la UI responde con:
 
 - `resolve_first_close({ action: "exit" | "tray" | "dismiss" }) -> void`
+- `get_window_state() -> WindowState`
+- `set_window_state({ restored_x, restored_y, restored_width, restored_height, maximized, display_fingerprint }) -> WindowState`
 
 La elección se persiste antes de ejecutar la acción; `tray` activa además `tray.monitoring_enabled`. `dismiss` (Esc o cierre del diálogo) no persiste nada y deja la ventana abierta. La geometría se captura desde eventos nativos, se valida en backend y no acepta coordenadas arbitrarias desde contenido web.
 
@@ -33,18 +36,26 @@ Segunda instancia: el backend usa el plugin de instancia única; la nueva instan
 
 ## Datos y restablecimiento
 
-- `delete_monitoring_data({ confirmation_token }) -> DeleteSummary`
-- `reset_application({ confirmation_token }) -> void`
+- `delete_monitoring_data({ confirmation_token }) -> DataOperationResult`
+- `reset_application({ confirmation_token }) -> DataOperationResult`
+- `get_storage_usage() -> { database_bytes, logs_bytes, total_bytes, session_count }`
+- `open_logs_folder() -> void`
+- `open_external_url({ target: "help" | "source" }) -> void`
+- `get_technical_summary() -> TechnicalSummary`: versiones, protocolo, estado del colector,
+  cobertura y métricas locales; sin identificadores ni registros en bruto.
+- `get_third_party_notices() -> Notice[]`: avisos empaquetados, sin rutas recibidas de la UI.
 
-Los tokens son efímeros y nacen de un diálogo local. `delete_monitoring_data` conserva preferencias, onboarding y ventana. `reset_application` borra todo el perfil local, desregistra inicio con Windows, elimina artefactos de actualización y provoca cierre/reinicio limpio.
+Los tokens son efímeros y nacen de un diálogo local. `delete_monitoring_data` conserva las preferencias tipadas. `reset_application` borra todo el perfil local, desregistra inicio con Windows, elimina artefactos de actualización y provoca cierre/reinicio limpio. `DataOperationResult` informa por separado de los pasos `cleared` y `failed`; no acepta rutas ni URLs.
 
 ## Telemetría en vivo y cobertura
 
 - `get_live_snapshot() -> LiveSnapshot`: último estado agregado (clasificación en vivo con `platform_kind`, `limit_severity` y si está dentro de la ventana de turbo; temperatura representativa y límite térmico efectivo; carga y núcleos activos; frecuencia activa y base por grupo; potencia y límite de potencia efectivo; potencial con mejor refrigeración si procede; contexto energético, frescura, estado del colector y nivel de cobertura). Sirve para el primer render; después la UI se suscribe al evento.
-- `get_coverage() -> CoverageMatrix`: por magnitud (`temperature`, `thermal_headroom`, `load`, `active_clock`, `base_clock`, `power`, `power_limit`, `thermal_flag`, `prochot_flag`, `power_flag`, `current_flag`): disponible, calidad, sensor de origen, motivo de ausencia (`message_key`), el **nivel de cobertura** (`A`/`B`/`C`) con lo que permite concluir y la **confianza máxima alcanzable**. Incluye `low_level_access` ya traducido a la UI (`not_needed | available | installable | denied | error`).
+- `get_coverage() -> CoverageMatrix`: por magnitud (`temperature`, `thermal_headroom`, `load`, `active_clock`, `base_clock`, `power`, `power_limit`, `thermal_flag`, `prochot_flag`, `power_flag`, `current_flag`): disponible, calidad, sensor de origen, motivo de ausencia (`message_key`), el **nivel de cobertura** (`A`/`B`/`C`) con lo que permite concluir y la **confianza máxima alcanzable**. Incluye `low_level_access` ya traducido a la UI (`not_needed | available | installable | upgradable | denied | error`).
 - `recheck_coverage() -> CoverageMatrix`: repite el descubrimiento sin reiniciar la sesión.
-- `request_low_level_access() -> void`: abre el flujo explícito de instalación/reparación (UAC). Solo válido en estado `installable`; en otro estado devuelve `coverage.access_not_installable`.
+- `request_low_level_access({ action: 'install' | 'upgrade' | 'repair' }) -> AccessRequestResult`: abre el flujo explícito de instalación, actualización o reparación (UAC). `install` solo es válido con PawnIO ausente (`installable`), `upgrade` con una versión anterior a la mínima (`upgradable`, FR-089) y `repair` con PawnIO vigente que no entrega nivel A (`error`); en otro caso devuelve `coverage.access_not_installable`. `denied` (una política o el antivirus bloquea el acceso, `data-model.md`) no ofrece `repair`: no hay nada que reintentar, la interfaz enlaza a ayuda en su lugar (T161, 2026-09-21).
+- `disable_advanced_access() -> CoverageMatrix`: desactiva el acceso avanzado en preferencias sin desinstalar PawnIO y fuerza la cobertura B/C.
 - `get_core_detail() -> CoreDetail`: último frame por núcleo/grupo en memoria para la pantalla CPU y su tabla avanzada.
+- `get_cpu_topology() -> CpuTopology`: devuelve los grupos P/E y los procesadores lógicos que el colector ha observado.
 
 Eventos:
 
@@ -61,6 +72,7 @@ Eventos:
 - `delete_session({ session_id, confirmation_token }) -> void`: no permitido sobre la sesión activa.
 - `get_report({ session_id }) -> DiagnosticReportView`: informe con textos como `message_key` + parámetros; la UI compone la prosa. Incluye `cooling_potential` (`band`, `low`, `high`, `method` y sus entradas) y, en sesiones guiadas, `guided_result` (rendimiento sostenido/inicial y desglose por causa) y la comparación «antes/después» si existe una referencia comparable.
 - `reevaluate_report({ session_id }) -> DiagnosticReportView`: solo para `imported`; devuelve una segunda evaluación con el ruleset actual sin sobrescribir la original.
+  Sin límite térmico efectivo por muestra (nunca se ha almacenado) ni catálogo original, así que el margen térmico y la meseta de niveles B/C no están disponibles en la reevaluación; la cobertura se deriva de lo que la sesión llegó a registrar, no de lo que el equipo anunciaba. Devuelve `report.reevaluation_not_imported` fuera de `imported` y `session.not_found` si no existe.
 - `set_session_reference({ session_id, is_reference }) -> void`: marca o desmarca un diagnóstico guiado completado como referencia para comparaciones «antes/después»; devuelve `guided.reference_not_guided` si la sesión no es guiada.
 
 Eventos:
@@ -106,8 +118,8 @@ Eventos:
 ## Diagnóstico técnico y ayuda
 
 - `get_technical_summary() -> TechnicalSummary`: versiones, protocolo, estado del colector, cobertura, últimos errores por código, métricas locales; sin identificadores. La UI ofrece «Copiar».
-- `open_logs_folder() -> void`, `open_external_url({ id }) -> void` (solo IDs de una lista cerrada: `docs`, `releases`, `licenses`; nunca URLs libres), `get_third_party_notices() -> Notice[]`.
-- `get_storage_usage() -> { database_bytes, logs_bytes, sessions, oldest_sample_at }`.
+- `open_logs_folder() -> void`, `open_external_url({ target: "help" | "source" }) -> void`
+  (solo destinos de una lista cerrada; nunca URLs libres), `get_third_party_notices() -> Notice[]`.
 - `log_frontend({ events: FrontendLogEvent[] }) -> void`: única vía de registro de la interfaz (constitución XVII). Cada evento: `{ level: "error" | "warn" | "info" | "debug", code, target, msg, fields? }`, validado contra el esquema `log-event`; como máximo 60 eventos por minuto (el exceso se descarta y se registra el recuento). Solo se aceptan `debug` e `info` con `Registro detallado` activo. Rust añade `ts`, `component: "ui"` y la redacción.
 - `Registro detallado` se gestiona con `set_preference({ key: "logging.detailed_until", value: true | false })`: `true` fija el vencimiento en ahora + 24 h y `false` lo desactiva; `get_preferences` devuelve la fecha de vencimiento o `null`.
 
@@ -121,10 +133,11 @@ Un zoom provoca una nueva consulta con intervalo menor; la WebView no solicita n
 
 ## Actualizaciones
 
-- `check_for_update({ manual: boolean }) -> UpdateAvailable | null`
-- `download_update() -> void`
-- `install_update() -> void`
-- `set_updates_enabled({ enabled }) -> void`
+- `get_update_state() -> UpdateState`: estado actual (`state`, `enabled`, `current_version`, `last_check`, `version`, `notes`, `downloaded`, `total`, `error_code`, `recoverable`); es lo que la interfaz lee al abrir Ajustes.
+- `check_for_update({ manual: boolean }) -> UpdateState`: responde al instante con el estado y hace la comprobación en un hilo aparte; el resultado llega por eventos. Con las actualizaciones apagadas devuelve `update.disabled` sin ninguna petición de red.
+- `download_update() -> UpdateState`: solo válido en `available`; la firma se verifica al terminar la descarga y solo entonces se llega a `verified`.
+- `install_update() -> UpdateState`: solo válido en `verified`; con una operación en curso devuelve `update.blocked_by_running_operation` y `message_key` `update.blocked.<guided_test|export|import|data_operation>`.
+- `set_updates_enabled({ enabled })` no es un comando aparte: se realiza con la preferencia tipada `updates.enabled` (`set_preference`), que apaga el actualizador, descarta lo descargado y detiene toda comprobación.
 
 Eventos:
 

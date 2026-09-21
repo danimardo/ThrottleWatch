@@ -6,9 +6,11 @@
 //! coverage signals are computed from what the collector really delivers.
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
+use super::evaluator::LiveEvaluator;
+use super::host_clock::HostClockReading;
 use super::normalization::{SensorMetadata, SensorQuality, normalize_number};
 use super::snapshot::SnapshotInput;
-use crate::diagnostics::CoverageSignals;
+use crate::diagnostics::{CoverageSignals, DiagnosticResult, DiagnosticSample, Ruleset};
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -67,6 +69,9 @@ pub struct SensorDescriptor {
     pub scope_ref: Option<String>,
     pub unit: String,
     pub quality: String,
+    /// What the collector knows about the sensor (`thermal_limit_c`, `tjmax_c`, …), if anything.
+    #[serde(default)]
+    pub metadata: Option<Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -125,6 +130,9 @@ pub struct LiveState {
     collector: CollectorState,
     attempt: u32,
     message_key: Option<String>,
+    evaluator: Option<LiveEvaluator>,
+    host_clock: Option<HostClockReading>,
+    sampling_interval_ms: Option<u64>,
 }
 
 impl Default for LiveState {
@@ -144,6 +152,9 @@ impl LiveState {
             collector: CollectorState::Stopped,
             attempt: 0,
             message_key: None,
+            evaluator: Ruleset::v1().ok().map(LiveEvaluator::new),
+            host_clock: None,
+            sampling_interval_ms: None,
         }
     }
 
@@ -159,6 +170,9 @@ impl LiveState {
         self.cpu = Some(parsed.cpu);
         self.groups = parsed.groups;
         self.sensors = parsed.sensors;
+        if let Some(evaluator) = self.evaluator.as_mut() {
+            evaluator.reset();
+        }
         Ok(())
     }
 
@@ -188,7 +202,53 @@ impl LiveState {
             self.readings.insert(value.sensor_id, Reading { number, boolean });
         }
         self.captured_at_ms = Some(now_ms);
+        let sample = self.diagnostic_sample(now_ms);
+        let coverage = self.coverage_signals();
+        if let Some(evaluator) = self.evaluator.as_mut() {
+            evaluator.observe(sample, coverage);
+        }
         Ok(())
+    }
+
+    /// The engine's verdict on the recent window; `None` until a usable sample has arrived.
+    pub fn diagnostic(&self) -> Option<&DiagnosticResult> {
+        self.evaluator.as_ref().and_then(LiveEvaluator::latest)
+    }
+
+    /// One engine input from the latest readings; a sample without package load is not usable.
+    fn diagnostic_sample(&self, monotonic_ms: u64) -> Option<DiagnosticSample> {
+        let input = self.snapshot_input()?;
+        Some(DiagnosticSample {
+            monotonic_ms,
+            load_percent: input.load_percent?,
+            active_clock_mhz: input.active_clock_mhz,
+            base_clock_mhz: input.base_clock_mhz,
+            temperature_c: input.temperature_c,
+            thermal_limit_c: input.thermal_limit_c,
+            package_power_w: input.package_power_w,
+            power_limit_w: input.power_limit_w,
+            thermal_flag: self.flag("thermal_flag").unwrap_or(false),
+            prochot_flag: self.flag("prochot_flag").unwrap_or(false),
+            power_flag: self.flag("power_flag").unwrap_or(false),
+            current_flag: self.flag("current_flag").unwrap_or(false),
+            in_turbo_window: false,
+        })
+    }
+
+    /// Stores the clock the host derived from the Windows counters (`None` keeps the last one
+    /// out: an unreadable counter must not leave a stale clock behind).
+    pub fn apply_host_clock(&mut self, reading: Option<HostClockReading>) {
+        self.host_clock = reading;
+    }
+
+    /// The interval the collector was last asked to sample at; how long a reading stays fresh
+    /// depends on it, so the interface never calls a slow profile «stale».
+    pub fn set_sampling_interval_ms(&mut self, interval_ms: u64) {
+        self.sampling_interval_ms = Some(interval_ms);
+    }
+
+    pub const fn sampling_interval_ms(&self) -> Option<u64> {
+        self.sampling_interval_ms
     }
 
     pub fn set_collector(
@@ -240,18 +300,33 @@ impl LiveState {
         self.readings.get(&descriptor.id)?.boolean
     }
 
+    /// The effective thermal limit the collector published on the package temperature descriptor
+    /// (`TjMax − TCC offset` on Intel, the family limit on AMD, FR-076). Absent until the collector
+    /// knows it; a value outside a physically plausible range is discarded, never trusted.
+    pub fn thermal_limit_c(&self) -> Option<f64> {
+        let limit = self
+            .descriptor("temperature", "package")?
+            .metadata
+            .as_ref()?
+            .get("thermal_limit_c")?
+            .as_f64()?;
+        (40.0..=125.0).contains(&limit).then_some(limit)
+    }
+
     /// Latest package-level values, or `None` when no sample has arrived yet.
     pub fn snapshot_input(&self) -> Option<SnapshotInput> {
         Some(SnapshotInput {
             captured_at_ms: self.captured_at_ms?,
             temperature_c: self.number("temperature", "package"),
-            // The sidecar does not publish the thermal limit yet (it needs the level A tables): unknown.
-            thermal_limit_c: None,
+            thermal_limit_c: self.thermal_limit_c(),
             load_percent: self.number("load", "package"),
             active_clock_mhz: self
                 .number("active_clock", "package")
-                .or_else(|| self.number("clock", "package")),
-            base_clock_mhz: self.number("base_clock", "package"),
+                .or_else(|| self.number("clock", "package"))
+                .or(self.host_clock.map(|clock| clock.active_mhz)),
+            base_clock_mhz: self
+                .number("base_clock", "package")
+                .or(self.host_clock.map(|clock| clock.base_mhz)),
             package_power_w: self.number("power", "package"),
             power_limit_w: self.number("power_limit", "package"),
         })
@@ -261,6 +336,20 @@ impl LiveState {
     /// mapping from these stable IDs to tracks; substring matching would make a new sensor silently
     /// appear in the wrong chart.
     pub fn analysis_values(&self) -> Vec<AnalysisValue> {
+        let host_clock = self.host_clock.filter(|_| {
+            self.number("active_clock", "package").is_none()
+                && self.number("clock", "package").is_none()
+        });
+        let host_values = host_clock.into_iter().flat_map(|clock| {
+            [("host.active_clock", clock.active_mhz), ("host.base_clock", clock.base_mhz)].map(
+                |(id, value)| AnalysisValue {
+                    sensor_id: id.to_owned(),
+                    value: Some(value),
+                    boolean: None,
+                    quality: "derived".to_owned(),
+                },
+            )
+        });
         self.sensors
             .iter()
             .map(|sensor| {
@@ -278,6 +367,7 @@ impl LiveState {
                     },
                 }
             })
+            .chain(host_values)
             .collect()
     }
 
@@ -293,13 +383,34 @@ impl LiveState {
         CoverageSignals {
             temperature: self.number("temperature", "package").is_some(),
             active_clock: self.number("active_clock", "package").is_some()
-                || self.number("clock", "package").is_some(),
+                || self.number("clock", "package").is_some()
+                || self.host_clock.is_some(),
             per_core_load,
             package_power: self.number("power", "package").is_some(),
             power_limit: self.number("power_limit", "package").is_some(),
             limit_reasons: ["thermal_flag", "prochot_flag", "power_flag", "current_flag"]
                 .iter()
                 .any(|metric| self.flag(metric).is_some()),
+        }
+    }
+
+    /// Drops only readings that require the advanced provider. The ordinary
+    /// temperature/clock/load/power path remains usable at coverage B/C after
+    /// a recoverable provider failure.
+    pub fn clear_advanced_readings(&mut self) {
+        let advanced_ids: Vec<String> = self
+            .sensors
+            .iter()
+            .filter(|sensor| {
+                matches!(
+                    sensor.metric.as_str(),
+                    "power_limit" | "thermal_flag" | "prochot_flag" | "power_flag" | "current_flag"
+                )
+            })
+            .map(|sensor| sensor.id.clone())
+            .collect();
+        for id in advanced_ids {
+            self.readings.remove(&id);
         }
     }
 
@@ -458,6 +569,117 @@ mod tests {
         assert_eq!(state.coverage_signals().tier(), crate::diagnostics::CoverageTier::B);
     }
 
+    fn temperature_descriptor_with(metadata: Value) -> Value {
+        json!({"id": "cpu.package.temp", "source_id": "t", "source_name": "CPU Package",
+               "metric": "temperature", "scope": "package", "scope_ref": null,
+               "unit": "celsius", "quality": "direct", "metadata": metadata})
+    }
+
+    #[test]
+    fn the_collectors_thermal_limit_reaches_the_snapshot_and_implausible_ones_do_not() {
+        let mut state = LiveState::new();
+        state
+            .apply_capabilities(&capabilities(vec![temperature_descriptor_with(
+                json!({"tjmax_c": 100.0, "tcc_offset_c": 5.0, "thermal_limit_c": 95.0}),
+            )]))
+            .unwrap_or_else(|error| panic!("capabilities: {error:?}"));
+        state
+            .apply_sample(&sample(vec![ok("cpu.package.temp", 70.0)]), 1_000)
+            .unwrap_or_else(|error| panic!("sample: {error:?}"));
+        assert_eq!(state.thermal_limit_c(), Some(95.0));
+        let input = state.snapshot_input().unwrap_or_else(|| panic!("snapshot expected"));
+        assert_eq!(input.thermal_limit_c, Some(95.0));
+
+        for bogus in [
+            json!({"thermal_limit_c": 5.0}),
+            json!({"thermal_limit_c": 900.0}),
+            json!({"thermal_limit_c": null}),
+            json!({}),
+        ] {
+            let mut other = LiveState::new();
+            other
+                .apply_capabilities(&capabilities(vec![temperature_descriptor_with(bogus)]))
+                .unwrap_or_else(|error| panic!("capabilities: {error:?}"));
+            assert_eq!(other.thermal_limit_c(), None);
+        }
+    }
+
+    #[test]
+    fn a_collector_that_publishes_no_limit_leaves_it_unknown() {
+        let state = state_with_full_b_coverage();
+        assert_eq!(state.thermal_limit_c(), None);
+    }
+
+    #[test]
+    fn the_host_clock_fills_the_clocks_the_collector_does_not_publish() {
+        use crate::telemetry::host_clock::HostClockReading;
+        let mut state = state_with_full_b_coverage();
+        state.apply_host_clock(Some(HostClockReading { active_mhz: 3780.0, base_mhz: 3600.0 }));
+        state
+            .apply_sample(&sample(vec![ok("cpu.package.load", 40.0)]), 1_000)
+            .unwrap_or_else(|error| panic!("sample: {error:?}"));
+
+        let input = state.snapshot_input().unwrap_or_else(|| panic!("snapshot expected"));
+        assert_eq!(input.active_clock_mhz, Some(3780.0));
+        assert_eq!(input.base_clock_mhz, Some(3600.0));
+        assert!(state.coverage_signals().active_clock);
+
+        state.apply_host_clock(None);
+        let input = state.snapshot_input().unwrap_or_else(|| panic!("snapshot expected"));
+        assert_eq!(input.active_clock_mhz, None, "an unreadable counter leaves no stale clock");
+        assert_eq!(input.base_clock_mhz, None);
+    }
+
+    #[test]
+    fn the_collector_clock_wins_over_the_host_clock() {
+        use crate::telemetry::host_clock::HostClockReading;
+        let mut state = state_with_full_b_coverage();
+        state.apply_host_clock(Some(HostClockReading { active_mhz: 1000.0, base_mhz: 3600.0 }));
+        state
+            .apply_sample(&sample(vec![ok("cpu.package.clock", 4200.0)]), 1_000)
+            .unwrap_or_else(|error| panic!("sample: {error:?}"));
+
+        let input = state.snapshot_input().unwrap_or_else(|| panic!("snapshot expected"));
+        assert_eq!(input.active_clock_mhz, Some(4200.0));
+        assert_eq!(input.base_clock_mhz, Some(3600.0));
+    }
+
+    #[test]
+    fn a_loaded_trace_with_limit_reasons_is_classified_from_the_live_samples() {
+        let mut state = LiveState::new();
+        state
+            .apply_capabilities(&capabilities(vec![
+                sensor("cpu.package.temp", "temperature", "package", None),
+                sensor("cpu.package.load", "load", "package", None),
+                sensor("cpu.package.clock", "active_clock", "package", None),
+                sensor("cpu.package.base", "base_clock", "package", None),
+                sensor("cpu.package.power", "power", "package", None),
+                sensor("cpu.package.limit", "power_limit", "package", None),
+                sensor("cpu.core.1.load", "load", "core", Some("1")),
+                sensor("cpu.package.thermal", "thermal_flag", "package", None),
+            ]))
+            .unwrap_or_else(|error| panic!("capabilities: {error:?}"));
+        assert!(state.diagnostic().is_none(), "no verdict before the first sample");
+        for second in 0..=200_u64 {
+            let mut values = vec![
+                ok("cpu.package.temp", 94.0),
+                ok("cpu.package.load", 98.0),
+                ok("cpu.package.clock", 3400.0),
+                ok("cpu.package.base", 3600.0),
+                ok("cpu.package.power", 60.0),
+                ok("cpu.package.limit", 90.0),
+                ok("cpu.core.1.load", 98.0),
+            ];
+            values
+                .push(json!({"sensor_id": "cpu.package.thermal", "status": "ok", "boolean": true}));
+            state
+                .apply_sample(&sample(values), second * 1_000)
+                .unwrap_or_else(|error| panic!("sample: {error:?}"));
+        }
+        let result = state.diagnostic().unwrap_or_else(|| panic!("a verdict is expected"));
+        assert_eq!(result.classification.key(), "thermal_confirmed");
+    }
+
     #[test]
     fn invalid_missing_and_impossible_values_stay_absent_never_zero() {
         let mut state = state_with_full_b_coverage();
@@ -504,6 +726,40 @@ mod tests {
 
         assert!(!state.coverage_signals().per_core_load);
         assert_eq!(state.coverage_signals().tier(), crate::diagnostics::CoverageTier::C);
+    }
+
+    #[test]
+    fn provider_failure_clears_only_advanced_signals_and_keeps_level_b_usable() {
+        let mut state = LiveState::new();
+        state
+            .apply_capabilities(&capabilities(vec![
+                sensor("cpu.package.temp", "temperature", "package", None),
+                sensor("cpu.package.clock", "clock", "package", None),
+                sensor("cpu.package.power", "power", "package", None),
+                sensor("cpu.package.limit", "power_limit", "package", None),
+                sensor("cpu.package.thermal", "thermal_flag", "package", None),
+                sensor("cpu.core.1.load", "load", "core", Some("1")),
+            ]))
+            .unwrap_or_else(|error| panic!("capabilities: {error:?}"));
+        state
+            .apply_sample(
+                &sample(vec![
+                    ok("cpu.package.temp", 70.0),
+                    ok("cpu.package.clock", 3900.0),
+                    ok("cpu.package.power", 60.0),
+                    ok("cpu.package.limit", 95.0),
+                    json!({"sensor_id": "cpu.package.thermal", "boolean": true, "status": "ok"}),
+                    ok("cpu.core.1.load", 80.0),
+                ]),
+                1,
+            )
+            .unwrap_or_else(|error| panic!("sample: {error:?}"));
+        assert_eq!(state.coverage_signals().tier(), crate::diagnostics::CoverageTier::A);
+
+        state.clear_advanced_readings();
+
+        assert_eq!(state.coverage_signals().tier(), crate::diagnostics::CoverageTier::B);
+        assert!(state.snapshot_input().is_some_and(|input| input.package_power_w == Some(60.0)));
     }
 
     #[test]

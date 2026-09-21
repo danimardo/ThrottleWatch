@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import {
+    Banner,
     ContextStrip,
     CoverageMatrix,
     StatWidget,
@@ -16,6 +17,10 @@
     liveSnapshotSchema,
     commandResponseSchemas
   } from '../../lib/bridge/schemas';
+  import {
+    accessRequestAction,
+    type AccessRequestAction
+  } from '../../lib/access-action';
   import { createTranslator } from '../../lib/i18n';
   import { toStatusHeroView } from './adapter';
   import {
@@ -69,6 +74,11 @@
   let advancedAccess = $state<DashboardSnapshot['advancedAccess']>(
     createDemoSnapshot(t).advancedAccess
   );
+  let coverageDegraded = $state(false);
+
+  function coverageRank(value: 'A' | 'B' | 'C'): number {
+    return value === 'A' ? 3 : value === 'B' ? 2 : 1;
+  }
 
   $effect(() => {
     currentSnapshot = incomingSnapshot ?? createDemoSnapshot(t);
@@ -126,6 +136,14 @@
         confidenceLabel: `Maximum reachable confidence: ${parsed.value.confidence_ceiling}`
       };
       advancedAccess = parsed.value.advanced_access;
+      if (
+        parsed.value.from_tier !== undefined &&
+        parsed.value.to_tier !== undefined
+      ) {
+        coverageDegraded =
+          coverageRank(parsed.value.to_tier) <
+          coverageRank(parsed.value.from_tier);
+      }
     }).then((stop) => {
       if (disposed) stop();
       else unlisten.push(stop);
@@ -196,13 +214,13 @@
     });
   }
 
-  function requestAdvancedAccess() {
+  function requestAdvancedAccess(action?: AccessRequestAction) {
+    action ??= accessRequestAction(advancedAccess);
+    if (!action) return;
     void invokeValidated(
       'request_low_level_access',
       {
-        request: {
-          action: advancedAccess === 'installable' ? 'install' : 'repair'
-        }
+        request: { action }
       },
       commandResponseSchemas.request_low_level_access
     ).then((result) => {
@@ -234,13 +252,16 @@
   }
 </script>
 
-<main class="dashboard">
+<main class="dashboard" aria-label={t('nav.now')}>
   <ContextStrip
     cpuLabel={currentSnapshot.cpuLabel}
     topologyLabel={currentSnapshot.topologyLabel}
     powerLabel={currentSnapshot.powerLabel}
     collectorState={currentSnapshot.collectorState}
     collectorLabel={localizedCollectorLabel(currentSnapshot.collectorLabel)}
+    coverageNoticeLabel={coverageDegraded
+      ? t('dashboard.coverageDegradedTitle')
+      : undefined}
     coverageActionLabel={t('dashboard.viewCoverage')}
     onCoverage={() => (coverageOpen = !coverageOpen)}
   />
@@ -313,6 +334,23 @@
   </section>
   {#if coverageOpen}
     <section class="coverage" aria-label={t('dashboard.equipmentCoverage')}>
+      {#if coverageDegraded}
+        <Banner
+          tone="warning"
+          title={t('dashboard.coverageDegradedTitle')}
+          description={t('dashboard.coverageDegradedDescription')}
+        >
+          {#snippet action()}
+            <button
+              type="button"
+              class="repair-link"
+              onclick={() => requestAdvancedAccess('repair')}
+            >
+              {t('dashboard.repairAdvanced')}
+            </button>
+          {/snippet}
+        </Banner>
+      {/if}
       <CoverageMatrix
         title={t('dashboard.equipmentCoverage')}
         rows={coverageRows}
@@ -329,11 +367,15 @@
         accessState={advancedAccess}
         accessLabel={advancedAccess === 'not_needed'
           ? t('dashboard.advancedNotNeeded')
-          : t('dashboard.advancedCanImprove')}
-        requestAccessLabel={t('dashboard.installAdvanced')}
-        onRequestAccess={requestAdvancedAccess}
+          : advancedAccess === 'upgradable'
+            ? t('dashboard.advancedUpgradable')
+            : t('dashboard.advancedCanImprove')}
+        requestAccessLabel={advancedAccess === 'upgradable'
+          ? t('dashboard.upgradeAdvanced')
+          : t('dashboard.installAdvanced')}
+        onRequestAccess={() => requestAdvancedAccess()}
         accessRetryLabel={t('dashboard.repairAdvanced')}
-        onAccessRetry={requestAdvancedAccess}
+        onAccessRetry={() => requestAdvancedAccess()}
         disableAccessLabel={t('dashboard.disableAdvanced')}
         onDisableAccess={disableAdvancedAccess}
         recheckLabel={t('dashboard.checkAgain')}
@@ -359,5 +401,14 @@
   }
   .coverage {
     padding-top: var(--space-2);
+  }
+  .repair-link {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--accent-blue);
+    font: inherit;
+    text-decoration: underline;
+    cursor: default;
   }
 </style>

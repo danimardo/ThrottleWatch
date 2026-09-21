@@ -62,7 +62,7 @@
 }
 ```
 
-Estados: `available`, `reduced`, `missing`, `denied`, `error`, `unknown`. Rust los traduce al enum de UI (`not_needed | available | installable | denied | error`) según `data-model.md`; el sidecar nunca decide si el acceso «hace falta».
+Estados: `available`, `reduced`, `missing`, `denied`, `error`, `unknown`. Rust los traduce al enum de UI (`not_needed | available | installable | upgradable | denied | error`; `upgradable` lo deriva Rust al comparar la versión de PawnIO instalada con la mínima, FR-089) según `data-model.md`; el sidecar nunca decide si el acceso «hace falta».
 
 ## Descubrimiento
 

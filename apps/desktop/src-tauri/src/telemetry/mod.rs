@@ -1,8 +1,15 @@
+pub mod catalog;
 pub mod clock;
+pub mod evaluator;
+pub mod host_clock;
 pub mod launch;
 pub mod live;
 pub mod normalization;
 pub mod power_context;
+pub mod recorder;
+pub mod reevaluate;
 pub mod runtime;
 pub mod session;
+pub mod sink;
 pub mod snapshot;
+pub mod timeline;

@@ -5,6 +5,7 @@
     Button,
     CloseBlockedDialog,
     EmptyState,
+    FirstCloseDialog,
     NavigationItem,
     NavIcon,
     OnboardingFlow,
@@ -19,13 +20,20 @@
   import GuidedDiagnostic from '../features/guided/GuidedDiagnostic.svelte';
   import Analysis from '../features/analysis/Analysis.svelte';
   import CpuOverview from '../features/cpu/CpuOverview.svelte';
+  import Sessions from '../features/sessions/Sessions.svelte';
+  import SettingsHost from '../features/settings/SettingsHost.svelte';
   import {
     commandResponseSchemas,
     type CoverageMatrix,
     type OnboardingState
   } from '../lib/bridge/schemas';
-  import { invokeValidated } from '../lib/bridge';
+  import { invokeValidated, listenValidated } from '../lib/bridge';
+  import { stopOperationFor } from '../lib/lifecycle/close';
   import { createTranslator } from '../lib/i18n';
+  import {
+    isDetailedLoggingActive,
+    setApplicationDetailedLogging
+  } from '../lib/logging';
   import {
     createWindowAdapter,
     type WindowAdapter
@@ -80,6 +88,10 @@
   let coverage = $state<CoverageMatrix | null>(null);
   let guidedRunning = $state(false);
   let closeBlockedOpen = $state(false);
+  let closeBlockedReason = $state<'guided' | 'export' | 'download' | 'install'>(
+    'guided'
+  );
+  let firstCloseOpen = $state(false);
   let detectionStarted = false;
   const compactDestinations = destinations.slice(0, 3);
   const overflowDestinations = destinations.slice(3);
@@ -95,6 +107,49 @@
   );
 
   onMount(() => {
+    const onExportRequest = (): void => {
+      active = 'sessions';
+      window.setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('throttlewatch:open-export'));
+      }, 0);
+    };
+    const onShortcut = (event: KeyboardEvent): void => {
+      if (event.key === 'F1') {
+        event.preventDefault();
+        void invokeValidated(
+          'open_external_url',
+          { request: { target: 'help' } },
+          commandResponseSchemas.open_external_url
+        );
+        return;
+      }
+      if (event.ctrlKey && !event.altKey && event.key.toLowerCase() === 'e') {
+        event.preventDefault();
+        active = 'sessions';
+        window.setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('throttlewatch:open-export'));
+        }, 0);
+        return;
+      }
+      if (event.ctrlKey && !event.altKey && !event.shiftKey) {
+        const destinationsByShortcut: Record<string, Destination['id']> = {
+          '1': 'now',
+          '2': 'analysis',
+          '3': 'cpu',
+          '4': 'sessions',
+          '5': 'guided',
+          '6': 'settings',
+          ',': 'settings'
+        };
+        const destination = destinationsByShortcut[event.key];
+        if (destination !== undefined) {
+          event.preventDefault();
+          active = destination;
+        }
+      }
+    };
+    window.addEventListener('keydown', onShortcut);
+    window.addEventListener('throttlewatch:request-export', onExportRequest);
     windowAdapter = createWindowAdapter();
     void windowAdapter.isMaximized().then((value) => (maximized = value));
     void windowAdapter.restoreSavedGeometry();
@@ -124,10 +179,35 @@
         void startDetection();
       }
     });
+    void loadDetailedLoggingState();
+    let stopCloseBlockedListener: () => void = () => undefined;
+    void listenValidated('lifecycle:close-blocked', (value) => {
+      const reason = (value as { reason?: string }).reason;
+      if (
+        reason === 'guided' ||
+        reason === 'export' ||
+        reason === 'download' ||
+        reason === 'install'
+      ) {
+        closeBlockedReason = reason;
+        closeBlockedOpen = true;
+      }
+    }).then((stop) => (stopCloseBlockedListener = stop));
+    let stopFirstCloseListener: () => void = () => undefined;
+    void listenValidated('lifecycle:close-decision-required', () => {
+      firstCloseOpen = true;
+    }).then((stop) => (stopFirstCloseListener = stop));
     return () => {
       stopAppearanceListener();
       stopGeometryListener();
       stopGuidedSessionListener();
+      stopCloseBlockedListener();
+      stopFirstCloseListener();
+      window.removeEventListener('keydown', onShortcut);
+      window.removeEventListener(
+        'throttlewatch:request-export',
+        onExportRequest
+      );
     };
   });
 
@@ -139,8 +219,64 @@
     void windowAdapter.persistGeometry().then(() => windowAdapter.close());
   }
 
-  async function stopGuidedAndClose(): Promise<void> {
-    if (await stopGuidedSession()) closeWindow();
+  async function loadDetailedLoggingState(): Promise<void> {
+    const result = await invokeValidated(
+      'get_preferences',
+      undefined,
+      commandResponseSchemas.get_preferences
+    );
+    if (result.ok) {
+      setApplicationDetailedLogging(
+        isDetailedLoggingActive(result.value.values['logging.detailed_until'])
+      );
+    }
+  }
+
+  async function resolveFirstClose(
+    action: 'exit' | 'tray' | 'dismiss'
+  ): Promise<void> {
+    await invokeValidated(
+      'resolve_first_close',
+      { request: { action } },
+      commandResponseSchemas.resolve_first_close
+    );
+    firstCloseOpen = false;
+  }
+
+  /** Whether it is safe to actually destroy the window right now — a running export/download/
+   * install (T090), or the exit/tray/ask-once choice of FR-046 (T182) — is Rust's call, not this
+   * button's: `windowAdapter.close()` emits the same native `CloseRequested` Alt+F4 or the window
+   * manager would, so Rust can intercept it either way and answer with `lifecycle:close-blocked`
+   * or `lifecycle:close-decision-required` instead of letting it close (see the listeners in
+   * `onMount`) — that is the only gate for all four reasons plus the first-close choice.
+   *
+   * A running guided test asks first, locally: `guidedRunning` is already tracked here (for the
+   * banner below) independently of anything the backend infers, so showing the dialog does not
+   * need the round trip — Rust still refuses the native close on its own if this button is ever
+   * bypassed (Alt+F4). */
+  function requestClose(): void {
+    if (guidedRunning) {
+      closeBlockedReason = 'guided';
+      closeBlockedOpen = true;
+    } else {
+      closeWindow();
+    }
+  }
+
+  async function confirmClose(stopOperation: boolean): Promise<void> {
+    await invokeValidated(
+      'confirm_close',
+      { request: { stop_operation: stopOperation } },
+      commandResponseSchemas.confirm_close
+    );
+    closeBlockedOpen = false;
+  }
+
+  /** `install` never gets a confirm action here (see `closeBlockedConfirm`) or on the backend
+   * (`lifecycle::confirm_close_outcome`), which refuses it independently of what this returns. */
+  function closeBlockedConfirm(): (() => void) | undefined {
+    if (closeBlockedReason === 'install') return undefined;
+    return () => void confirmClose(stopOperationFor(closeBlockedReason));
   }
 
   function onboardingSteps(): [
@@ -167,11 +303,13 @@
       advancedAccessNote:
         coverage?.advanced_access === 'installable'
           ? t('onboarding.access.installable')
-          : coverage?.advanced_access === 'available'
-            ? t('onboarding.access.available')
-            : coverage?.advanced_access === 'denied'
-              ? t('onboarding.access.denied')
-              : undefined
+          : coverage?.advanced_access === 'upgradable'
+            ? t('onboarding.access.upgradable')
+            : coverage?.advanced_access === 'available'
+              ? t('onboarding.access.available')
+              : coverage?.advanced_access === 'denied'
+                ? t('onboarding.access.denied')
+                : undefined
     };
     return [
       {
@@ -265,10 +403,7 @@
       maximized = !maximized;
       void windowAdapter.toggleMaximize();
     }}
-    onClose={() => {
-      if (guidedRunning) closeBlockedOpen = true;
-      else closeWindow();
-    }}
+    onClose={requestClose}
     minimizeLabel={t('app.minimize')}
     maximizeLabel={t('app.maximize')}
     restoreLabel={t('app.restore')}
@@ -349,20 +484,14 @@
         <main aria-label={t('cpu.title')}>
           <CpuOverview />
         </main>
+      {:else if active === 'sessions'}
+        <main aria-label={t('nav.sessions')}>
+          <Sessions />
+        </main>
       {:else if active === 'settings'}
-        <EmptyState
-          icon={settingsIcon}
-          title={t('screens.comingSoon')}
-          description={t('screens.notAvailable')}
-        >
-          {#snippet action()}
-            <Button
-              variant="secondary"
-              label={t('settings.repeatIntroduction')}
-              onclick={repeatIntroduction}
-            />
-          {/snippet}
-        </EmptyState>
+        <main aria-label={t('nav.settings')}>
+          <SettingsHost onRepeatIntroduction={repeatIntroduction} />
+        </main>
       {:else}
         <EmptyState
           icon={active === 'sessions'
@@ -390,13 +519,48 @@
 
   <CloseBlockedDialog
     bind:open={closeBlockedOpen}
-    reason="guided"
-    title={t('guided.inProgress')}
-    description={t('guided.closeDescription')}
-    confirmLabel={t('guided.closeAndStop')}
-    cancelLabel={t('guided.cancel')}
-    onConfirm={() => void stopGuidedAndClose()}
+    reason={closeBlockedReason}
+    title={closeBlockedReason === 'guided'
+      ? t('guided.inProgress')
+      : closeBlockedReason === 'export'
+        ? t('settings.closeBlockedExportTitle')
+        : closeBlockedReason === 'download'
+          ? t('settings.closeBlockedDownloadTitle')
+          : t('settings.closeBlockedInstallTitle')}
+    description={closeBlockedReason === 'guided'
+      ? t('guided.closeDescription')
+      : closeBlockedReason === 'export'
+        ? t('settings.closeBlockedExportDescription')
+        : closeBlockedReason === 'download'
+          ? t('settings.closeBlockedDownloadDescription')
+          : t('settings.closeBlockedInstallDescription')}
+    confirmLabel={closeBlockedReason === 'guided'
+      ? t('guided.closeAndStop')
+      : closeBlockedReason === 'export'
+        ? t('settings.closeBlockedExportConfirm')
+        : closeBlockedReason === 'download'
+          ? t('settings.closeBlockedDownloadConfirm')
+          : undefined}
+    cancelLabel={closeBlockedReason === 'guided'
+      ? t('guided.cancel')
+      : closeBlockedReason === 'install'
+        ? t('settings.closeBlockedInstallUnderstood')
+        : t('settings.cancel')}
+    onConfirm={closeBlockedConfirm()}
     onCancel={() => (closeBlockedOpen = false)}
+  />
+
+  <FirstCloseDialog
+    bind:open={firstCloseOpen}
+    title={t('settings.firstCloseTitle')}
+    description={t('settings.firstCloseDescription')}
+    exitLabel={t('settings.exit')}
+    trayLabel={t('settings.firstCloseTray')}
+    trayNote={t('settings.firstCloseTrayNote')}
+    settingsHint={t('settings.firstCloseSettingsHint')}
+    onExit={() => void resolveFirstClose('exit')}
+    onTray={() => void resolveFirstClose('tray')}
+    onDismiss={() => void resolveFirstClose('dismiss')}
   />
 
   {#if win.tier === 'compact'}

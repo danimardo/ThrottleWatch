@@ -218,7 +218,7 @@ Tabla de magnitudes × estado, reutilizada en `Ahora` (panel) y en `Ajustes → 
 - Filas: temperatura, límite térmico efectivo, carga por núcleo, frecuencia activa, frecuencia base, potencia, límite de potencia, razón térmica, PROCHOT, razón de potencia, razón de corriente.
 - Columnas: disponible (icono + texto), calidad (`directo` / `derivado` / `sustituto`), sensor de origen, motivo de ausencia.
 - Cabecera: **nivel de cobertura** (A completo / B con potencia / C básico) con una frase de lo que permite concluir; en B y C, el acceso avanzado se presenta como recomendado para llegar al nivel A.
-- Pie: «Confianza máxima alcanzable en este equipo: alta / media / baja» y estado del acceso avanzado (`not_needed | available | installable | denied | error`) con «Instalar/Reparar acceso avanzado» solo en `installable`.
+- Pie: «Confianza máxima alcanzable en este equipo: alta / media / baja» y estado del acceso avanzado (`not_needed | available | installable | upgradable | denied | error`) con «Instalar/Actualizar acceso avanzado» solo en `installable`/`upgradable`.
 - Acciones: «Volver a comprobar» y «Copiar resumen técnico».
 
 ## Pantalla “Informe”

@@ -8,14 +8,16 @@ test('@critical guided diagnosis shows phases and stops with Ctrl+Shift+X', asyn
     .getByRole('button', { name: /guided diagnostic|diagnóstico guiado/i })
     .click();
   await expect(
-    page.getByRole('heading', { name: /diagnóstico guiado/i })
+    page.getByRole('heading', { name: /guided diagnostic|diagnóstico guiado/i })
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Iniciar' }).click();
+  await page.getByRole('button', { name: /start|iniciar/i }).click();
   await expect(
-    page.getByRole('button', { name: 'Omitir reposo' })
+    page.getByRole('button', { name: /skip rest|omitir reposo/i })
   ).toBeVisible();
   await page.keyboard.press('Control+Shift+X');
-  await expect(page.getByText('Prueba incompleta')).toBeVisible();
+  await expect(
+    page.getByText(/incomplete test|prueba incompleta/i)
+  ).toBeVisible();
 });
 
 test('@critical guided session remains stoppable after navigation and protects close', async ({
@@ -26,22 +28,24 @@ test('@critical guided session remains stoppable after navigation and protects c
   await page
     .getByRole('button', { name: /guided diagnostic|diagnóstico guiado/i })
     .click();
-  await page.getByRole('button', { name: 'Iniciar' }).click();
-  await page.getByRole('button', { name: 'Omitir reposo' }).click();
+  await page.getByRole('button', { name: /start|iniciar/i }).click();
+  await page.getByRole('button', { name: /skip rest|omitir reposo/i }).click();
 
   await page.getByRole('button', { name: /analysis|análisis/i }).click();
-  const globalStop = page.getByRole('button', { name: 'Detener ahora' });
+  const globalStop = page.getByRole('button', {
+    name: /stop now|detener ahora/i
+  });
   await expect(globalStop).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(globalStop).toBeVisible();
 
   await page.locator('button.close').click();
   await expect(
-    page.getByRole('button', { name: 'Detener y salir' })
+    page.getByRole('button', { name: /stop and exit|detener y salir/i })
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Cancelar' }).click();
+  await page.getByRole('button', { name: /cancel|cancelar/i }).click();
   await expect(
-    page.getByRole('button', { name: 'Detener y salir' })
+    page.getByRole('button', { name: /stop and exit|detener y salir/i })
   ).toBeHidden();
 
   await globalStop.click();
@@ -49,7 +53,9 @@ test('@critical guided session remains stoppable after navigation and protects c
   await page
     .getByRole('button', { name: /guided diagnostic|diagnóstico guiado/i })
     .click();
-  await expect(page.getByText('Prueba incompleta')).toBeVisible();
+  await expect(
+    page.getByText(/incomplete test|prueba incompleta/i)
+  ).toBeVisible();
 });
 
 test('@critical guided diagnosis also works at compact size', async ({
@@ -61,16 +67,18 @@ test('@critical guided diagnosis also works at compact size', async ({
   await page
     .getByRole('menuitem', { name: /guided diagnostic|diagnóstico guiado/i })
     .click();
-  await page.getByRole('button', { name: 'Iniciar' }).click();
+  await page.getByRole('button', { name: /start|iniciar/i }).click();
   await expect(
-    page.getByRole('button', { name: 'Omitir reposo' })
+    page.getByRole('button', { name: /skip rest|omitir reposo/i })
   ).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(
-    page.getByRole('button', { name: 'Omitir reposo' })
+    page.getByRole('button', { name: /skip rest|omitir reposo/i })
   ).toBeVisible();
   await page.keyboard.press('Control+Shift+X');
-  await expect(page.getByText('Prueba incompleta')).toBeVisible();
+  await expect(
+    page.getByText(/incomplete test|prueba incompleta/i)
+  ).toBeVisible();
 });
 
 test('@critical analysis renders four tracks, gaps and event evidence', async ({
@@ -79,26 +87,36 @@ test('@critical analysis renders four tracks, gaps and event evidence', async ({
   await page.goto('/');
   await page.getByRole('button', { name: /analysis|análisis/i }).click();
   await expect(
-    page.getByRole('group', { name: 'Pistas del análisis' }).first()
+    page
+      .getByRole('group', { name: /analysis tracks|pistas del análisis/i })
+      .first()
   ).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Thermal limit' })
   ).toBeVisible();
   await expect(
-    page.getByRole('slider', { name: 'Cursor temporal' })
+    page.getByRole('slider', { name: /time cursor|cursor temporal/i })
   ).toHaveAttribute('aria-valuenow', '0');
   await expect(page.locator('path[stroke-dasharray="3 3"]')).toHaveCount(4);
-  await expect(page.getByText('Evidencia', { exact: true })).toBeVisible();
-  await page.getByRole('slider', { name: 'Cursor temporal' }).press('Home');
-  await page.getByRole('slider', { name: 'Cursor temporal' }).press('Enter');
-  await page.getByRole('slider', { name: 'Cursor temporal' }).press('End');
-  await page.getByRole('slider', { name: 'Cursor temporal' }).press('Enter');
+  await expect(page.getByText(/^Evidence$|^Evidencia$/i)).toBeVisible();
+  await page
+    .getByRole('slider', { name: /time cursor|cursor temporal/i })
+    .press('Home');
+  await page
+    .getByRole('slider', { name: /time cursor|cursor temporal/i })
+    .press('Enter');
+  await page
+    .getByRole('slider', { name: /time cursor|cursor temporal/i })
+    .press('End');
+  await page
+    .getByRole('slider', { name: /time cursor|cursor temporal/i })
+    .press('Enter');
   await expect(
-    page.getByText('Rango seleccionado', { exact: true })
+    page.getByText(/Selected range|Rango seleccionado/i, { exact: true })
   ).toBeVisible();
   await expect(page.locator('table')).toBeAttached();
   await expect(
-    page.getByRole('slider', { name: 'Cursor temporal' })
+    page.getByRole('slider', { name: /time cursor|cursor temporal/i })
   ).toHaveAttribute('aria-valuenow', '3');
   await page.screenshot({
     path: 'test-results/analysis-guided.png',
@@ -139,10 +157,12 @@ test('@critical CPU topology keeps core selection while changing metric', async 
   await expect(page.locator('.group-label', { hasText: 'P' })).toBeVisible();
   await expect(page.locator('.group-label', { hasText: 'E' })).toBeVisible();
 
-  const firstCore = page.locator('button[aria-label*="Núcleo 0"]').first();
+  const firstCore = page
+    .locator('button[aria-label*="Core 0"], button[aria-label*="Núcleo 0"]')
+    .first();
   await firstCore.click();
   await expect(firstCore).toHaveAttribute('aria-pressed', 'true');
-  await page.getByRole('button', { name: 'Frecuencia' }).click();
+  await page.getByRole('button', { name: /frequency|frecuencia/i }).click();
   await expect(firstCore).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByText('3900 MHz', { exact: true })).toBeVisible();
 });

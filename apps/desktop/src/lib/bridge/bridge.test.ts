@@ -4,11 +4,16 @@ import {
   fakeBridgeAllowed,
   invokeValidated,
   listenValidated,
+  parseEvent,
   validateEnvelope
 } from './index';
 import { z } from 'zod';
 import { FakeBridge, liveSnapshot } from '../../test-support/bridge';
-import { liveSnapshotSchema } from './schemas';
+import {
+  coverageMatrixSchema,
+  liveSnapshotSchema,
+  trayStateSchema
+} from './schemas';
 
 const validEnvelope = {
   protocol_version: 1,
@@ -72,6 +77,26 @@ describe('bridge outside Tauri', () => {
 });
 
 describe('injectable bridge transport', () => {
+  it('accepts a coverage transition with its stable reason', () => {
+    const result = parseEvent('coverage:changed', {
+      tier: 'B',
+      confidence_ceiling: 'medium',
+      advanced_access: 'denied',
+      rows: [],
+      conclusion_key: 'coverage.conclusion.b',
+      from_tier: 'A',
+      to_tier: 'B',
+      reason: 'provider_error'
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.from_tier).toBe('A');
+      expect(result.value.to_tier).toBe('B');
+      expect(result.value.reason).toBe('provider_error');
+    }
+  });
+
   it('invokes and validates a fake command response', async () => {
     const bridge = createBridge(new FakeBridge());
     const result = await bridge.invokeValidated(
@@ -96,5 +121,53 @@ describe('injectable bridge transport', () => {
     stop();
 
     expect(values).toEqual([{ state: 'running' }]);
+  });
+
+  it('pauses the fake collector through the same nested request as Tauri', async () => {
+    const fake = new FakeBridge();
+    const bridge = createBridge(fake);
+    const result = await bridge.invokeValidated(
+      'set_tray_paused',
+      { request: { paused: true } },
+      trayStateSchema
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: { icon: 'unknown', paused: true }
+    });
+  });
+});
+
+describe('advanced access vocabulary', () => {
+  it('accepts every state the host derives, including an older PawnIO', () => {
+    for (const state of [
+      'not_needed',
+      'available',
+      'installable',
+      'upgradable',
+      'denied',
+      'error'
+    ]) {
+      const parsed = coverageMatrixSchema.safeParse({
+        tier: 'B',
+        confidence_ceiling: 'medium',
+        advanced_access: state,
+        rows: [],
+        conclusion_key: 'coverage.conclusion.b'
+      });
+      expect(parsed.success, state).toBe(true);
+    }
+  });
+
+  it('rejects a state outside the closed vocabulary', () => {
+    const parsed = coverageMatrixSchema.safeParse({
+      tier: 'B',
+      confidence_ceiling: 'medium',
+      advanced_access: 'reinstallable',
+      rows: [],
+      conclusion_key: 'coverage.conclusion.b'
+    });
+    expect(parsed.success).toBe(false);
   });
 });

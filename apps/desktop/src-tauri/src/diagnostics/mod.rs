@@ -1,5 +1,6 @@
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
+pub mod alerts;
 pub mod analysis;
 pub mod classifier;
 pub mod disk_space;
@@ -9,6 +10,7 @@ pub mod platform;
 pub mod potential;
 pub mod power;
 pub mod rules;
+pub mod sampling;
 pub mod thermal;
 pub mod topology;
 pub mod windows;

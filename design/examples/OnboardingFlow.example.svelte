@@ -19,6 +19,7 @@
     not_needed: 'No hace falta acceso avanzado en este equipo.',
     available: 'Acceso avanzado disponible.',
     installable: 'Recomendado: el acceso avanzado sube este equipo al nivel A (confirmar la causa y estimar cuánto ayudaría enfriar mejor).',
+    upgradable: 'Hay una versión anterior del controlador de acceso avanzado; actualizarla mejora la cobertura.',
     denied: 'El acceso avanzado está bloqueado por una directiva del sistema o por el antivirus.',
     error: 'No se pudo comprobar el acceso avanzado.'
   };

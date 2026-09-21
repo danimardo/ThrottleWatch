@@ -27,6 +27,7 @@
     collectorState: CollectorState;
     /** e.g. "Conectado · hace 1 s" / "Datos obsoletos · hace 12 s" / "Colector desconectado". */
     collectorLabel: string;
+    coverageNoticeLabel?: string;
     coverageActionLabel?: string;
     onCoverage?: () => void;
     coverageIcon?: Snippet;
@@ -39,6 +40,7 @@
     powerLabel,
     collectorState,
     collectorLabel,
+    coverageNoticeLabel,
     coverageActionLabel,
     onCoverage,
     coverageIcon,
@@ -93,6 +95,10 @@
       <span class="body" style:color={collectorState === 'fresh' ? 'var(--text-secondary)' : 'var(--tw-strip-color)'}>{collectorLabel}</span>
     </span>
   </div>
+
+  {#if coverageNoticeLabel}
+    <span class="caption coverage-notice" style:color="var(--status-warm)">{coverageNoticeLabel}</span>
+  {/if}
 
   {#if onCoverage && coverageActionLabel}
     <div class="group action">
@@ -166,6 +172,13 @@
   .action {
     flex: 0 0 auto;
     margin-left: auto;
+  }
+  .coverage-notice {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .tw-context-strip.compact {
     flex-wrap: wrap;

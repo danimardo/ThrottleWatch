@@ -8,15 +8,16 @@
 //! policy) comes from `ruleset-v1`.
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
+use super::host_clock::{self, HostClockReading};
 use super::live::{CollectorState, LiveState};
-use crate::diagnostics::Ruleset;
+use crate::diagnostics::{CoverageTier, Ruleset};
 use crate::ipc::protocol::{MAX_MESSAGE_BYTES, PROTOCOL_VERSION, validate_message};
 use crate::ipc::supervisor::{RestartPolicy, spawn_verified};
 use serde_json::{Value, json};
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, mpsc};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -31,6 +32,24 @@ pub enum Change {
     Collector,
     Catalog,
     Sample,
+    Coverage { from: CoverageTier, to: CoverageTier, reason: CoverageChangeReason },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CoverageChangeReason {
+    Sample,
+    ProviderError,
+    Catalog,
+}
+
+impl CoverageChangeReason {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Sample => "sample",
+            Self::ProviderError => "provider_error",
+            Self::Catalog => "catalog",
+        }
+    }
 }
 
 /// Told after every change of the live state (the glue emits the Tauri events from here).
@@ -56,23 +75,36 @@ pub trait CollectorLauncher: Send {
 
 #[derive(Debug, Clone)]
 pub struct RuntimeConfig {
-    pub interval: Duration,
+    /// The sampling interval in force, shared with [`CollectorRuntime::set_interval`]: a change
+    /// ends the session as [`SessionEnd::Reconfigured`] and the next one starts with the new value.
+    pub interval_ms: Arc<AtomicU64>,
     pub stall_intervals: u32,
     pub max_invalid: u32,
     pub handshake_timeout: Duration,
     pub restart: RestartPolicy,
+    /// Where the host-derived clock comes from; replaced in tests so they never touch the machine.
+    pub host_clock: fn() -> Option<HostClockReading>,
 }
 
 impl RuntimeConfig {
     pub fn from_ruleset(rules: &Ruleset) -> Option<Self> {
-        let interval_ms = rules.parameter("sampling.interval_normal_ms")?;
+        Self::from_ruleset_with_profile(rules, "normal")
+    }
+
+    pub fn from_ruleset_with_profile(rules: &Ruleset, profile: &str) -> Option<Self> {
+        let interval_key = match profile {
+            "low_power" => "sampling.interval_low_power_ms",
+            "diagnostic" => "sampling.interval_diagnostic_ms",
+            _ => "sampling.interval_normal_ms",
+        };
+        let interval_ms = rules.parameter(interval_key)?;
         let stall = rules.parameter("collector.stall_intervals")?;
         let max_invalid = rules.parameter("collector.max_invalid_messages")?;
         let max_restarts = rules.parameter("collector.max_restarts")?;
         let window_min = rules.parameter("collector.restart_window_min")?;
         let interval = Duration::from_millis(interval_ms as u64);
         Some(Self {
-            interval,
+            interval_ms: Arc::new(AtomicU64::new(interval_ms as u64)),
             stall_intervals: stall as u32,
             max_invalid: max_invalid as u32,
             // The sidecar must answer `hello` and publish its catalog within the stall window of the
@@ -83,11 +115,16 @@ impl RuntimeConfig {
                 window: Duration::from_secs((window_min as u64).saturating_mul(60)),
                 ..RestartPolicy::default()
             },
+            host_clock: host_clock::read,
         })
     }
 
+    pub fn interval(&self) -> Duration {
+        Duration::from_millis(self.interval_ms.load(Ordering::SeqCst))
+    }
+
     fn stall_window(&self) -> Duration {
-        self.interval.saturating_mul(self.stall_intervals)
+        self.interval().saturating_mul(self.stall_intervals)
     }
 }
 
@@ -102,6 +139,10 @@ pub enum SessionEnd {
     Fatal,
     /// The application asked to stop.
     Stopped,
+    /// The tray asked to pause sampling; the session can be restarted when resumed.
+    Paused,
+    /// The sampling interval changed (profile, battery policy): restart at once with the new one.
+    Reconfigured,
 }
 
 fn lock(live: &Mutex<LiveState>) -> MutexGuard<'_, LiveState> {
@@ -147,17 +188,32 @@ pub fn run_session(
     config: &RuntimeConfig,
     stop: &AtomicBool,
 ) -> SessionEnd {
+    let pause = AtomicBool::new(false);
+    run_session_with_pause(link, nonce, live, observer, config, stop, &pause)
+}
+
+fn run_session_with_pause(
+    link: &mut dyn CollectorLink,
+    nonce: &str,
+    live: &Mutex<LiveState>,
+    observer: &dyn LiveObserver,
+    config: &RuntimeConfig,
+    stop: &AtomicBool,
+    pause: &AtomicBool,
+) -> SessionEnd {
     let mut outbox = Outbox { link, nonce, sequence: 0 };
     let hello = json!({"app_version": env!("CARGO_PKG_VERSION"), "supported_protocols": [PROTOCOL_VERSION]});
     if outbox.send("hello", &hello).is_err() {
         return SessionEnd::Eof;
     }
 
+    let session_interval_ms = config.interval_ms.load(Ordering::SeqCst);
     let mut previous: Option<u64> = None;
     let mut invalid = 0_u32;
     let mut sent_start = false;
     let mut started = false;
     let mut last_progress = Instant::now();
+    let mut coverage = None;
 
     loop {
         if stop.load(Ordering::SeqCst) {
@@ -165,6 +221,16 @@ pub fn run_session(
             let _ = outbox.send("stop", &json!({}));
             let _ = outbox.send("shutdown", &json!({}));
             return SessionEnd::Stopped;
+        }
+        if pause.load(Ordering::SeqCst) {
+            let _ = outbox.send("stop", &json!({}));
+            let _ = outbox.send("shutdown", &json!({}));
+            return SessionEnd::Paused;
+        }
+        if config.interval_ms.load(Ordering::SeqCst) != session_interval_ms {
+            let _ = outbox.send("stop", &json!({}));
+            let _ = outbox.send("shutdown", &json!({}));
+            return SessionEnd::Reconfigured;
         }
         let limit = if started { config.stall_window() } else { config.handshake_timeout };
         match outbox.link.receive(STOP_POLL.min(limit)) {
@@ -197,6 +263,7 @@ pub fn run_session(
                     &mut outbox,
                     &mut sent_start,
                     &mut started,
+                    &mut coverage,
                 );
                 match handled {
                     Handled::Progress => {
@@ -236,6 +303,7 @@ fn handle_message(
     outbox: &mut Outbox<'_>,
     sent_start: &mut bool,
     started: &mut bool,
+    coverage: &mut Option<CoverageTier>,
 ) -> Handled {
     match message_type {
         "hello_ack" => Handled::Progress,
@@ -245,10 +313,12 @@ fn handle_message(
                 return Handled::Invalid;
             }
             observer.updated(Change::Catalog, &guard);
+            observe_coverage(&guard, observer, coverage, CoverageChangeReason::Catalog);
             drop(guard);
             if !*sent_start {
-                let start =
-                    json!({"interval_ms": config.interval.as_millis() as u64, "detail": DETAIL});
+                let interval_ms = config.interval().as_millis() as u64;
+                lock(live).set_sampling_interval_ms(interval_ms);
+                let start = json!({"interval_ms": interval_ms, "detail": DETAIL});
                 if outbox.send("start", &start).is_err() {
                     return Handled::PeerClosed;
                 }
@@ -265,10 +335,12 @@ fn handle_message(
         }
         "sample" => {
             let mut guard = lock(live);
+            guard.apply_host_clock((config.host_clock)());
             if guard.apply_sample(payload, epoch_ms()).is_err() {
                 return Handled::Invalid;
             }
             observer.updated(Change::Sample, &guard);
+            observe_coverage(&guard, observer, coverage, CoverageChangeReason::Sample);
             Handled::Progress
         }
         "error" => match payload.get("severity").and_then(Value::as_str) {
@@ -277,8 +349,10 @@ fn handle_message(
                 let key = payload.get("message_key").and_then(Value::as_str).map(str::to_owned);
                 let mut guard = lock(live);
                 let attempt = guard.attempt();
+                guard.clear_advanced_readings();
                 guard.set_collector(CollectorState::Degraded, attempt, key);
                 observer.updated(Change::Collector, &guard);
+                observe_coverage(&guard, observer, coverage, CoverageChangeReason::ProviderError);
                 Handled::Ignored
             }
             _ => Handled::Ignored,
@@ -286,6 +360,21 @@ fn handle_message(
         "stopped" => Handled::PeerClosed,
         _ => Handled::Ignored,
     }
+}
+
+fn observe_coverage(
+    live: &LiveState,
+    observer: &dyn LiveObserver,
+    previous: &mut Option<CoverageTier>,
+    reason: CoverageChangeReason,
+) {
+    let current = live.coverage_signals().tier();
+    if let Some(from) = *previous
+        && from != current
+    {
+        observer.updated(Change::Coverage { from, to: current, reason }, live);
+    }
+    *previous = Some(current);
 }
 
 fn session_nonce() -> String {
@@ -310,6 +399,18 @@ pub fn run_forever(
     config: &RuntimeConfig,
     stop: &AtomicBool,
 ) {
+    let pause = AtomicBool::new(false);
+    run_forever_with_pause(launcher, live, observer, config, stop, &pause);
+}
+
+fn run_forever_with_pause(
+    launcher: &mut dyn CollectorLauncher,
+    live: &Mutex<LiveState>,
+    observer: &dyn LiveObserver,
+    config: &RuntimeConfig,
+    stop: &AtomicBool,
+    pause: &AtomicBool,
+) {
     let mut attempts: Vec<Instant> = Vec::new();
     let mut restart_number = 0_u32;
     while !stop.load(Ordering::SeqCst) {
@@ -317,9 +418,15 @@ pub fn run_forever(
             if restart_number == 0 { CollectorState::Starting } else { CollectorState::Restarting };
         set_state(live, observer, state, restart_number, None);
         let end = match launcher.launch() {
-            Ok(mut link) => {
-                run_session(link.as_mut(), &session_nonce(), live, observer, config, stop)
-            }
+            Ok(mut link) => run_session_with_pause(
+                link.as_mut(),
+                &session_nonce(),
+                live,
+                observer,
+                config,
+                stop,
+                pause,
+            ),
             Err(_) => {
                 // A missing, altered or unstartable sidecar is not transient: retrying changes nothing.
                 set_state(
@@ -334,6 +441,17 @@ pub fn run_forever(
         };
         if end == SessionEnd::Stopped || stop.load(Ordering::SeqCst) {
             break;
+        }
+        if end == SessionEnd::Paused {
+            while pause.load(Ordering::SeqCst) && !stop.load(Ordering::SeqCst) {
+                thread::sleep(STOP_POLL);
+            }
+            restart_number = 0;
+            continue;
+        }
+        if end == SessionEnd::Reconfigured {
+            restart_number = 0;
+            continue;
         }
         if !config.restart.can_restart(&mut attempts, Instant::now()) {
             set_state(
@@ -491,6 +609,11 @@ impl CollectorLauncher for CommandLauncher {
 /// Owns the thread that runs the collector; stopping it ends the session and kills the process.
 pub struct CollectorRuntime {
     stop: Arc<AtomicBool>,
+    /// The effective pause the session loop watches: the person's, or the battery policy's.
+    pause: Arc<AtomicBool>,
+    user_paused: AtomicBool,
+    battery_paused: AtomicBool,
+    interval_ms: Arc<AtomicU64>,
     handle: Option<JoinHandle<()>>,
 }
 
@@ -502,12 +625,57 @@ impl CollectorRuntime {
         config: RuntimeConfig,
     ) -> io::Result<Self> {
         let stop = Arc::new(AtomicBool::new(false));
+        let pause = Arc::new(AtomicBool::new(false));
         let thread_stop = Arc::clone(&stop);
+        let thread_pause = Arc::clone(&pause);
+        let interval_ms = Arc::clone(&config.interval_ms);
         let handle =
             thread::Builder::new().name("collector-runtime".to_owned()).spawn(move || {
-                run_forever(launcher.as_mut(), &live, observer.as_ref(), &config, &thread_stop);
+                run_forever_with_pause(
+                    launcher.as_mut(),
+                    &live,
+                    observer.as_ref(),
+                    &config,
+                    &thread_stop,
+                    &thread_pause,
+                );
             })?;
-        Ok(Self { stop, handle: Some(handle) })
+        Ok(Self {
+            stop,
+            pause,
+            user_paused: AtomicBool::new(false),
+            battery_paused: AtomicBool::new(false),
+            interval_ms,
+            handle: Some(handle),
+        })
+    }
+
+    /// The person's pause (tray menu, `set_tray_paused`).
+    pub fn set_paused(&self, paused: bool) {
+        self.user_paused.store(paused, Ordering::SeqCst);
+        self.apply_pause();
+    }
+
+    /// The `sampling.on_battery = pause` policy; independent of the person's pause.
+    pub fn set_battery_paused(&self, paused: bool) {
+        self.battery_paused.store(paused, Ordering::SeqCst);
+        self.apply_pause();
+    }
+
+    fn apply_pause(&self) {
+        let effective =
+            self.user_paused.load(Ordering::SeqCst) || self.battery_paused.load(Ordering::SeqCst);
+        self.pause.store(effective, Ordering::SeqCst);
+    }
+
+    /// Whether the person paused sampling (the tray label); the battery policy is not a pause
+    /// the person asked for.
+    pub fn is_paused(&self) -> bool {
+        self.user_paused.load(Ordering::SeqCst)
+    }
+
+    pub fn set_interval(&self, interval: Duration) {
+        self.interval_ms.store(interval.as_millis() as u64, Ordering::SeqCst);
     }
 
     pub fn stop(&mut self) {
@@ -584,7 +752,7 @@ mod tests {
 
     fn config() -> RuntimeConfig {
         RuntimeConfig {
-            interval: Duration::from_millis(20),
+            interval_ms: Arc::new(AtomicU64::new(20)),
             stall_intervals: 3,
             max_invalid: 3,
             handshake_timeout: Duration::from_millis(400),
@@ -594,6 +762,7 @@ mod tests {
                 initial_backoff: Duration::from_millis(1),
                 max_backoff: Duration::from_millis(2),
             },
+            host_clock: || None,
         }
     }
 
@@ -734,6 +903,58 @@ mod tests {
     }
 
     #[test]
+    fn provider_error_emits_a_coverage_transition_without_losing_the_session() {
+        let mut inbound = good_start();
+        inbound[1] = message(
+            1,
+            "capabilities",
+            json!({
+                "cpu": {"vendor": "amd", "display_name": "Test CPU", "logical_processors": 4, "hybrid": false, "virtualized": false},
+                "groups": [{"id": "all", "kind": "homogeneous", "logical_count": 4}],
+                "sensors": [
+                    {"id": "cpu.package.temp", "source_id": "t", "source_name": "CPU Temperature", "metric": "temperature", "scope": "package", "unit": "celsius", "quality": "direct"},
+                    {"id": "cpu.package.clock", "source_id": "c", "source_name": "CPU Clock", "metric": "clock", "scope": "package", "unit": "megahertz", "quality": "direct"},
+                    {"id": "cpu.package.power", "source_id": "p", "source_name": "CPU Power", "metric": "power", "scope": "package", "unit": "watt", "quality": "direct"},
+                    {"id": "cpu.package.limit", "source_id": "l", "source_name": "CPU Limit", "metric": "power_limit", "scope": "package", "unit": "watt", "quality": "direct"},
+                    {"id": "cpu.package.thermal", "source_id": "r", "source_name": "Thermal Flag", "metric": "thermal_flag", "scope": "package", "unit": "boolean", "quality": "direct"},
+                    {"id": "cpu.core.1.load", "source_id": "cl", "source_name": "Core Load", "metric": "load", "scope": "core", "scope_ref": "1", "unit": "percent", "quality": "direct"}
+                ]
+            }),
+        );
+        inbound.push(message(
+            3,
+            "sample",
+            json!({"monotonic_ms": 1, "duration_ms": 1, "values": [
+                {"sensor_id": "cpu.package.temp", "number": 70.0, "status": "ok"},
+                {"sensor_id": "cpu.package.clock", "number": 3900.0, "status": "ok"},
+                {"sensor_id": "cpu.package.power", "number": 60.0, "status": "ok"},
+                {"sensor_id": "cpu.package.limit", "number": 95.0, "status": "ok"},
+                {"sensor_id": "cpu.package.thermal", "boolean": true, "status": "ok"},
+                {"sensor_id": "cpu.core.1.load", "number": 40.0, "status": "ok"}
+            ]}),
+        ));
+        inbound.push(message(
+            4,
+            "error",
+            json!({"code": "SENSOR_ENUMERATION_FAILED", "severity": "recoverable", "message_key": "collector.sensor_enumeration_failed"}),
+        ));
+        inbound.push(Received::Eof);
+        let mut link = Scripted::new(inbound, || Received::Eof);
+        let (end, _live, observer) = run(&mut link, &AtomicBool::new(false));
+
+        assert_eq!(end, SessionEnd::Eof);
+        let changes = lock_vec(&observer.changes);
+        assert!(changes.iter().any(|change| matches!(
+            change,
+            Change::Coverage {
+                from: CoverageTier::A,
+                to: CoverageTier::B,
+                reason: CoverageChangeReason::ProviderError
+            }
+        )));
+    }
+
+    #[test]
     fn the_stop_flag_asks_the_sidecar_to_stop_and_ends_the_session() {
         let mut link = Scripted::new(good_start(), || Received::Timeout);
         let stop = AtomicBool::new(true);
@@ -744,6 +965,75 @@ mod tests {
         let types: Vec<&str> =
             link.sent.iter().filter_map(|message| message["type"].as_str()).collect();
         assert_eq!(types, vec!["hello", "stop", "shutdown"]);
+    }
+
+    #[test]
+    fn the_pause_flag_ends_the_session_without_marking_the_collector_failed() {
+        let mut link = Scripted::new(good_start(), || Received::Timeout);
+        let stop = AtomicBool::new(false);
+        let pause = AtomicBool::new(true);
+        let live = Mutex::new(LiveState::new());
+        let observer = Recorder::default();
+
+        let end =
+            run_session_with_pause(&mut link, NONCE, &live, &observer, &config(), &stop, &pause);
+
+        assert_eq!(end, SessionEnd::Paused);
+        let types: Vec<&str> =
+            link.sent.iter().filter_map(|message| message["type"].as_str()).collect();
+        assert_eq!(types, vec!["hello", "stop", "shutdown"]);
+        assert_eq!(lock(&live).collector(), CollectorState::Stopped);
+    }
+
+    #[test]
+    fn changing_the_interval_ends_the_session_so_the_next_one_starts_with_the_new_value() {
+        let mut link = Scripted::new(good_start(), || Received::Timeout);
+        let stop = AtomicBool::new(false);
+        let pause = AtomicBool::new(false);
+        let live = Mutex::new(LiveState::new());
+        let observer = Recorder::default();
+        let mut config = config();
+        config.stall_intervals = 100; // the stall window must outlast the change
+        let interval = Arc::clone(&config.interval_ms);
+        let changer = thread::spawn(move || {
+            thread::sleep(Duration::from_millis(50));
+            interval.store(500, Ordering::SeqCst);
+        });
+
+        let end =
+            run_session_with_pause(&mut link, NONCE, &live, &observer, &config, &stop, &pause);
+        let _ = changer.join();
+
+        assert_eq!(end, SessionEnd::Reconfigured);
+        let types: Vec<&str> =
+            link.sent.iter().filter_map(|message| message["type"].as_str()).collect();
+        assert_eq!(types, vec!["hello", "start", "stop", "shutdown"]);
+        assert_eq!(link.sent[1]["payload"]["interval_ms"], 20);
+        assert_eq!(config.interval(), Duration::from_millis(500));
+        assert_eq!(lock(&live).sampling_interval_ms(), Some(20));
+    }
+
+    #[test]
+    fn the_battery_pause_and_the_persons_pause_are_independent() {
+        let runtime_pause = Arc::new(AtomicBool::new(false));
+        let runtime = CollectorRuntime {
+            stop: Arc::new(AtomicBool::new(false)),
+            pause: Arc::clone(&runtime_pause),
+            user_paused: AtomicBool::new(false),
+            battery_paused: AtomicBool::new(false),
+            interval_ms: Arc::new(AtomicU64::new(1000)),
+            handle: None,
+        };
+        runtime.set_battery_paused(true);
+        assert!(runtime_pause.load(Ordering::SeqCst));
+        assert!(!runtime.is_paused(), "the battery policy is not the person's pause");
+        runtime.set_paused(true);
+        runtime.set_battery_paused(false);
+        assert!(runtime_pause.load(Ordering::SeqCst), "the person's pause still holds");
+        runtime.set_paused(false);
+        assert!(!runtime_pause.load(Ordering::SeqCst));
+        runtime.set_interval(Duration::from_secs(5));
+        assert_eq!(runtime.interval_ms.load(Ordering::SeqCst), 5000);
     }
 
     struct Launcher {
@@ -807,10 +1097,23 @@ mod tests {
 
         let config = RuntimeConfig::from_ruleset(&rules).unwrap_or_else(|| panic!("config"));
 
-        assert_eq!(config.interval, Duration::from_millis(1000));
+        assert_eq!(config.interval(), Duration::from_millis(1000));
         assert_eq!(config.stall_intervals, 3);
         assert_eq!(config.max_invalid, 3);
         assert_eq!(config.restart.max_restarts, 3);
         assert_eq!(config.restart.window, Duration::from_secs(600));
+    }
+
+    #[test]
+    fn the_selected_sampling_profile_changes_the_collector_interval() {
+        let rules = Ruleset::v1().unwrap_or_else(|error| panic!("ruleset: {error}"));
+        let low = RuntimeConfig::from_ruleset_with_profile(&rules, "low_power")
+            .unwrap_or_else(|| panic!("low power profile"));
+        let normal = RuntimeConfig::from_ruleset_with_profile(&rules, "normal")
+            .unwrap_or_else(|| panic!("normal profile"));
+        let diagnostic = RuntimeConfig::from_ruleset_with_profile(&rules, "diagnostic")
+            .unwrap_or_else(|| panic!("diagnostic profile"));
+        assert!(low.interval() > normal.interval());
+        assert!(diagnostic.interval() < normal.interval());
     }
 }

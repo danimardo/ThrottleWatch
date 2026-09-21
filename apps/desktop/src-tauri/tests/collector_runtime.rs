@@ -41,8 +41,8 @@ fn the_real_sidecar_feeds_the_live_state_and_stops_cleanly() {
     let bytes = std::fs::read(&executable).unwrap_or_else(|error| panic!("read sidecar: {error}"));
     let launcher = SidecarLauncher { expected_sha256: sha256_hex(&bytes), executable };
     let rules = Ruleset::v1().unwrap_or_else(|error| panic!("ruleset: {error}"));
-    let mut config = RuntimeConfig::from_ruleset(&rules).unwrap_or_else(|| panic!("config"));
-    config.interval = Duration::from_millis(250);
+    let config = RuntimeConfig::from_ruleset(&rules).unwrap_or_else(|| panic!("config"));
+    config.interval_ms.store(250, std::sync::atomic::Ordering::SeqCst);
 
     let live = Arc::new(Mutex::new(LiveState::new()));
     let samples = Arc::new(AtomicUsize::new(0));

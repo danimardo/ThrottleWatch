@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createLogger } from './index';
+import { createLogger, isDetailedLoggingActive } from './index';
 
 describe('frontend logging', () => {
   beforeEach(() => {
@@ -30,5 +30,15 @@ describe('frontend logging', () => {
       instance.logger.warn('UI_WARNING', `event-${String(index)}`);
     }
     expect(send).toHaveBeenCalledTimes(60);
+  });
+
+  it('expires detailed logging at the persisted deadline', () => {
+    const deadline = '2026-09-20T12:00:00.000Z';
+    const before = Date.parse('2026-09-20T11:59:59.999Z');
+    const atDeadline = Date.parse(deadline);
+
+    expect(isDetailedLoggingActive(deadline, before)).toBe(true);
+    expect(isDetailedLoggingActive(deadline, atDeadline)).toBe(false);
+    expect(isDetailedLoggingActive(null, before)).toBe(false);
   });
 });

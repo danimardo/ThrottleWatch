@@ -236,6 +236,9 @@
     onRequestAdvancedAccess?: () => void;
     accessRetryLabel?: string;
     onAccessRetry?: () => void;
+    /** `denied` (data-model.md): a policy or antivirus blocks it — a link to help, not a retry. */
+    accessHelpLabel?: string;
+    onAccessHelp?: () => void;
     disableAccessLabel?: string;
     onDisableAdvancedAccess?: () => void;
     recheckLabel: string;
@@ -326,14 +329,14 @@
     repeatIntroDescription?: string;
     onRepeatIntro: () => void;
     links: SettingsAboutLink[];
-    /** Optional folded block with the log level. */
+    /** Optional folded block with the time-limited detailed logging switch. */
     advancedLabel?: string;
-    logLevelRowLabel?: string;
-    logLevelRowDescription?: string;
-    logLevelLabel?: string;
-    logLevel?: string;
-    logLevelOptions?: SettingsOption[];
-    onLogLevelChange?: (value: string) => void;
+    detailedLoggingRowLabel?: string;
+    detailedLoggingRowDescription?: string;
+    detailedLoggingLabel?: string;
+    detailedLogging: boolean;
+    detailedLoggingUntilLabel?: string;
+    onDetailedLoggingChange: (checked: boolean) => void;
     /** Host renders a `TechnicalSummary` here. */
     technicalSummary?: Snippet;
   }
@@ -387,7 +390,11 @@
   let resetDialogOpen = $state(false);
 
   /** Per-section fold state of the "Avanzado" blocks — view-only, never persisted. */
-  let advancedOpen: Record<'monitoring' | 'tray' | 'about', boolean> = $state({ monitoring: false, tray: false, about: false });
+  let advancedOpen: Record<'monitoring' | 'tray' | 'about', boolean> = $state({
+    monitoring: false,
+    tray: false,
+    about: false
+  });
 
   function confirmDelete() {
     deleteDialogOpen = false;
@@ -399,7 +406,9 @@
   }
 
   let updatesBusy = $derived(
-    updates.status === 'checking' || updates.status === 'downloading' || updates.status === 'installing'
+    updates.status === 'checking' ||
+      updates.status === 'downloading' ||
+      updates.status === 'installing'
   );
 </script>
 
@@ -410,7 +419,14 @@
     StatusIcon's glyphs are reserved for diagnostic_report.classification.
   -->
   <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-    <circle cx="12" cy="12" r="10" fill="none" stroke="var(--status-normal)" stroke-width="1.6" />
+    <circle
+      cx="12"
+      cy="12"
+      r="10"
+      fill="none"
+      stroke="var(--status-normal)"
+      stroke-width="1.6"
+    />
     <path
       d="M7.5 12.5 L10.5 15.5 L16.5 8.5"
       fill="none"
@@ -423,19 +439,43 @@
 {/snippet}
 
 {#snippet sensorsRetryAction()}
-  <Button variant="secondary" label={sensors.recheckLabel} onclick={sensors.onRecheck} />
+  <Button
+    variant="secondary"
+    label={sensors.recheckLabel}
+    onclick={sensors.onRecheck}
+  />
 {/snippet}
 
 {#snippet sensorsRequestAccessAction()}
-  <Button variant="secondary" label={sensors.requestAccessLabel ?? ''} onclick={sensors.onRequestAdvancedAccess} />
+  <Button
+    variant="secondary"
+    label={sensors.requestAccessLabel ?? ''}
+    onclick={sensors.onRequestAdvancedAccess}
+  />
 {/snippet}
 
 {#snippet sensorsAccessRetryAction()}
-  <Button variant="secondary" label={sensors.accessRetryLabel ?? ''} onclick={sensors.onAccessRetry} />
+  <Button
+    variant="secondary"
+    label={sensors.accessRetryLabel ?? ''}
+    onclick={sensors.onAccessRetry}
+  />
+{/snippet}
+
+{#snippet sensorsAccessHelpAction()}
+  <Button
+    variant="secondary"
+    label={sensors.accessHelpLabel ?? ''}
+    onclick={sensors.onAccessHelp}
+  />
 {/snippet}
 
 {#snippet sensorsDisableAccessAction()}
-  <Button variant="secondary" label={sensors.disableAccessLabel ?? ''} onclick={sensors.onDisableAdvancedAccess} />
+  <Button
+    variant="secondary"
+    label={sensors.disableAccessLabel ?? ''}
+    onclick={sensors.onDisableAdvancedAccess}
+  />
 {/snippet}
 
 {#snippet advancedToggle(key: 'monitoring' | 'tray' | 'about', label: string)}
@@ -446,7 +486,16 @@
     onclick={() => (advancedOpen[key] = !advancedOpen[key])}
   >
     <span class="chevron" class:open={advancedOpen[key]} aria-hidden="true">
-      <svg viewBox="0 0 12 12" width="10" height="10"><path d="M4 2 L8 6 L4 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      <svg viewBox="0 0 12 12" width="10" height="10"
+        ><path
+          d="M4 2 L8 6 L4 10"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        /></svg
+      >
     </span>
     {label}
   </button>
@@ -458,7 +507,9 @@
     <h3 class="label section-title">{general.title}</h3>
     <OptionRow
       label={general.closeActionRowLabel}
-      description={general.closeAction === 'unset' ? general.closeActionUndecidedText : general.closeActionRowDescription}
+      description={general.closeAction === 'unset'
+        ? general.closeActionUndecidedText
+        : general.closeActionRowDescription}
     >
       {#snippet control()}
         <SegmentedControl
@@ -469,9 +520,16 @@
         />
       {/snippet}
     </OptionRow>
-    <OptionRow label={general.startOnLoginLabel} description={general.startOnLoginDescription}>
+    <OptionRow
+      label={general.startOnLoginLabel}
+      description={general.startOnLoginDescription}
+    >
       {#snippet control()}
-        <Switch checked={general.startOnLogin} label={general.startOnLoginLabel} onchange={general.onStartOnLoginChange} />
+        <Switch
+          checked={general.startOnLogin}
+          label={general.startOnLoginLabel}
+          onchange={general.onStartOnLoginChange}
+        />
       {/snippet}
     </OptionRow>
     <OptionRow
@@ -496,18 +554,28 @@
     <h3 class="label section-title">{language.title}</h3>
     <OptionRow label={language.rowLabel} description={language.rowDescription}>
       {#snippet control()}
-        <Select label={language.selectLabel} value={language.value} options={language.options} onchange={language.onChange} />
+        <Select
+          label={language.selectLabel}
+          value={language.value}
+          options={language.options}
+          onchange={language.onChange}
+        />
       {/snippet}
     </OptionRow>
     {#if language.effectiveLabel}
-      <span class="caption effective" style:color="var(--text-tertiary)">{language.effectiveLabel}</span>
+      <span class="caption effective" style:color="var(--text-tertiary)"
+        >{language.effectiveLabel}</span
+      >
     {/if}
   </section>
 
   <!-- 3. Apariencia -->
   <section>
     <h3 class="label section-title">{appearance.title}</h3>
-    <OptionRow label={appearance.rowLabel} description={appearance.rowDescription}>
+    <OptionRow
+      label={appearance.rowLabel}
+      description={appearance.rowDescription}
+    >
       {#snippet control()}
         <SegmentedControl
           label={appearance.segmentedLabel}
@@ -517,7 +585,10 @@
         />
       {/snippet}
     </OptionRow>
-    <OptionRow label={appearance.motionRowLabel} description={appearance.motionRowDescription}>
+    <OptionRow
+      label={appearance.motionRowLabel}
+      description={appearance.motionRowDescription}
+    >
       {#snippet control()}
         <SegmentedControl
           label={appearance.motionLabel}
@@ -527,7 +598,10 @@
         />
       {/snippet}
     </OptionRow>
-    <OptionRow label={appearance.glassRowLabel} description={appearance.glassRowDescription}>
+    <OptionRow
+      label={appearance.glassRowLabel}
+      description={appearance.glassRowDescription}
+    >
       {#snippet control()}
         <SegmentedControl
           label={appearance.glassLabel}
@@ -542,7 +616,10 @@
   <!-- 4. Monitorización -->
   <section>
     <h3 class="label section-title">{monitoring.title}</h3>
-    <OptionRow label={monitoring.modeRowLabel} description={monitoring.modeRowDescription}>
+    <OptionRow
+      label={monitoring.modeRowLabel}
+      description={monitoring.modeRowDescription}
+    >
       {#snippet control()}
         <SegmentedControl
           label={monitoring.modeLabel}
@@ -552,7 +629,10 @@
         />
       {/snippet}
     </OptionRow>
-    <OptionRow label={monitoring.onBatteryRowLabel} description={monitoring.onBatteryRowDescription}>
+    <OptionRow
+      label={monitoring.onBatteryRowLabel}
+      description={monitoring.onBatteryRowDescription}
+    >
       {#snippet control()}
         <SegmentedControl
           label={monitoring.onBatteryLabel}
@@ -581,9 +661,16 @@
             />
           {/snippet}
         </OptionRow>
-        <OptionRow label={monitoring.perCoreHistoryLabel} description={monitoring.perCoreHistoryDescription}>
+        <OptionRow
+          label={monitoring.perCoreHistoryLabel}
+          description={monitoring.perCoreHistoryDescription}
+        >
           {#snippet control()}
-            <Switch checked={monitoring.perCoreHistory} label={monitoring.perCoreHistoryLabel} onchange={monitoring.onPerCoreHistoryChange} />
+            <Switch
+              checked={monitoring.perCoreHistory}
+              label={monitoring.perCoreHistoryLabel}
+              onchange={monitoring.onPerCoreHistoryChange}
+            />
           {/snippet}
         </OptionRow>
       </div>
@@ -593,14 +680,28 @@
   <!-- 5. Bandeja y notificaciones -->
   <section>
     <h3 class="label section-title">{tray.title}</h3>
-    <OptionRow label={tray.backgroundLabel} description={tray.backgroundDescription}>
+    <OptionRow
+      label={tray.backgroundLabel}
+      description={tray.backgroundDescription}
+    >
       {#snippet control()}
-        <Switch checked={tray.backgroundMonitoring} label={tray.backgroundLabel} onchange={tray.onBackgroundMonitoringChange} />
+        <Switch
+          checked={tray.backgroundMonitoring}
+          label={tray.backgroundLabel}
+          onchange={tray.onBackgroundMonitoringChange}
+        />
       {/snippet}
     </OptionRow>
-    <OptionRow label={tray.notificationsLabel} description={tray.notificationsDescription}>
+    <OptionRow
+      label={tray.notificationsLabel}
+      description={tray.notificationsDescription}
+    >
       {#snippet control()}
-        <Switch checked={tray.notifications} label={tray.notificationsLabel} onchange={tray.onNotificationsChange} />
+        <Switch
+          checked={tray.notifications}
+          label={tray.notificationsLabel}
+          onchange={tray.onNotificationsChange}
+        />
       {/snippet}
     </OptionRow>
     {#if tray.onTestNotification && tray.testNotificationLabel}
@@ -610,19 +711,34 @@
         disabledReason={tray.testNotificationDisabledReason}
       >
         {#snippet control()}
-          <Button variant="secondary" label={tray.testNotificationLabel ?? ''} disabled={tray.testNotificationDisabled} onclick={tray.onTestNotification} />
+          <Button
+            variant="secondary"
+            label={tray.testNotificationLabel ?? ''}
+            disabled={tray.testNotificationDisabled}
+            onclick={tray.onTestNotification}
+          />
         {/snippet}
       </OptionRow>
     {/if}
     {@render advancedToggle('tray', tray.advancedLabel)}
     {#if advancedOpen.tray}
       <div class="advanced">
-        <OptionRow label={tray.quietPeriodLabel} description={tray.quietPeriodDescription}>
+        <OptionRow
+          label={tray.quietPeriodLabel}
+          description={tray.quietPeriodDescription}
+        >
           {#snippet control()}
-            <Switch checked={tray.quietPeriodEnabled} label={tray.quietPeriodLabel} onchange={tray.onQuietPeriodEnabledChange} />
+            <Switch
+              checked={tray.quietPeriodEnabled}
+              label={tray.quietPeriodLabel}
+              onchange={tray.onQuietPeriodEnabledChange}
+            />
           {/snippet}
         </OptionRow>
-        <OptionRow label={tray.quietPeriodStartLabel} disabled={!tray.quietPeriodEnabled}>
+        <OptionRow
+          label={tray.quietPeriodStartLabel}
+          disabled={!tray.quietPeriodEnabled}
+        >
           {#snippet control()}
             <Select
               label={tray.quietPeriodStartLabel}
@@ -633,19 +749,25 @@
             />
           {/snippet}
         </OptionRow>
-        <OptionRow label={tray.quietPeriodEndLabel} disabled={!tray.quietPeriodEnabled}>
+        <OptionRow
+          label={tray.quietPeriodEndLabel}
+          disabled={!tray.quietPeriodEnabled}
+        >
           {#snippet control()}
             <Select
               label={tray.quietPeriodEndLabel}
               value={tray.quietPeriodEnd}
               options={tray.quietPeriodOptions}
               disabled={!tray.quietPeriodEnabled}
-              onchange={(v) => tray.onQuietPeriodChange(tray.quietPeriodStart, v)}
+              onchange={(v) =>
+                tray.onQuietPeriodChange(tray.quietPeriodStart, v)}
             />
           {/snippet}
         </OptionRow>
         {#if tray.alertRulesNote}
-          <span class="caption note" style:color="var(--text-tertiary)">{tray.alertRulesNote}</span>
+          <span class="caption note" style:color="var(--text-tertiary)"
+            >{tray.alertRulesNote}</span
+          >
         {/if}
       </div>
     {/if}
@@ -654,7 +776,10 @@
   <!-- 6. Datos y privacidad -->
   <section>
     <h3 class="label section-title">{privacy.title}</h3>
-    <OptionRow label={privacy.retentionRowLabel} description={privacy.retentionRowDescription}>
+    <OptionRow
+      label={privacy.retentionRowLabel}
+      description={privacy.retentionRowDescription}
+    >
       {#snippet control()}
         <Select
           label={privacy.retentionSelectLabel}
@@ -664,14 +789,26 @@
         />
       {/snippet}
     </OptionRow>
-    <OptionRow label={privacy.storageRowLabel} description={privacy.storageDescription}>
+    <OptionRow
+      label={privacy.storageRowLabel}
+      description={privacy.storageDescription}
+    >
       {#snippet control()}
-        <span class="body value" style:color="var(--text-secondary)">{privacy.storageValue}</span>
+        <span class="body value" style:color="var(--text-secondary)"
+          >{privacy.storageValue}</span
+        >
       {/snippet}
     </OptionRow>
-    <OptionRow label={privacy.anonymizeExportsLabel} description={privacy.anonymizeExportsDescription}>
+    <OptionRow
+      label={privacy.anonymizeExportsLabel}
+      description={privacy.anonymizeExportsDescription}
+    >
       {#snippet control()}
-        <Switch checked={privacy.anonymizeExports} label={privacy.anonymizeExportsLabel} onchange={privacy.onAnonymizeExportsChange} />
+        <Switch
+          checked={privacy.anonymizeExports}
+          label={privacy.anonymizeExportsLabel}
+          onchange={privacy.onAnonymizeExportsChange}
+        />
       {/snippet}
     </OptionRow>
     <OptionRow
@@ -681,10 +818,18 @@
       disabledReason={privacy.exportDisabledReason}
     >
       {#snippet control()}
-        <Button variant="secondary" label={privacy.exportButtonLabel} disabled={privacy.exportDisabled} onclick={privacy.onExport} />
+        <Button
+          variant="secondary"
+          label={privacy.exportButtonLabel}
+          disabled={privacy.exportDisabled}
+          onclick={privacy.onExport}
+        />
       {/snippet}
     </OptionRow>
-    <OptionRow label={privacy.deleteRowLabel} description={privacy.deleteRowDescription}>
+    <OptionRow
+      label={privacy.deleteRowLabel}
+      description={privacy.deleteRowDescription}
+    >
       {#snippet control()}
         <Button
           variant="secondary"
@@ -696,7 +841,11 @@
     </OptionRow>
     {#if privacy.deleteStatus === 'inProgress'}
       <div class="status-block">
-        <ProgressBar indeterminate tone="accent" label={privacy.deleteButtonLabel} />
+        <ProgressBar
+          indeterminate
+          tone="accent"
+          label={privacy.deleteButtonLabel}
+        />
       </div>
     {:else if privacy.deleteStatus === 'error'}
       <div class="status-block">
@@ -710,22 +859,37 @@
     <h3 class="label section-title">{sensors.title}</h3>
     <OptionRow label={sensors.rowLabel}>
       {#snippet control()}
-        <Button variant="secondary" label={sensors.recheckLabel} onclick={sensors.onRecheck} disabled={sensors.status === 'detecting'} />
+        <Button
+          variant="secondary"
+          label={sensors.recheckLabel}
+          onclick={sensors.onRecheck}
+          disabled={sensors.status === 'detecting'}
+        />
       {/snippet}
     </OptionRow>
     <div class="status-block">
       {#if sensors.status === 'detecting'}
-        <ProgressBar indeterminate tone="accent" label={sensors.detectingLabel} />
-        <span class="caption" style:color="var(--text-tertiary)">{sensors.detectingLabel}</span>
+        <ProgressBar
+          indeterminate
+          tone="accent"
+          label={sensors.detectingLabel}
+        />
+        <span class="caption" style:color="var(--text-tertiary)"
+          >{sensors.detectingLabel}</span
+        >
       {:else if sensors.coverage}
         {@render sensors.coverage()}
       {:else if sensors.status === 'complete'}
         <div class="sensors-complete">
           {@render sensorsCheckmark()}
           <div class="sensors-complete-text">
-            <span class="body-strong" style:color="var(--text-primary)">{sensors.coverageTitle}</span>
+            <span class="body-strong" style:color="var(--text-primary)"
+              >{sensors.coverageTitle}</span
+            >
             {#if sensors.coverageDescription}
-              <span class="caption" style:color="var(--text-secondary)">{sensors.coverageDescription}</span>
+              <span class="caption" style:color="var(--text-secondary)"
+                >{sensors.coverageDescription}</span
+              >
             {/if}
           </div>
         </div>
@@ -738,20 +902,34 @@
         />
       {/if}
       {#if sensors.status !== 'detecting' && !sensors.coverage}
-        {#if sensors.advancedAccess === 'installable'}
+        {#if sensors.advancedAccess === 'installable' || sensors.advancedAccess === 'upgradable'}
           <Banner
             tone="info"
             title={sensors.advancedAccessNote ?? ''}
-            action={sensors.onRequestAdvancedAccess ? sensorsRequestAccessAction : undefined}
+            action={sensors.onRequestAdvancedAccess
+              ? sensorsRequestAccessAction
+              : undefined}
           />
         {:else if sensors.advancedAccess === 'denied'}
-          <Banner tone="warning" title={sensors.advancedAccessNote ?? ''} />
+          <Banner
+            tone="warning"
+            title={sensors.advancedAccessNote ?? ''}
+            action={sensors.onAccessHelp ? sensorsAccessHelpAction : undefined}
+          />
         {:else if sensors.advancedAccess === 'error'}
-          <Banner tone="critical" title={sensors.advancedAccessNote ?? ''} action={sensors.onAccessRetry ? sensorsAccessRetryAction : undefined} />
+          <Banner
+            tone="critical"
+            title={sensors.advancedAccessNote ?? ''}
+            action={sensors.onAccessRetry
+              ? sensorsAccessRetryAction
+              : undefined}
+          />
         {:else if sensors.advancedAccess === 'available' && sensors.onDisableAdvancedAccess}
           {@render sensorsDisableAccessAction()}
         {:else if sensors.advancedAccessNote}
-          <span class="caption" style:color="var(--text-tertiary)">{sensors.advancedAccessNote}</span>
+          <span class="caption" style:color="var(--text-tertiary)"
+            >{sensors.advancedAccessNote}</span
+          >
         {/if}
       {/if}
     </div>
@@ -760,7 +938,10 @@
   <!-- 8. Diagnóstico -->
   <section>
     <h3 class="label section-title">{diagnostics.title}</h3>
-    <OptionRow label={diagnostics.durationRowLabel} description={diagnostics.durationRowDescription}>
+    <OptionRow
+      label={diagnostics.durationRowLabel}
+      description={diagnostics.durationRowDescription}
+    >
       {#snippet control()}
         <SegmentedControl
           label={diagnostics.durationLabel}
@@ -770,9 +951,16 @@
         />
       {/snippet}
     </OptionRow>
-    <OptionRow label={diagnostics.requireAcLabel} description={diagnostics.requireAcDescription}>
+    <OptionRow
+      label={diagnostics.requireAcLabel}
+      description={diagnostics.requireAcDescription}
+    >
       {#snippet control()}
-        <Switch checked={diagnostics.requireAc} label={diagnostics.requireAcLabel} onchange={diagnostics.onRequireAcChange} />
+        <Switch
+          checked={diagnostics.requireAc}
+          label={diagnostics.requireAcLabel}
+          onchange={diagnostics.onRequireAcChange}
+        />
       {/snippet}
     </OptionRow>
     <OptionRow
@@ -791,17 +979,25 @@
       {/snippet}
     </OptionRow>
     <div class="safety">
-      <span class="caption" style:color="var(--text-tertiary)">{diagnostics.safetyLimitsTitle}</span>
+      <span class="caption" style:color="var(--text-tertiary)"
+        >{diagnostics.safetyLimitsTitle}</span
+      >
       <dl class="safety-list">
         {#each diagnostics.safetyLimits as limit (limit.label)}
           <div class="safety-row">
-            <dt class="body" style:color="var(--text-secondary)">{limit.label}</dt>
-            <dd class="body value" style:color="var(--text-primary)">{limit.value}</dd>
+            <dt class="body" style:color="var(--text-secondary)">
+              {limit.label}
+            </dt>
+            <dd class="body value" style:color="var(--text-primary)">
+              {limit.value}
+            </dd>
           </div>
         {/each}
       </dl>
       {#if diagnostics.safetyLimitsNote}
-        <span class="caption" style:color="var(--text-tertiary)">{diagnostics.safetyLimitsNote}</span>
+        <span class="caption" style:color="var(--text-tertiary)"
+          >{diagnostics.safetyLimitsNote}</span
+        >
       {/if}
     </div>
   </section>
@@ -811,18 +1007,29 @@
     <h3 class="label section-title">{updates.title}</h3>
     <OptionRow label={updates.versionRowLabel}>
       {#snippet control()}
-        <span class="body value" style:color="var(--text-secondary)">{updates.currentVersion}</span>
+        <span class="body value" style:color="var(--text-secondary)"
+          >{updates.currentVersion}</span
+        >
       {/snippet}
     </OptionRow>
-    <OptionRow label={updates.autoCheckLabel} description={updates.autoCheckDescription}>
+    <OptionRow
+      label={updates.autoCheckLabel}
+      description={updates.autoCheckDescription}
+    >
       {#snippet control()}
-        <Switch checked={updates.autoCheck} label={updates.autoCheckLabel} onchange={updates.onAutoCheckChange} />
+        <Switch
+          checked={updates.autoCheck}
+          label={updates.autoCheckLabel}
+          onchange={updates.onAutoCheckChange}
+        />
       {/snippet}
     </OptionRow>
     {#if updates.lastCheckLabel}
       <OptionRow label={updates.lastCheckLabel}>
         {#snippet control()}
-          <span class="body value" style:color="var(--text-secondary)">{updates.lastCheckValue ?? '—'}</span>
+          <span class="body value" style:color="var(--text-secondary)"
+            >{updates.lastCheckValue ?? '—'}</span
+          >
         {/snippet}
       </OptionRow>
     {/if}
@@ -842,15 +1049,25 @@
     </OptionRow>
     <div class="status-block">
       {#if updates.status === 'checking'}
-        <ProgressBar indeterminate tone="accent" label={updates.checkingLabel} />
+        <ProgressBar
+          indeterminate
+          tone="accent"
+          label={updates.checkingLabel}
+        />
         {#if updates.checkingLabel}
-          <span class="caption" style:color="var(--text-tertiary)">{updates.checkingLabel}</span>
+          <span class="caption" style:color="var(--text-tertiary)"
+            >{updates.checkingLabel}</span
+          >
         {/if}
       {:else if updates.status === 'upToDate' && updates.upToDateLabel}
         <Banner tone="info" title={updates.upToDateLabel} />
       {:else if updates.status === 'available'}
         {#snippet downloadAction()}
-          <Button variant="primary" label={updates.downloadLabel ?? ''} onclick={updates.onDownload} />
+          <Button
+            variant="primary"
+            label={updates.downloadLabel ?? ''}
+            onclick={updates.onDownload}
+          />
         {/snippet}
         <Banner
           tone="info"
@@ -859,16 +1076,29 @@
           action={updates.onDownload ? downloadAction : undefined}
         />
       {:else if updates.status === 'downloading'}
-        <ProgressBar percent={updates.downloadPercent ?? 0} tone="accent" label={updates.downloadingLabel} />
+        <ProgressBar
+          percent={updates.downloadPercent ?? 0}
+          tone="accent"
+          label={updates.downloadingLabel}
+        />
         {#if updates.downloadingLabel}
-          <span class="caption" style:color="var(--text-tertiary)">{updates.downloadingLabel} — {updates.downloadPercent ?? 0}%</span>
+          <span class="caption" style:color="var(--text-tertiary)"
+            >{updates.downloadingLabel} — {updates.downloadPercent ?? 0}%</span
+          >
         {/if}
       {:else if updates.status === 'verified'}
         {#snippet installAction()}
           <div class="install-action">
-            <Button variant="primary" label={updates.installLabel ?? ''} disabled={updates.installDisabled} onclick={updates.onInstall} />
+            <Button
+              variant="primary"
+              label={updates.installLabel ?? ''}
+              disabled={updates.installDisabled}
+              onclick={updates.onInstall}
+            />
             {#if updates.installDisabled && updates.installDisabledReason}
-              <span class="caption" style:color="var(--text-tertiary)">{updates.installDisabledReason}</span>
+              <span class="caption" style:color="var(--text-tertiary)"
+                >{updates.installDisabledReason}</span
+              >
             {/if}
           </div>
         {/snippet}
@@ -879,15 +1109,29 @@
           action={updates.onInstall ? installAction : undefined}
         />
       {:else if updates.status === 'installing'}
-        <ProgressBar indeterminate tone="accent" label={updates.installingLabel} />
+        <ProgressBar
+          indeterminate
+          tone="accent"
+          label={updates.installingLabel}
+        />
         {#if updates.installingLabel}
-          <span class="caption" style:color="var(--text-tertiary)">{updates.installingLabel}</span>
+          <span class="caption" style:color="var(--text-tertiary)"
+            >{updates.installingLabel}</span
+          >
         {/if}
       {:else if updates.status === 'error'}
         {#snippet retryAction()}
-          <Button variant="secondary" label={updates.retryLabel ?? ''} onclick={updates.onRetry} />
+          <Button
+            variant="secondary"
+            label={updates.retryLabel ?? ''}
+            onclick={updates.onRetry}
+          />
         {/snippet}
-        <Banner tone="critical" title={updates.errorMessage ?? ''} action={updates.onRetry ? retryAction : undefined} />
+        <Banner
+          tone="critical"
+          title={updates.errorMessage ?? ''}
+          action={updates.onRetry ? retryAction : undefined}
+        />
       {/if}
     </div>
   </section>
@@ -897,25 +1141,66 @@
     <h3 class="label section-title">{about.title}</h3>
     <OptionRow label={about.versionRowLabel} description={about.buildLabel}>
       {#snippet control()}
-        <span class="body value" style:color="var(--text-secondary)">{about.version}</span>
+        <span class="body value" style:color="var(--text-secondary)"
+          >{about.version}</span
+        >
       {/snippet}
     </OptionRow>
-    <OptionRow label={about.repeatIntroLabel} description={about.repeatIntroDescription}>
+    <OptionRow
+      label={about.repeatIntroLabel}
+      description={about.repeatIntroDescription}
+    >
       {#snippet control()}
-        <Button variant="secondary" label={about.repeatIntroLabel} onclick={about.onRepeatIntro} />
+        <Button
+          variant="secondary"
+          label={about.repeatIntroLabel}
+          onclick={about.onRepeatIntro}
+        />
       {/snippet}
     </OptionRow>
     {#each about.links as link (link.label)}
-      <OptionRow label={link.label} description={link.external ? link.externalHint : undefined}>
+      <OptionRow
+        label={link.label}
+        description={link.external ? link.externalHint : undefined}
+      >
         {#snippet control()}
-          <button type="button" class="link-row-button" aria-label={link.label} onclick={link.onOpen}>
+          <button
+            type="button"
+            class="link-row-button"
+            aria-label={link.label}
+            onclick={link.onOpen}
+          >
             {#if link.external}
-              <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true">
-                <path d="M5 2 H2.5 A0.5 0.5 0 0 0 2 2.5 V9.5 A0.5 0.5 0 0 0 2.5 10 H9.5 A0.5 0.5 0 0 0 10 9.5 V7 M7 2 H10 V5 M10 2 L5.5 6.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />
+              <svg
+                viewBox="0 0 12 12"
+                width="11"
+                height="11"
+                aria-hidden="true"
+              >
+                <path
+                  d="M5 2 H2.5 A0.5 0.5 0 0 0 2 2.5 V9.5 A0.5 0.5 0 0 0 2.5 10 H9.5 A0.5 0.5 0 0 0 10 9.5 V7 M7 2 H10 V5 M10 2 L5.5 6.5"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.3"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
               </svg>
             {:else}
-              <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true">
-                <path d="M4 2 L8 6 L4 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+              <svg
+                viewBox="0 0 12 12"
+                width="10"
+                height="10"
+                aria-hidden="true"
+              >
+                <path
+                  d="M4 2 L8 6 L4 10"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
               </svg>
             {/if}
           </button>
@@ -925,20 +1210,29 @@
     {#if about.technicalSummary}
       <div class="status-block">{@render about.technicalSummary()}</div>
     {/if}
-    {#if about.advancedLabel && about.logLevelRowLabel && about.logLevelOptions && about.onLogLevelChange}
+    {#if about.advancedLabel && about.detailedLoggingRowLabel}
       {@render advancedToggle('about', about.advancedLabel)}
       {#if advancedOpen.about}
         <div class="advanced">
-          <OptionRow label={about.logLevelRowLabel} description={about.logLevelRowDescription}>
+          <OptionRow
+            label={about.detailedLoggingRowLabel}
+            description={about.detailedLoggingRowDescription}
+          >
             {#snippet control()}
-              <SegmentedControl
-                label={about.logLevelLabel ?? about.logLevelRowLabel ?? ''}
-                value={about.logLevel ?? ''}
-                options={about.logLevelOptions ?? []}
-                onchange={about.onLogLevelChange}
+              <Switch
+                checked={about.detailedLogging}
+                label={about.detailedLoggingLabel ??
+                  about.detailedLoggingRowLabel ??
+                  ''}
+                onchange={about.onDetailedLoggingChange}
               />
             {/snippet}
           </OptionRow>
+          {#if about.detailedLoggingUntilLabel}
+            <span class="caption effective" style:color="var(--text-tertiary)"
+              >{about.detailedLoggingUntilLabel}</span
+            >
+          {/if}
         </div>
       {/if}
     {/if}
@@ -946,8 +1240,13 @@
 
   <!-- 11. Zona de riesgo -->
   <section class="risk-zone">
-    <h3 class="label section-title" style:color="var(--status-thermal)">{riskZone.title}</h3>
-    <OptionRow label={riskZone.resetRowLabel} description={riskZone.resetRowDescription}>
+    <h3 class="label section-title" style:color="var(--status-thermal)">
+      {riskZone.title}
+    </h3>
+    <OptionRow
+      label={riskZone.resetRowLabel}
+      description={riskZone.resetRowDescription}
+    >
       {#snippet control()}
         <Button
           variant="secondary"
@@ -959,7 +1258,11 @@
     </OptionRow>
     {#if riskZone.resetStatus === 'inProgress'}
       <div class="status-block">
-        <ProgressBar indeterminate tone="thermal" label={riskZone.resetButtonLabel} />
+        <ProgressBar
+          indeterminate
+          tone="thermal"
+          label={riskZone.resetButtonLabel}
+        />
       </div>
     {:else if riskZone.resetStatus === 'error'}
       <div class="status-block">
@@ -980,8 +1283,16 @@
   tone="warning"
 >
   {#snippet actions()}
-    <Button variant="secondary" label={privacy.deleteDialogCancelLabel} onclick={() => (deleteDialogOpen = false)} />
-    <Button variant="destructive" label={privacy.deleteDialogConfirmLabel} onclick={confirmDelete} />
+    <Button
+      variant="secondary"
+      label={privacy.deleteDialogCancelLabel}
+      onclick={() => (deleteDialogOpen = false)}
+    />
+    <Button
+      variant="destructive"
+      label={privacy.deleteDialogConfirmLabel}
+      onclick={confirmDelete}
+    />
   {/snippet}
 </Dialog>
 
@@ -992,8 +1303,16 @@
   tone="warning"
 >
   {#snippet actions()}
-    <Button variant="secondary" label={riskZone.resetDialogCancelLabel} onclick={() => (resetDialogOpen = false)} />
-    <Button variant="destructive" label={riskZone.resetDialogConfirmLabel} onclick={confirmReset} />
+    <Button
+      variant="secondary"
+      label={riskZone.resetDialogCancelLabel}
+      onclick={() => (resetDialogOpen = false)}
+    />
+    <Button
+      variant="destructive"
+      label={riskZone.resetDialogConfirmLabel}
+      onclick={confirmReset}
+    />
   {/snippet}
 </Dialog>
 
@@ -1006,7 +1325,16 @@
     max-width: 720px;
     margin: 0 auto;
     padding: var(--space-6);
-    font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif);
+    font-family: var(
+      --font-sans,
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      Roboto,
+      'Helvetica Neue',
+      Arial,
+      sans-serif
+    );
     container-type: inline-size;
     container-name: tw-settings;
   }
@@ -1023,16 +1351,30 @@
     padding: var(--space-4) var(--space-5);
     animation: tw-rise var(--motion-slow) var(--motion-ease-out) both;
   }
-  section:nth-child(2) { animation-delay: calc(1 * var(--motion-stagger)); }
-  section:nth-child(3) { animation-delay: calc(2 * var(--motion-stagger)); }
-  section:nth-child(4) { animation-delay: calc(3 * var(--motion-stagger)); }
-  section:nth-child(5) { animation-delay: calc(4 * var(--motion-stagger)); }
-  section:nth-child(6) { animation-delay: calc(5 * var(--motion-stagger)); }
+  section:nth-child(2) {
+    animation-delay: calc(1 * var(--motion-stagger));
+  }
+  section:nth-child(3) {
+    animation-delay: calc(2 * var(--motion-stagger));
+  }
+  section:nth-child(4) {
+    animation-delay: calc(3 * var(--motion-stagger));
+  }
+  section:nth-child(5) {
+    animation-delay: calc(4 * var(--motion-stagger));
+  }
+  section:nth-child(6) {
+    animation-delay: calc(5 * var(--motion-stagger));
+  }
   .section-title {
     margin: 0 0 var(--space-2) 0;
   }
   .risk-zone {
-    border-color: color-mix(in srgb, var(--status-thermal) 30%, var(--glass-border));
+    border-color: color-mix(
+      in srgb,
+      var(--status-thermal) 30%,
+      var(--glass-border)
+    );
   }
   .advanced {
     animation: tw-rise var(--motion-base) var(--motion-ease-out) both;

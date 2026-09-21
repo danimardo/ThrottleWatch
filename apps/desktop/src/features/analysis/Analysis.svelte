@@ -5,7 +5,8 @@
   import ExportDialog from '../../design-system/components/ExportDialog.svelte';
   import {
     commandResponseSchemas,
-    type AnalysisWindow
+    type AnalysisWindow,
+    type ExportPreview
   } from '../../lib/bridge/schemas';
   import { invokeValidated } from '../../lib/bridge';
   import { createTranslator } from '../../lib/i18n';
@@ -23,6 +24,8 @@
   let exportOpen = $state(false);
   let exportFormat = $state<'csv' | 'json'>('csv');
   let anonymize = $state(true);
+  let exportPreview = $state<ExportPreview | null>(null);
+  let exportBusy = $state(false);
 
   async function loadWindow(startMs = 0, endMs = 86_400_000): Promise<void> {
     // Keep the chart mounted while a zoom asks for a higher-resolution window.
@@ -77,6 +80,68 @@
     selectedRange = range;
     if (range) void loadWindow(range[0], Math.max(range[1], range[0] + 1));
   }
+
+  async function refreshExportPreview(): Promise<void> {
+    if (selectedRange === null) {
+      exportPreview = null;
+      return;
+    }
+    const result = await invokeValidated(
+      'preview_export',
+      {
+        request: {
+          scope: {
+            kind: 'range',
+            session_id: 'latest',
+            start_ms: selectedRange[0],
+            end_ms: selectedRange[1]
+          },
+          format: exportFormat,
+          anonymize
+        }
+      },
+      commandResponseSchemas.preview_export
+    );
+    exportPreview = result.ok ? result.value : null;
+  }
+
+  async function openExport(): Promise<void> {
+    exportOpen = true;
+    await refreshExportPreview();
+  }
+
+  async function runExport(): Promise<void> {
+    if (selectedRange === null) return;
+    exportBusy = true;
+    const result = await invokeValidated(
+      'export',
+      {
+        request: {
+          scope: {
+            kind: 'range',
+            session_id: 'latest',
+            start_ms: selectedRange[0],
+            end_ms: selectedRange[1]
+          },
+          format: exportFormat,
+          anonymize
+        }
+      },
+      commandResponseSchemas.export
+    );
+    exportBusy = false;
+    if (result.ok) exportOpen = false;
+  }
+
+  function cancelExport(): void {
+    if (exportBusy)
+      void invokeValidated(
+        'cancel_export',
+        undefined,
+        commandResponseSchemas.cancel_export
+      );
+    exportOpen = false;
+  }
 </script>
 
 <div class="analysis-actions">
@@ -84,7 +149,7 @@
     variant="secondary"
     label={t('analysis.exportRange')}
     disabled={!selectedRange}
-    onclick={() => (exportOpen = true)}
+    onclick={() => void openExport()}
   />
 </div>
 
@@ -126,25 +191,30 @@
     { value: 'csv', label: t('analysis.csv') },
     { value: 'json', label: t('analysis.json') }
   ]}
-  onFormatChange={(value) => (exportFormat = value)}
+  onFormatChange={(value) => {
+    exportFormat = value;
+    void refreshExportPreview();
+  }}
   anonymizeLabel={t('analysis.anonymize')}
   anonymizeDescription={t('analysis.anonymizeDescription')}
   {anonymize}
-  onAnonymizeChange={(value) => (anonymize = value)}
+  onAnonymizeChange={(value) => {
+    anonymize = value;
+    void refreshExportPreview();
+  }}
   includedTitle={t('analysis.included')}
-  includedFields={[
-    t('analysis.samples'),
-    t('analysis.quality'),
-    t('analysis.events')
-  ]}
+  includedFields={exportPreview?.included_fields ?? []}
   excludedTitle={t('analysis.excluded')}
-  excludedFields={[]}
-  sizeLabel={t('analysis.estimatedSize')}
-  fileNameLabel={t('analysis.fileName')}
+  excludedFields={exportPreview?.excluded_fields ?? []}
+  sizeLabel={exportPreview
+    ? `${t('analysis.estimatedSize')}: ${exportPreview.estimated_bytes} B`
+    : undefined}
+  fileNameLabel={exportPreview?.proposed_file_name}
   cancelLabel={t('analysis.cancel')}
-  confirmLabel={t('analysis.save')}
-  onCancel={() => (exportOpen = false)}
-  onConfirm={() => (exportOpen = false)}
+  confirmLabel={exportBusy ? t('analysis.loading') : t('analysis.save')}
+  confirmDisabled={exportPreview === null || exportBusy}
+  onCancel={cancelExport}
+  onConfirm={() => void runExport()}
 />
 
 <style>

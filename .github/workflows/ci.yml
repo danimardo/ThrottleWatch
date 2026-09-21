@@ -21,12 +21,15 @@ jobs:
       - run: pnpm lint
       - run: pnpm check
       - run: pnpm design:check
+      - run: pnpm design:check:versions
       - run: npm ci
         working-directory: design/harness
       - run: npm ci
         working-directory: design/mockup
       - run: pnpm design:check:sources
       - run: pnpm check:contracts
+      - run: pnpm check:command-surface
+      - run: pnpm test:scripts
       - run: pnpm test
       - run: pnpm build
       - run: pnpm check:traceability
@@ -74,6 +77,7 @@ jobs:
         working-directory: apps/desktop/src-tauri
       - run: cargo about generate -o ..\..\..\docs\licenses\rust-third-party.html ..\..\..\about.hbs
         working-directory: apps/desktop/src-tauri
+      - run: pnpm licenses:sbom
       - name: Upload test artifacts
         if: always()
         uses: actions/upload-artifact@v4

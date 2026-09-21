@@ -28,6 +28,60 @@ export default defineConfig({
         trace: 'retain-on-failure'
       },
       grep: /@smoke|@critical|@a11y|@visual/
+    },
+    {
+      name: 'matrix-480x600',
+      testMatch: /environment-matrix\.spec\.ts/,
+      use: { browserName: 'chromium', viewport: { width: 480, height: 600 } }
+    },
+    {
+      name: 'matrix-480x500',
+      testMatch: /environment-matrix\.spec\.ts/,
+      use: { browserName: 'chromium', viewport: { width: 480, height: 500 } }
+    },
+    {
+      name: 'matrix-480x384',
+      testMatch: /environment-matrix\.spec\.ts/,
+      use: { browserName: 'chromium', viewport: { width: 480, height: 384 } }
+    },
+    {
+      name: 'matrix-840x760',
+      testMatch: /environment-matrix\.spec\.ts/,
+      use: { browserName: 'chromium', viewport: { width: 840, height: 760 } }
+    },
+    {
+      name: 'matrix-1100x760',
+      testMatch: /environment-matrix\.spec\.ts/,
+      use: { browserName: 'chromium', viewport: { width: 1100, height: 760 } }
+    },
+    {
+      name: 'matrix-scale-200',
+      testMatch: /environment-matrix\.spec\.ts/,
+      use: {
+        browserName: 'chromium',
+        viewport: { width: 1100, height: 760 },
+        deviceScaleFactor: 2
+      }
+    },
+    {
+      name: 'appearance-en',
+      testMatch: /appearance-matrix\.spec\.ts/,
+      use: { browserName: 'chromium', locale: 'en-US' }
+    },
+    {
+      name: 'appearance-es',
+      testMatch: /appearance-matrix\.spec\.ts/,
+      use: { browserName: 'chromium', locale: 'es-ES' }
+    },
+    {
+      name: 'a11y-en',
+      testMatch: /accessibility\.spec\.ts/,
+      use: { browserName: 'chromium', locale: 'en-US' }
+    },
+    {
+      name: 'a11y-es',
+      testMatch: /accessibility\.spec\.ts/,
+      use: { browserName: 'chromium', locale: 'es-ES' }
     }
   ],
   use: {

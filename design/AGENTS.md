@@ -236,7 +236,7 @@ genuinely new requirement, not a gap in this inventory.
     `installDisabled` is true (a guided test, export, import or wipe is
     running).
 21. **`advancedAccess` is the 5-value enum from `lib/access.ts`, never
-    a boolean.** Only `installable` renders "Instalar/Reparar acceso
+    a boolean.** Only `installable`/`upgradable` render "Instalar/Actualizar acceso
     avanzado"; the host (Rust) decides `not_needed` from the coverage,
     the component never infers it.
 22. **The close action is tri-state.** `SettingsGeneralSection.closeAction`
@@ -413,7 +413,7 @@ different visual style without checking rule 9 above first.
 | `maxConfidenceLabel` | `string` | yes | full sentence, host-computed |
 | `accessState` | `AdvancedAccessState` | yes | |
 | `accessLabel` | `string` | yes | sentence describing the state |
-| `requestAccessLabel` / `onRequestAccess` | `string` / `() => void` | no | rendered only for `installable` |
+| `requestAccessLabel` / `onRequestAccess` | `string` / `() => void` | no | rendered only for `installable`/`upgradable` |
 | `accessRetryLabel` / `onAccessRetry` | `string` / `() => void` | no | rendered only for `error` |
 | `recheckLabel` / `onRecheck` / `recheckDisabled` | `string` / `() => void` / `boolean` | yes/yes/no | |
 | `copySummaryLabel` / `onCopySummary` | `string` / `() => void` | no | |
@@ -699,10 +699,10 @@ fixed 5-slide shape — normally you want `OnboardingFlow` itself.
 | `detectingLabel` | `string?` | shown next to the indeterminate `ProgressBar` while detecting |
 | `coverageTitle` | `string?` | e.g. "Cobertura completa" / "Cobertura parcial" |
 | `coverageDescription` | `string?` | what's covered, or what's missing when partial |
-| `advancedAccess` | `AdvancedAccessState?` | `installable` → info `Banner` + request button; `denied` → warning `Banner`; `error` → critical `Banner` + retry; `available`/`not_needed` → quiet caption (rule 21) |
+| `advancedAccess` | `AdvancedAccessState?` | `installable`/`upgradable` → info `Banner` + request button; `denied` → warning `Banner`; `error` → critical `Banner` + retry; `available`/`not_needed` → quiet caption (rule 21) |
 | `advancedAccessNote` | `string?` | the banner/caption text |
 | `onRetry` / `retryLabel` | `(() => void)?` / `string?` | action button inside the `partial` warning `Banner` |
-| `onRequestAdvancedAccess` / `requestAccessLabel` | `(() => void)?` / `string?` | action button inside the `installable` `Banner` |
+| `onRequestAdvancedAccess` / `requestAccessLabel` | `(() => void)?` / `string?` | action button inside the `installable`/`upgradable` `Banner` |
 | `onAccessRetry` / `accessRetryLabel` | `(() => void)?` / `string?` | action button inside the `error` `Banner` |
 
 ### SettingsScreen
@@ -730,7 +730,7 @@ optional snippets — `sensors.coverage` (a `CoverageMatrix`) and
 | `sensors` | `SettingsSensorsSection` | `'detecting'\|'complete'\|'partial'` + `advancedAccess: AdvancedAccessState` (rule 21) + optional `coverage` Snippet that replaces the short line with an embedded `CoverageMatrix`; the `'complete'` state draws its own local checkmark, not `StatusIcon` |
 | `diagnostics` | `SettingsDiagnosticsSection` | duración short/standard/long (`SegmentedControl`), exigir CA, avisar al terminar (`notifyDisabled`/`Reason`), read-only `safetyLimits[]` block |
 | `updates` | `SettingsUpdatesSection` | `status: 'idle'\|'checking'\|'upToDate'\|'available'\|'downloading'\|'verified'\|'installing'\|'error'` → nothing / indeterminate `ProgressBar` / info `Banner` / info `Banner` + **Descargar** / determinate `ProgressBar` / info `Banner` + **Instalar** (`installDisabled`/`Reason`) / indeterminate `ProgressBar` / critical `Banner` + retry. Optional `lastCheckLabel`/`Value`. No channel (rule 20) |
-| `about` | `SettingsAboutSection` | version row, Repetir introducción, `links[]` (`external: true` draws the external-link glyph + `externalHint`), optional `technicalSummary` Snippet, optional folded Avanzado with nivel de registro |
+| `about` | `SettingsAboutSection` | version row, Repetir introducción, `links[]` (`external: true` draws the external-link glyph + `externalHint`), optional `technicalSummary` Snippet, optional folded Avanzado with `detailedLogging`, its `detailedLoggingUntilLabel` and `onDetailedLoggingChange` |
 | `riskZone` | `SettingsRiskZoneSection` | "restablecer ThrottleWatch" (opens an internal confirm `Dialog`, `resetStatus` drives the same in-progress/error rendering as `privacy`'s delete action) |
 | `footer` | `Snippet?` | optional extra content after "Zona de riesgo" (e.g. a build id) |
 

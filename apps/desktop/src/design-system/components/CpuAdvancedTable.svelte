@@ -134,7 +134,16 @@
     {#if sortedRows.length === 0}
       <div class="empty-filter body" style:color="var(--text-tertiary)">{emptyFilterMessage}</div>
     {:else}
-      <div class="viewport" bind:this={viewportEl} style:max-height={`${maxHeight}px`} onscroll={onScroll}>
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex: the virtualized scroll region must be keyboard focusable. -->
+      <div
+        class="viewport"
+        bind:this={viewportEl}
+        role="region"
+        aria-label={columnLabels.group}
+        tabindex="0"
+        style:max-height={`${maxHeight}px`}
+        onscroll={onScroll}
+      >
         <div style:height={`${topSpacer}px`}></div>
         {#each visibleRows as row (row.id)}
           <div class="data-row" class:unavailable={row.unavailable} style:height={`${rowHeight}px`}>

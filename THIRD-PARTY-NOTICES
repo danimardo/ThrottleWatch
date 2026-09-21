@@ -15,3 +15,8 @@ Desde 2026-09-19 el binario del instalador NO se versiona en este repositorio: `
 lo obtiene de la release oficial en tiempo de compilación, comprueba el SHA-256 y la firma Authenticode
 contra `apps/desktop/src-tauri/resources/pawnio-manifest.json` y solo entonces lo coloca como recurso
 del paquete. La aplicación no descarga PawnIO en ejecución.
+
+LibreHardwareMonitorLib 0.9.6
+-----------------------------
+Licencia: Mozilla Public License 2.0. La versión exacta, la referencia al código fuente
+correspondiente y los pasos de publicación están en `docs/licenses/mpl-source-offer.md`.

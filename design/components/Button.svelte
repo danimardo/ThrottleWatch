@@ -141,11 +141,11 @@
 
   /* Deepened fills: see doc comment above for why this isn't var(--accent-blue) directly. */
   .tw-btn.primary {
-    background: color-mix(in srgb, var(--accent-blue) 88%, black);
+    background: color-mix(in srgb, var(--accent-blue) 70%, black);
     color: #ffffff;
   }
   .tw-btn.primary:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--accent-blue) 78%, black);
+    background: color-mix(in srgb, var(--accent-blue) 62%, black);
   }
   .tw-btn.destructive {
     background: color-mix(in srgb, var(--status-thermal) 84%, black);

@@ -35,11 +35,11 @@
   /* Text */
   --text-primary: #ffffff;
   --text-secondary: #98989d;
-  --text-tertiary: #67676c;
+  --text-tertiary: #98989d;
 
   /* System accent — navigation, focus, toolbar actions, neutral figures.
      Never used for a thermal/power alert state. */
-  --accent-blue: #0a84ff;
+  --accent-blue: #4da3ff;
 
   /* Status — one token per diagnostic_report.classification family */
   --status-normal: #32d74b;
@@ -82,9 +82,9 @@
 
   --text-primary: #1d1d1f;
   --text-secondary: #4b4b50;
-  --text-tertiary: #7a7a80;
+  --text-tertiary: #5f6068;
 
-  --accent-blue: #0066cc;
+  --accent-blue: #005bb7;
 
   /* Deepened vs. Apple's vivid system colors so every status token
      clears 4.5:1 text contrast on white — see README "Fundamentos

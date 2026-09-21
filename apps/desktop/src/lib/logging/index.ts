@@ -73,15 +73,35 @@ export function createLogger(
       void send([event]);
     };
   };
-  logger.setLevel(detailed ? 'debug' : 'warn');
+  // The level is a runtime preference owned by the application, never a browser
+  // persistence mechanism. Passing `false` prevents loglevel from writing a
+  // `loglevel:*` key to localStorage in the WebView/browser fallback.
+  logger.setLevel(detailed ? 'debug' : 'warn', false);
 
   return {
     logger,
     setDetailed(value: boolean) {
       detailed = value;
-      logger.setLevel(value ? 'debug' : 'warn');
+      logger.setLevel(value ? 'debug' : 'warn', false);
     }
   };
+}
+
+export function isDetailedLoggingActive(
+  value: unknown,
+  now: number = Date.now()
+): boolean {
+  return typeof value === 'string' && Date.parse(value) > now;
+}
+
+const applicationLogger = createLogger('application');
+
+export function setApplicationDetailedLogging(enabled: boolean): void {
+  applicationLogger.setDetailed(enabled);
+}
+
+export function getApplicationLogger() {
+  return applicationLogger.logger;
 }
 
 async function sendToBackend(

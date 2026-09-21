@@ -1224,7 +1224,7 @@
           "name": "about",
           "type": "SettingsAboutSection",
           "required": true,
-          "notes": "version, Repetir introducción, links (external flag + hint), optional technicalSummary Snippet, folded Avanzado: nivel de registro"
+          "notes": "version, Repetir introducción, links (external flag + hint), optional technicalSummary Snippet, folded Avanzado: interruptor de Registro detallado con caducidad"
         },
         {
           "name": "riskZone",
@@ -2255,7 +2255,7 @@
           "name": "onRequestAccess",
           "type": "() => void",
           "required": false,
-          "notes": "rendered only for accessState=installable"
+          "notes": "rendered only for accessState=installable|upgradable"
         },
         {
           "name": "accessRetryLabel",
@@ -2751,7 +2751,7 @@
       ],
       "notes": "Internal — used by StatusChip and StatusHero. Not meant to be called directly by app screens."
     },
-    "lib/access.ts": "AdvancedAccessState = 'not_needed' | 'available' | 'installable' | 'denied' | 'error' — UI-side translation of the IPC low_level_access state (see data-model.md)."
+    "lib/access.ts": "AdvancedAccessState = 'not_needed' | 'available' | 'installable' | 'upgradable' | 'denied' | 'error' — UI-side translation of the IPC low_level_access state (see data-model.md)."
   },
   "brandAssets": {
     "appIcon": {

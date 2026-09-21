@@ -15,7 +15,7 @@
   import ProgressBar from './ProgressBar.svelte';
   import Banner from './Banner.svelte';
 
-  export type ImportStatus = 'reading' | 'validating' | 'migrating' | 'success' | 'error';
+  export type ImportStatus = 'reading' | 'validating' | 'migrating' | 'storing' | 'success' | 'error';
 
   interface Props {
     open?: boolean;
@@ -47,7 +47,7 @@
     onOpenSession
   }: Props = $props();
 
-  let inProgress = $derived(status === 'reading' || status === 'validating' || status === 'migrating');
+  let inProgress = $derived(status === 'reading' || status === 'validating' || status === 'migrating' || status === 'storing');
 
   // `Dialog.onclose` also fires after a programmatic close (the native
   // <dialog> `close` event does not distinguish), so an explicit choice

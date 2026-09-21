@@ -82,6 +82,26 @@ function argsSchemaFor(command: string): z.ZodType | undefined {
       return commandArgsSchemas.set_onboarding_state;
     case 'get_window_state':
       return commandArgsSchemas.get_window_state;
+    case 'get_preferences':
+      return commandArgsSchemas.get_preferences;
+    case 'get_storage_usage':
+      return commandArgsSchemas.get_storage_usage;
+    case 'get_technical_summary':
+      return commandArgsSchemas.get_technical_summary;
+    case 'get_third_party_notices':
+      return commandArgsSchemas.get_third_party_notices;
+    case 'log_frontend':
+      return commandArgsSchemas.log_frontend;
+    case 'delete_monitoring_data':
+      return commandArgsSchemas.delete_monitoring_data;
+    case 'reset_application':
+      return commandArgsSchemas.reset_application;
+    case 'open_logs_folder':
+      return commandArgsSchemas.open_logs_folder;
+    case 'open_external_url':
+      return commandArgsSchemas.open_external_url;
+    case 'set_preference':
+      return commandArgsSchemas.set_preference;
     case 'set_window_state':
       return commandArgsSchemas.set_window_state;
     case 'request_low_level_access':
@@ -96,8 +116,42 @@ function argsSchemaFor(command: string): z.ZodType | undefined {
       return commandArgsSchemas.stop_guided;
     case 'get_analysis_window':
       return commandArgsSchemas.get_analysis_window;
+    case 'preview_export':
+      return commandArgsSchemas.preview_export;
+    case 'export':
+      return commandArgsSchemas.export;
+    case 'cancel_export':
+      return commandArgsSchemas.cancel_export;
+    case 'import_session':
+      return commandArgsSchemas.import_session;
     case 'get_cpu_topology':
       return commandArgsSchemas.get_cpu_topology;
+    case 'set_tray_paused':
+      return commandArgsSchemas.set_tray_paused;
+    case 'list_sessions':
+      return commandArgsSchemas.list_sessions;
+    case 'get_session':
+      return commandArgsSchemas.get_session;
+    case 'get_report':
+      return commandArgsSchemas.get_report;
+    case 'delete_session':
+      return commandArgsSchemas.delete_session;
+    case 'set_session_reference':
+      return commandArgsSchemas.set_session_reference;
+    case 'confirm_close':
+      return commandArgsSchemas.confirm_close;
+    case 'resolve_first_close':
+      return commandArgsSchemas.resolve_first_close;
+    case 'get_update_state':
+      return commandArgsSchemas.get_update_state;
+    case 'reevaluate_report':
+      return commandArgsSchemas.reevaluate_report;
+    case 'check_for_update':
+      return commandArgsSchemas.check_for_update;
+    case 'download_update':
+      return commandArgsSchemas.download_update;
+    case 'install_update':
+      return commandArgsSchemas.install_update;
     default:
       return undefined;
   }
@@ -182,6 +236,26 @@ export function parseEvent(
   event: 'guided:phase',
   value: unknown
 ): BridgeResult<import('./schemas').GuidedPhase>;
+export function parseEvent(
+  event: 'tray:state',
+  value: unknown
+): BridgeResult<import('./schemas').TrayState>;
+export function parseEvent(
+  event: 'session:changed',
+  value: unknown
+): BridgeResult<import('./schemas').SessionChangedEvent>;
+export function parseEvent(
+  event: 'report:frozen',
+  value: unknown
+): BridgeResult<{ session_id: string }>;
+export function parseEvent(
+  event: 'import:progress',
+  value: unknown
+): BridgeResult<import('./schemas').ImportProgress>;
+export function parseEvent(
+  event: 'export:progress',
+  value: unknown
+): BridgeResult<import('./schemas').ExportProgress>;
 export function parseEvent(
   event: keyof typeof eventSchemas,
   value: unknown

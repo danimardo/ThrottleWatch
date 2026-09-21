@@ -48,3 +48,35 @@ job debe construir la variante `e2e`, arrancarla con CDP, esperar a
 cerrar el proceso. Si el runner no dispone de WebView2 o de una sesión de
 escritorio interactiva, ese job debe quedar explícitamente marcado como
 infraestructura no disponible, no convertirse en una prueba falsa contra Vite.
+
+## Arnés reutilizable (2026-09-21)
+
+El paso 2 de arriba (`tauri dev -f e2e` con un `beforeDevCommand` vacío local)
+era deliberadamente un atajo de un solo uso, no algo que debiera entrar en el
+repositorio. Se sustituyó por un lanzamiento directo del binario ya
+compilado, sin servidor de desarrollo:
+
+```
+pnpm exec vite build
+cargo build --locked --features e2e,custom-protocol --manifest-path src-tauri/Cargo.toml
+pnpm exec playwright test --config playwright.native.config.ts
+```
+
+`custom-protocol` incrusta el `dist/` recién construido en el binario (lo
+mismo que usa `tauri build`), así que no hace falta ningún servidor Vite ni
+variable de entorno de máquina. `e2e-native/global-setup.ts` arranca el
+`.exe`, espera a `/json/version` y devuelve una función de cierre que
+Playwright llama sola al terminar; `e2e-native/fixtures.ts` sustituye el
+`browser` habitual por `chromium.connectOverCDP('http://127.0.0.1:9222')`.
+`e2e-native/smoke.spec.ts` confirma el título, que `__TAURI_INTERNALS__`
+existe (para no confundir esta ventana con una pestaña de vista previa) y una
+navegación real (Ctrl+6 → Ajustes) con IPC de verdad, no el puente falso de
+`e2e/fixtures.ts`. Verificado en local (Windows) tres ejecuciones seguidas,
+0 procesos `throttlewatch.exe` colgados después de cada una.
+
+**Sigue sin hacer:** el job de `windows-2025` en CI (no verificable sin un
+runner real) y decidir qué subconjunto de los especificaciones `app`
+existentes (hoy arnés Vite con el puente falso) tiene sentido migrar a este
+arnés — la mayoría usan parámetros de URL (`?with-history`, `?updates=on`…)
+que solo entiende el puente falso, así que no se trasladan sin más. Ver T181
+en `tasks.md`.

@@ -4,6 +4,10 @@ use std::io::{self, Write};
 use std::panic;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
@@ -17,6 +21,40 @@ use tracing_subscriber::registry::LookupSpan;
 const MAX_LOG_BYTES: u64 = 5 * 1024 * 1024;
 const MAX_LOG_FILES: usize = 5;
 const REDACTED: &str = "[redacted]";
+
+pub fn directory_bytes(directory: impl AsRef<Path>) -> io::Result<u64> {
+    let mut total = 0_u64;
+    let entries = match fs::read_dir(directory) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(0),
+        Err(error) => return Err(error),
+    };
+    for entry in entries {
+        let entry = entry?;
+        if entry.file_type()?.is_file() {
+            total = total.saturating_add(entry.metadata()?.len());
+        }
+    }
+    Ok(total)
+}
+
+pub fn clear_directory(directory: impl AsRef<Path>) -> io::Result<()> {
+    let directory = directory.as_ref();
+    let entries = match fs::read_dir(directory) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error),
+    };
+    for entry in entries {
+        let entry = entry?;
+        if entry.file_type()?.is_file()
+            && entry.file_name().to_string_lossy().starts_with("throttlewatch")
+        {
+            fs::remove_file(entry.path())?;
+        }
+    }
+    Ok(())
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LogError {
@@ -48,6 +86,7 @@ struct EventFields {
     component: Option<String>,
     code: Option<String>,
     msg: Option<String>,
+    target: Option<String>,
     session_id: Option<String>,
     protocol_version: Option<u64>,
     fields: Map<String, Value>,
@@ -63,6 +102,7 @@ impl tracing::field::Visit for EventFields {
             "component" => self.component = Some(value.to_owned()),
             "code" => self.code = Some(value.to_owned()),
             "msg" => self.msg = Some(value.to_owned()),
+            "target" => self.target = Some(value.to_owned()),
             "session_id" => self.session_id = Some(value.to_owned()),
             _ => {
                 self.fields.insert(field.name().to_owned(), Value::String(value.to_owned()));
@@ -136,7 +176,7 @@ fn event_from_tracing(
         ts: now_utc(),
         level: metadata.level().to_string(),
         component: fields.component.take().unwrap_or_else(|| "core".to_owned()),
-        target: metadata.target().to_owned(),
+        target: fields.target.take().unwrap_or_else(|| metadata.target().to_owned()),
         code,
         msg: fields.msg.take().unwrap_or_else(|| "backend log event".to_owned()),
         session_id: fields.session_id.take(),
@@ -149,11 +189,12 @@ fn event_from_tracing(
 pub struct JsonLogLayer {
     writer: NonBlocking,
     deduplicator: Mutex<Deduplicator>,
+    control: LogControl,
 }
 
 impl JsonLogLayer {
-    fn new(writer: NonBlocking) -> Self {
-        Self { writer, deduplicator: Mutex::new(Deduplicator::default()) }
+    fn new(writer: NonBlocking, control: LogControl) -> Self {
+        Self { writer, deduplicator: Mutex::new(Deduplicator::default()), control }
     }
 }
 
@@ -196,6 +237,11 @@ where
     S: Subscriber + for<'span> LookupSpan<'span>,
 {
     fn on_event(&self, event: &Event<'_>, _context: Context<'_, S>) {
+        if matches!(*event.metadata().level(), tracing::Level::DEBUG | tracing::Level::TRACE)
+            && !self.control.is_detailed()
+        {
+            return;
+        }
         let mut fields = EventFields::default();
         event.record(&mut fields);
         let Some(entry) = event_from_tracing(event.metadata(), &mut fields) else {
@@ -268,6 +314,39 @@ impl Write for RotatingWriter {
 
 pub struct LogGuard {
     _worker: WorkerGuard,
+    control: LogControl,
+}
+
+#[derive(Clone)]
+pub struct LogControl {
+    detailed: Arc<AtomicBool>,
+    detailed_until: Arc<Mutex<Option<String>>>,
+}
+
+impl LogControl {
+    pub fn set_detailed(&self, enabled: bool) {
+        self.detailed.store(enabled, Ordering::Relaxed);
+        if let Ok(mut until) = self.detailed_until.lock() {
+            *until = None;
+        }
+    }
+
+    pub fn set_detailed_until(&self, until: Option<String>) {
+        self.detailed.store(until.is_some(), Ordering::Relaxed);
+        if let Ok(mut deadline) = self.detailed_until.lock() {
+            *deadline = until;
+        }
+    }
+
+    pub fn is_detailed(&self) -> bool {
+        if !self.detailed.load(Ordering::Relaxed) {
+            return false;
+        }
+        let Ok(until) = self.detailed_until.lock() else { return false };
+        until.as_deref().is_none_or(|value| {
+            value.parse::<jiff::Timestamp>().is_ok_and(|deadline| deadline > jiff::Timestamp::now())
+        })
+    }
 }
 
 pub fn init(directory: impl AsRef<Path>, detailed: bool) -> io::Result<LogGuard> {
@@ -275,11 +354,13 @@ pub fn init(directory: impl AsRef<Path>, detailed: bool) -> io::Result<LogGuard>
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
     let writer = RotatingWriter::open(directory.as_ref(), "throttlewatch.log")?;
     let (non_blocking, worker) = tracing_appender::non_blocking(writer);
-    let layer = JsonLogLayer::new(non_blocking);
-    let level = if detailed { tracing::Level::DEBUG } else { tracing::Level::INFO };
+    let control = LogControl {
+        detailed: Arc::new(AtomicBool::new(detailed)),
+        detailed_until: Arc::new(Mutex::new(None)),
+    };
+    let layer = JsonLogLayer::new(non_blocking, control.clone());
     tracing_subscriber::registry()
         .with(layer)
-        .with(tracing_subscriber::filter::LevelFilter::from_level(level))
         .try_init()
         .map_err(|error| io::Error::new(io::ErrorKind::AlreadyExists, error.to_string()))?;
     let previous_hook = panic::take_hook();
@@ -287,7 +368,13 @@ pub fn init(directory: impl AsRef<Path>, detailed: bool) -> io::Result<LogGuard>
         tracing::error!(component = "core", code = "RUST_PANIC", msg = "unhandled Rust panic");
         previous_hook(panic_info);
     }));
-    Ok(LogGuard { _worker: worker })
+    Ok(LogGuard { _worker: worker, control })
+}
+
+impl LogGuard {
+    pub fn control(&self) -> LogControl {
+        self.control.clone()
+    }
 }
 
 pub fn validate_collector_stderr(line: &str) -> Result<LogEvent, String> {
@@ -344,8 +431,14 @@ macro_rules! log_error {
 
 #[cfg(test)]
 mod tests {
-    use super::{Deduplicator, LogEvent, format_human, redact_fields, validate_collector_stderr};
+    use super::{
+        Deduplicator, LogControl, LogEvent, clear_directory, directory_bytes, format_human,
+        redact_fields, validate_collector_stderr,
+    };
     use serde_json::{Map, Value};
+    use std::fs::{self, File};
+    use std::io::Write;
+    use std::sync::{Arc, Mutex, atomic::AtomicBool};
     use std::time::{Duration, Instant};
 
     #[test]
@@ -416,5 +509,48 @@ mod tests {
             .push(event(), start + Duration::from_secs(61))
             .unwrap_or_else(|| panic!("the repeated event must flush"));
         assert_eq!(flushed.fields["count"], Value::from(2));
+    }
+
+    #[test]
+    fn detailed_logging_control_can_be_changed_without_restarting_the_layer() {
+        let control = LogControl {
+            detailed: Arc::new(AtomicBool::new(false)),
+            detailed_until: Arc::new(Mutex::new(None)),
+        };
+        assert!(!control.is_detailed());
+        control.set_detailed(true);
+        assert!(control.is_detailed());
+        control.set_detailed(false);
+        assert!(!control.is_detailed());
+    }
+
+    #[test]
+    fn detailed_logging_expires_while_the_process_remains_open() {
+        let control = LogControl {
+            detailed: Arc::new(AtomicBool::new(false)),
+            detailed_until: Arc::new(Mutex::new(None)),
+        };
+        control.set_detailed_until(Some("2020-01-01T00:00:00Z".to_owned()));
+        assert!(!control.is_detailed());
+    }
+
+    #[test]
+    fn measures_and_clears_only_throttlewatch_logs() -> std::io::Result<()> {
+        let directory =
+            std::env::temp_dir().join(format!("throttlewatch-log-test-{}", std::process::id()));
+        fs::create_dir_all(&directory)?;
+        let log = directory.join("throttlewatch.log");
+        let unrelated = directory.join("keep.txt");
+        let mut file = File::create(&log)?;
+        file.write_all(b"event")?;
+        drop(file);
+        File::create(&unrelated)?;
+        assert_eq!(directory_bytes(&directory)?, 5);
+        clear_directory(&directory)?;
+        assert!(!log.exists());
+        assert!(unrelated.exists());
+        fs::remove_file(unrelated)?;
+        fs::remove_dir(directory)?;
+        Ok(())
     }
 }

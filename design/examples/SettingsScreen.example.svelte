@@ -76,7 +76,7 @@
   let installBlocked = $state(false);
 
   // --- Acerca de ---
-  let logLevel = $state('info');
+  let detailedLogging = $state(false);
   let copied = $state(false);
 
   // --- Zona de riesgo ---
@@ -88,6 +88,7 @@
     not_needed: 'No hace falta acceso avanzado en este equipo.',
     available: 'Acceso avanzado disponible: razones de limitación, límites de potencia y TCC offset.',
     installable: 'Recomendado: el acceso avanzado sube este equipo al nivel A (confirmar la causa y estimar cuánto ayudaría enfriar mejor).',
+    upgradable: 'Hay una versión anterior del controlador de acceso avanzado; actualizarla mejora la cobertura.',
     denied: 'El acceso avanzado está bloqueado por una directiva del sistema o por el antivirus.',
     error: 'No se pudo comprobar el acceso avanzado.'
   };
@@ -560,15 +561,12 @@ almacenamiento: 38 MB · retención: ${dataRetention} · perfil: ${monitoringMod
         ],
         technicalSummary: technicalSummarySnippet,
         advancedLabel: 'Avanzado',
-        logLevelRowLabel: 'Nivel de registro',
-        logLevelRowDescription: '«Depuración» vuelve a «Normal» al reiniciar la aplicación.',
-        logLevelLabel: 'Nivel de registro',
-        logLevel,
-        logLevelOptions: [
-          { value: 'info', label: 'Normal' },
-          { value: 'debug', label: 'Depuración' }
-        ],
-        onLogLevelChange: (v) => (logLevel = v)
+        detailedLoggingRowLabel: 'Registro detallado',
+        detailedLoggingRowDescription: 'Se activa durante 24 horas y se desactiva al reiniciar la aplicación.',
+        detailedLoggingLabel: 'Registro detallado',
+        detailedLogging,
+        detailedLoggingUntilLabel: detailedLogging ? 'Activo hasta el próximo reinicio o durante 24 horas.' : 'Desactivado',
+        onDetailedLoggingChange: (checked) => (detailedLogging = checked)
       }}
       riskZone={{
         title: 'Zona de riesgo',

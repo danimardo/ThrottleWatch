@@ -21,6 +21,7 @@ import {
 
 export interface WindowAdapter {
   minimize(): Promise<void>;
+  hide(): Promise<void>;
   toggleMaximize(): Promise<void>;
   close(): Promise<void>;
   isMaximized(): Promise<boolean>;
@@ -72,6 +73,7 @@ function isRuntimeMonitor(
 
 const browserWindowAdapter: WindowAdapter = {
   minimize: () => Promise.resolve(),
+  hide: () => Promise.resolve(),
   toggleMaximize: () => Promise.resolve(),
   close: () => Promise.resolve(),
   isMaximized: () => Promise.resolve(false),
@@ -145,6 +147,7 @@ export function createWindowAdapter(): WindowAdapter {
 
   return {
     minimize: () => current.minimize(),
+    hide: () => current.hide(),
     toggleMaximize: () => current.toggleMaximize(),
     close: () => current.close(),
     isMaximized: () => current.isMaximized(),

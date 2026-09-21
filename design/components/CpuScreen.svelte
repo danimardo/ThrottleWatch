@@ -59,7 +59,7 @@
   <h2 class="value-md" style:color="var(--text-primary)">{title}</h2>
 
   <section>
-    <h3 class="label section-title" style:color="var(--text-tertiary)">{topologyLabel}</h3>
+    <h3 class="label section-title" style:color="var(--text-secondary)">{topologyLabel}</h3>
     <CpuTopologyMap
       {groups}
       {metricMode}
@@ -77,7 +77,7 @@
   </section>
 
   <section>
-    <h3 class="label section-title" style:color="var(--text-tertiary)">{tableLabel}</h3>
+    <h3 class="label section-title" style:color="var(--text-secondary)">{tableLabel}</h3>
     <CpuAdvancedTable
       rows={tableRows}
       columnLabels={tableColumnLabels}

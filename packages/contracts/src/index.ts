@@ -1,4 +1,47 @@
 export type ProtocolVersion = 1;
+
+export type ExportFormat = 'csv' | 'json';
+export type ExportScope =
+  | { readonly kind: 'session'; readonly session_id: string }
+  | { readonly kind: 'report'; readonly session_id: string }
+  | {
+      readonly kind: 'range';
+      readonly session_id: string;
+      readonly start_ms: number;
+      readonly end_ms: number;
+    };
+
+export interface CoverageChange {
+  readonly at: number;
+  readonly from_tier: 'A' | 'B' | 'C';
+  readonly to_tier: 'A' | 'B' | 'C';
+  readonly reason: string;
+}
+
+/** Versioned evidence format. It is deliberately separate from the IPC envelope. */
+export interface ExportDocument {
+  readonly schema_version: 1;
+  readonly kind: 'session';
+  readonly session: {
+    readonly session_id: string;
+    readonly status: string;
+    readonly started_at: string;
+    readonly ended_at: string | null;
+    readonly duration_ms: number | null;
+    readonly coverage_tier: 'A' | 'B' | 'C';
+    readonly cpu_vendor: string;
+    readonly cpu_model: string;
+    readonly topology: string;
+    readonly ruleset_version: string;
+  };
+  readonly samples: readonly Record<string, unknown>[];
+  readonly events: readonly Record<string, unknown>[];
+  readonly report:
+    | (Record<string, unknown> & {
+        readonly coverage_history?: readonly CoverageChange[];
+      })
+    | null;
+}
 export type MessageType =
   | 'hello'
   | 'hello_ack'

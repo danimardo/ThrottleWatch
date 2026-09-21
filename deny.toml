@@ -4,7 +4,8 @@ yanked = "deny"
 ignore = []
 
 [licenses]
-allow = ["Apache-2.0", "Apache-2.0 WITH LLVM-exception", "GPL-3.0-only", "MIT", "BSD-3-Clause", "MPL-2.0", "Unicode-3.0", "Zlib"]
+# CDLA-Permissive-2.0: Mozilla root-certificate data (webpki-root-certs) reached through the official updater's HTTPS client; permissive, attribution only. Added 2026-09-21 with T095-T103, pending owner review.
+allow = ["Apache-2.0", "Apache-2.0 WITH LLVM-exception", "GPL-3.0-only", "MIT", "BSD-3-Clause", "ISC", "MPL-2.0", "Unicode-3.0", "Zlib", "CDLA-Permissive-2.0"]
 confidence-threshold = 0.93
 
 [bans]

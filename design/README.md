@@ -629,7 +629,7 @@ native app):
   magnitude with available (glyph + text), quality (`substitute` gets a
   dashed underline, a pattern not just a color), source and reason;
   footer with the strongest reachable conclusion and the low-level
-  access state. Only `installable` renders the install/repair action.
+  access state. Only `installable`/`upgradable` render the install/update action.
   Opened as a panel from `ContextStrip` and embedded in Ajustes →
   Sensores via `SettingsSensorsSection.coverage`.
 - **ContextStrip** — the strip above `StatusHero`: CPU + topology,

@@ -1,0 +1,8242 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:00000000-0000-4000-8000-000000000001",
+  "version": 1,
+  "metadata": {
+    "component": {
+      "type": "application",
+      "name": "ThrottleWatch",
+      "version": "0.1.0"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@asamuzakjp/css-color",
+      "version": "7.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@asamuzakjp/dom-selector",
+      "version": "9.1.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@babel/helper-string-parser",
+      "version": "7.29.7",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@babel/helper-validator-identifier",
+      "version": "7.29.7",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@babel/parser",
+      "version": "7.29.8",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@babel/types",
+      "version": "7.29.8",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@bcoe/v8-coverage",
+      "version": "1.0.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@bramus/specificity",
+      "version": "2.4.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@cacheable/memory",
+      "version": "2.2.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@cacheable/utils",
+      "version": "2.5.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@csstools/color-helpers",
+      "version": "6.1.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT-0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@csstools/css-calc",
+      "version": "3.4.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@csstools/css-color-parser",
+      "version": "4.2.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@csstools/css-parser-algorithms",
+      "version": "4.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@csstools/css-syntax-patches-for-csstree",
+      "version": "1.1.14",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT-0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@csstools/css-tokenizer",
+      "version": "4.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@eslint-community/eslint-utils",
+      "version": "4.10.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@eslint-community/regexpp",
+      "version": "4.12.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@eslint/config-array",
+      "version": "0.23.5",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@eslint/config-helpers",
+      "version": "0.7.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@eslint/core",
+      "version": "1.2.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@eslint/object-schema",
+      "version": "3.0.5",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@eslint/plugin-kit",
+      "version": "0.7.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@exodus/bytes",
+      "version": "1.15.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@humanfs/core",
+      "version": "0.19.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@humanfs/node",
+      "version": "0.16.8",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@humanfs/types",
+      "version": "0.15.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@humanwhocodes/module-importer",
+      "version": "1.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@humanwhocodes/retry",
+      "version": "0.4.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@jridgewell/gen-mapping",
+      "version": "0.3.13",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@jridgewell/remapping",
+      "version": "2.3.5",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@jridgewell/resolve-uri",
+      "version": "3.1.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@jridgewell/sourcemap-codec",
+      "version": "1.6.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@jridgewell/trace-mapping",
+      "version": "0.3.31",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@keyv/bigmap",
+      "version": "1.3.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@keyv/serialize",
+      "version": "1.1.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@oxc-project/types",
+      "version": "0.150.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@playwright/test",
+      "version": "1.63.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@rolldown/binding-win32-x64-msvc",
+      "version": "1.2.9",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@rolldown/pluginutils",
+      "version": "1.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@sveltejs/acorn-typescript",
+      "version": "1.0.13",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@sveltejs/load-config",
+      "version": "0.2.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@sveltejs/vite-plugin-svelte",
+      "version": "7.3.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@tauri-apps/api",
+      "version": "2.11.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0 OR MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@tsconfig/svelte",
+      "version": "5.0.8",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@types/chai",
+      "version": "5.2.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@types/deep-eql",
+      "version": "4.0.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@types/esrecurse",
+      "version": "4.3.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@types/estree",
+      "version": "1.0.9",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@types/json-schema",
+      "version": "7.0.15",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@typescript-eslint/eslint-plugin",
+      "version": "8.70.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@typescript-eslint/parser",
+      "version": "8.70.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@typescript-eslint/project-service",
+      "version": "8.70.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@typescript-eslint/scope-manager",
+      "version": "8.70.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@typescript-eslint/tsconfig-utils",
+      "version": "8.70.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@typescript-eslint/type-utils",
+      "version": "8.70.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@typescript-eslint/types",
+      "version": "8.70.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@typescript-eslint/typescript-estree",
+      "version": "8.70.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@typescript-eslint/utils",
+      "version": "8.70.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@typescript-eslint/visitor-keys",
+      "version": "8.70.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@vitest/coverage-v8",
+      "version": "5.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@vitest/istanbul-lib-coverage",
+      "version": "1.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@vitest/istanbul-lib-report",
+      "version": "1.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@vitest/mocker",
+      "version": "5.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "@vitest/spy",
+      "version": "5.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "acorn-jsx",
+      "version": "5.3.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "acorn",
+      "version": "8.18.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "adler2",
+      "version": "2.0.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "aho-corasick",
+      "version": "1.1.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "ajv",
+      "version": "6.15.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "alloc-no-stdlib",
+      "version": "2.0.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "alloc-stdlib",
+      "version": "0.2.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "android_system_properties",
+      "version": "0.1.6"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "anyhow",
+      "version": "1.0.104"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "arbitrary",
+      "version": "1.4.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "aria-query",
+      "version": "5.3.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "assertion-error",
+      "version": "2.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "ast-v8-to-istanbul",
+      "version": "1.0.6",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "async-broadcast",
+      "version": "0.7.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "async-channel",
+      "version": "2.5.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "async-executor",
+      "version": "1.14.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "async-io",
+      "version": "2.6.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "async-lock",
+      "version": "3.4.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "async-process",
+      "version": "2.5.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "async-recursion",
+      "version": "1.1.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "async-signal",
+      "version": "0.2.14"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "async-task",
+      "version": "4.7.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "async-trait",
+      "version": "0.1.92"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "atk-sys",
+      "version": "0.18.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "atk",
+      "version": "0.18.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "atomic-waker",
+      "version": "1.1.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "auto-launch",
+      "version": "0.5.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "autocfg",
+      "version": "1.5.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "axobject-query",
+      "version": "4.1.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "balanced-match",
+      "version": "4.0.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "base64",
+      "version": "0.21.7"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "base64",
+      "version": "0.22.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "base64",
+      "version": "0.23.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "bidi-js",
+      "version": "1.1.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "bit-set",
+      "version": "0.8.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "bit-vec",
+      "version": "0.8.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "bitflags",
+      "version": "1.3.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "bitflags",
+      "version": "2.13.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "block-buffer",
+      "version": "0.10.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "block2",
+      "version": "0.6.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "blocking",
+      "version": "1.7.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "brace-expansion",
+      "version": "5.0.12",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "brotli-decompressor",
+      "version": "5.0.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "brotli",
+      "version": "8.0.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "bs58",
+      "version": "0.5.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "bumpalo",
+      "version": "3.20.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "bytemuck",
+      "version": "1.25.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "byteorder",
+      "version": "1.5.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "bytes",
+      "version": "1.12.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "cacheable",
+      "version": "2.5.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "cairo-rs",
+      "version": "0.18.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "cairo-sys-rs",
+      "version": "0.18.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "camino",
+      "version": "1.2.6"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "cargo_metadata",
+      "version": "0.19.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "cargo_toml",
+      "version": "0.22.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "cargo-platform",
+      "version": "0.1.9"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "cc",
+      "version": "1.4.7"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "cesu8",
+      "version": "1.1.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "cfb",
+      "version": "0.7.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "cfg-expr",
+      "version": "0.15.8"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "cfg-if",
+      "version": "1.0.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "chai",
+      "version": "6.2.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "chokidar",
+      "version": "4.0.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "chrono",
+      "version": "0.4.45"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "clsx",
+      "version": "2.1.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "combine",
+      "version": "4.6.8"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "concurrent-queue",
+      "version": "2.5.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "cookie",
+      "version": "0.18.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "core-foundation-sys",
+      "version": "0.8.7"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "core-foundation",
+      "version": "0.10.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "core-foundation",
+      "version": "0.9.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "core-graphics-types",
+      "version": "0.2.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "core-graphics",
+      "version": "0.25.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "NuGet"
+      },
+      "name": "coverlet.collector",
+      "version": "10.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "cpufeatures",
+      "version": "0.2.17"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "crc32fast",
+      "version": "1.5.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "cross-spawn",
+      "version": "7.0.6",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "crossbeam-channel",
+      "version": "0.5.17"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "crossbeam-utils",
+      "version": "0.8.23"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "crypto-common",
+      "version": "0.1.7"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "css-tree",
+      "version": "3.2.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "cssesc",
+      "version": "3.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "cssparser-macros",
+      "version": "0.6.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "cssparser",
+      "version": "0.36.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "ctor-proc-macro",
+      "version": "0.0.7"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "ctor",
+      "version": "0.8.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "darling_core",
+      "version": "0.24.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "darling_macro",
+      "version": "0.24.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "darling",
+      "version": "0.24.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "data-urls",
+      "version": "7.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "dbus",
+      "version": "0.9.12"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "debug",
+      "version": "4.4.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "decimal.js",
+      "version": "10.6.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "deep-is",
+      "version": "0.1.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "deepmerge",
+      "version": "4.3.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "defmt-macros",
+      "version": "1.1.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "defmt-parser",
+      "version": "1.0.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "defmt",
+      "version": "1.1.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "deranged",
+      "version": "0.5.8"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "derive_arbitrary",
+      "version": "1.4.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "derive_more-impl",
+      "version": "2.1.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "derive_more",
+      "version": "2.1.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "detect-libc",
+      "version": "2.1.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "devalue",
+      "version": "5.9.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "NuGet"
+      },
+      "name": "DiffEngine",
+      "version": "11.3.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "digest",
+      "version": "0.10.7"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "dirs-sys",
+      "version": "0.3.7"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "dirs-sys",
+      "version": "0.5.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "dirs",
+      "version": "4.0.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "dirs",
+      "version": "6.0.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "dispatch2",
+      "version": "0.3.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "displaydoc",
+      "version": "0.2.7"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "dlopen2_derive",
+      "version": "0.4.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "dlopen2",
+      "version": "0.8.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "dom_query",
+      "version": "0.27.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "dpi",
+      "version": "0.1.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "dtoa-short",
+      "version": "0.3.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "dtoa",
+      "version": "1.0.11"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "dtor-proc-macro",
+      "version": "0.0.6"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "dtor",
+      "version": "0.3.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "dunce",
+      "version": "1.0.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "dyn-clone",
+      "version": "1.0.20"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "embed_plist",
+      "version": "1.2.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "embed-resource",
+      "version": "3.0.11"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "NuGet"
+      },
+      "name": "EmptyFiles",
+      "version": "4.4.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "endi",
+      "version": "1.1.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "entities",
+      "version": "8.1.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-2-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "enumflags2_derive",
+      "version": "0.7.12"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "enumflags2",
+      "version": "0.7.12"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "equivalent",
+      "version": "1.0.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "erased-serde",
+      "version": "0.4.10"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "errno",
+      "version": "0.3.14"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "es-module-lexer",
+      "version": "2.3.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "escape-string-regexp",
+      "version": "4.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "eslint-plugin-svelte",
+      "version": "3.23.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "eslint-scope",
+      "version": "8.4.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-2-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "eslint-scope",
+      "version": "9.1.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-2-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "eslint-visitor-keys",
+      "version": "3.4.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "eslint-visitor-keys",
+      "version": "4.2.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "eslint-visitor-keys",
+      "version": "5.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "eslint",
+      "version": "10.10.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "esm-env",
+      "version": "1.2.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "espree",
+      "version": "10.4.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-2-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "espree",
+      "version": "11.2.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-2-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "esquery",
+      "version": "1.7.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "esrap",
+      "version": "2.3.7",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "esrecurse",
+      "version": "4.3.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-2-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "estraverse",
+      "version": "5.3.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-2-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "estree-walker",
+      "version": "3.0.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "esutils",
+      "version": "2.0.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-2-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "event-listener-strategy",
+      "version": "0.5.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "event-listener",
+      "version": "5.4.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "expect-type",
+      "version": "1.4.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "fallible-iterator",
+      "version": "0.3.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "fallible-streaming-iterator",
+      "version": "0.1.9"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "fast-deep-equal",
+      "version": "3.1.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "fast-json-stable-stringify",
+      "version": "2.1.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "fast-levenshtein",
+      "version": "2.0.6",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "fastrand",
+      "version": "2.5.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "fdeflate",
+      "version": "0.3.7"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "fdir",
+      "version": "6.5.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "field-offset",
+      "version": "0.3.6"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "file-entry-cache",
+      "version": "11.1.5",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "filetime",
+      "version": "0.2.29"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "find-msvc-tools",
+      "version": "0.1.13"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "find-up",
+      "version": "5.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "flat-cache",
+      "version": "6.1.23",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "flate2",
+      "version": "1.1.10"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "flatted",
+      "version": "3.4.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "fnv",
+      "version": "1.0.7"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "foldhash",
+      "version": "0.2.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "foreign-types-macros",
+      "version": "0.2.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "foreign-types-shared",
+      "version": "0.3.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "foreign-types",
+      "version": "0.5.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "form_urlencoded",
+      "version": "1.2.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "futures-channel",
+      "version": "0.3.34"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "futures-core",
+      "version": "0.3.34"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "futures-executor",
+      "version": "0.3.34"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "futures-io",
+      "version": "0.3.34"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "futures-lite",
+      "version": "2.6.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "futures-macro",
+      "version": "0.3.34"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "futures-sink",
+      "version": "0.3.34"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "futures-task",
+      "version": "0.3.34"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "futures-util",
+      "version": "0.3.34"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "gdk-pixbuf-sys",
+      "version": "0.18.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "gdk-pixbuf",
+      "version": "0.18.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "gdk-sys",
+      "version": "0.18.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "gdk",
+      "version": "0.18.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "gdkwayland-sys",
+      "version": "0.18.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "gdkx11-sys",
+      "version": "0.18.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "gdkx11",
+      "version": "0.18.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "generic-array",
+      "version": "0.14.7"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "getrandom",
+      "version": "0.2.17"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "getrandom",
+      "version": "0.3.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "getrandom",
+      "version": "0.4.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "gio-sys",
+      "version": "0.18.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "gio",
+      "version": "0.18.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "glib-macros",
+      "version": "0.18.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "glib-sys",
+      "version": "0.18.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "glib",
+      "version": "0.18.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "glob-parent",
+      "version": "6.0.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "glob",
+      "version": "0.3.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "globals",
+      "version": "16.5.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "gobject-sys",
+      "version": "0.18.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "gtk-sys",
+      "version": "0.18.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "gtk",
+      "version": "0.18.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "gtk3-macros",
+      "version": "0.18.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "hashbrown",
+      "version": "0.12.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "hashbrown",
+      "version": "0.16.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "hashbrown",
+      "version": "0.17.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "hashery",
+      "version": "1.5.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "hashlink",
+      "version": "0.12.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "heck",
+      "version": "0.4.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "heck",
+      "version": "0.5.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "hermit-abi",
+      "version": "0.5.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "hex",
+      "version": "0.4.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "hookified",
+      "version": "1.15.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "hookified",
+      "version": "2.2.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "html-encoding-sniffer",
+      "version": "6.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "html5ever",
+      "version": "0.38.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "http-body-util",
+      "version": "0.1.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "http-body",
+      "version": "1.1.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "http",
+      "version": "1.5.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "httparse",
+      "version": "1.10.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "hyper-rustls",
+      "version": "0.27.10"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "hyper-util",
+      "version": "0.1.20"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "hyper",
+      "version": "1.11.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "iana-time-zone-haiku",
+      "version": "0.1.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "iana-time-zone",
+      "version": "0.1.65"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "ico",
+      "version": "0.5.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "icu_collections",
+      "version": "2.3.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "icu_locale_core",
+      "version": "2.3.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "icu_normalizer_data",
+      "version": "2.3.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "icu_normalizer",
+      "version": "2.3.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "icu_properties_data",
+      "version": "2.3.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "icu_properties",
+      "version": "2.3.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "icu_provider",
+      "version": "2.3.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "ident_case",
+      "version": "1.0.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "idna_adapter",
+      "version": "1.2.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "idna",
+      "version": "1.1.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "ignore",
+      "version": "5.3.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "ignore",
+      "version": "7.0.9",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "imurmurhash",
+      "version": "0.1.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "indexmap",
+      "version": "1.9.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "indexmap",
+      "version": "2.14.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "infer",
+      "version": "0.19.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "ipnet",
+      "version": "2.12.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "is-docker",
+      "version": "0.2.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "is-extglob",
+      "version": "2.1.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "is-glob",
+      "version": "4.0.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "is-potential-custom-element-name",
+      "version": "1.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "is-reference",
+      "version": "3.0.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "is-wsl",
+      "version": "0.4.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "isexe",
+      "version": "2.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "itoa",
+      "version": "1.0.18"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "javascriptcore-rs-sys",
+      "version": "1.1.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "javascriptcore-rs",
+      "version": "1.1.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "jiff-core",
+      "version": "0.1.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "jiff-static",
+      "version": "0.2.37"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "jiff-tzdb-platform",
+      "version": "0.1.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "jiff-tzdb",
+      "version": "0.1.8"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "jiff",
+      "version": "0.2.37"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "jni-macros",
+      "version": "0.22.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "jni-sys-macros",
+      "version": "0.4.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "jni-sys",
+      "version": "0.3.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "jni-sys",
+      "version": "0.4.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "jni",
+      "version": "0.21.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "jni",
+      "version": "0.22.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "js-sys",
+      "version": "0.3.105"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "js-tokens",
+      "version": "10.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "jsdom",
+      "version": "30.1.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "json-patch",
+      "version": "3.0.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "json-schema-traverse",
+      "version": "0.4.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "json-stable-stringify-without-jsonify",
+      "version": "1.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "jsonptr",
+      "version": "0.6.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "keyboard-types",
+      "version": "0.7.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "keyv",
+      "version": "5.6.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "known-css-properties",
+      "version": "0.37.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "lazy_static",
+      "version": "1.5.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "levn",
+      "version": "0.4.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "libappindicator-sys",
+      "version": "0.9.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "libappindicator",
+      "version": "0.9.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "libc",
+      "version": "0.2.189"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "libdbus-sys",
+      "version": "0.2.7"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "libloading",
+      "version": "0.7.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "libredox",
+      "version": "0.1.24"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "libsqlite3-sys",
+      "version": "0.38.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "lightningcss-win32-x64-msvc",
+      "version": "1.33.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MPL-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "lightningcss",
+      "version": "1.33.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MPL-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "lilconfig",
+      "version": "2.1.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "linux-raw-sys",
+      "version": "0.12.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "litemap",
+      "version": "0.8.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "locate-character",
+      "version": "3.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "locate-path",
+      "version": "6.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "lock_api",
+      "version": "0.4.14"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "log",
+      "version": "0.4.34"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "loglevel",
+      "version": "1.9.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "lru-cache",
+      "version": "11.5.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "BlueOak-1.0.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "mac-notification-sys",
+      "version": "0.6.15"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "magic-string",
+      "version": "0.30.21",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "magic-string",
+      "version": "1.4.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "magicast",
+      "version": "0.5.5",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "markup5ever",
+      "version": "0.38.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "mdn-data",
+      "version": "2.27.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "CC0-1.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "memchr",
+      "version": "2.8.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "memoffset",
+      "version": "0.9.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "NuGet"
+      },
+      "name": "Microsoft.ApplicationInsights",
+      "version": "2.23.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "NuGet"
+      },
+      "name": "Microsoft.Bcl.AsyncInterfaces",
+      "version": "6.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "NuGet"
+      },
+      "name": "Microsoft.CodeAnalysis.BannedApiAnalyzers",
+      "version": "5.6.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "NuGet"
+      },
+      "name": "Microsoft.Testing.Extensions.Telemetry",
+      "version": "2.4.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "NuGet"
+      },
+      "name": "Microsoft.Testing.Extensions.TrxReport.Abstractions",
+      "version": "2.4.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "NuGet"
+      },
+      "name": "Microsoft.Testing.Platform.MSBuild",
+      "version": "2.4.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "NuGet"
+      },
+      "name": "Microsoft.Testing.Platform",
+      "version": "2.4.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "NuGet"
+      },
+      "name": "Microsoft.Win32.Registry",
+      "version": "5.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "mime",
+      "version": "0.3.17"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "minimatch",
+      "version": "10.2.6",
+      "licenses": [
+        {
+          "license": {
+            "id": "BlueOak-1.0.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "minisign-verify",
+      "version": "0.2.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "miniz_oxide",
+      "version": "0.8.9"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "miniz_oxide",
+      "version": "0.9.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "mio",
+      "version": "1.2.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "mri",
+      "version": "1.2.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "ms",
+      "version": "2.1.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "muda",
+      "version": "0.19.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "nanoid",
+      "version": "3.3.19",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "natural-compare",
+      "version": "1.4.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "ndk-sys",
+      "version": "0.6.0+11769913"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "ndk",
+      "version": "0.9.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "new_debug_unreachable",
+      "version": "1.0.6"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "notify-rust",
+      "version": "4.18.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "nu-ansi-term",
+      "version": "0.50.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "num_enum_derive",
+      "version": "0.7.6"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "num_enum",
+      "version": "0.7.6"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "num-conv",
+      "version": "0.2.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "num-traits",
+      "version": "0.2.19"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "objc2-app-kit",
+      "version": "0.3.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "objc2-cloud-kit",
+      "version": "0.3.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "objc2-core-data",
+      "version": "0.3.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "objc2-core-foundation",
+      "version": "0.3.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "objc2-core-graphics",
+      "version": "0.3.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "objc2-core-image",
+      "version": "0.3.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "objc2-core-location",
+      "version": "0.3.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "objc2-core-text",
+      "version": "0.3.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "objc2-encode",
+      "version": "4.1.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "objc2-exception-helper",
+      "version": "0.1.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "objc2-foundation",
+      "version": "0.3.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "objc2-io-surface",
+      "version": "0.3.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "objc2-osa-kit",
+      "version": "0.3.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "objc2-quartz-core",
+      "version": "0.3.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "objc2-ui-kit",
+      "version": "0.3.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "objc2-user-notifications",
+      "version": "0.3.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "objc2-web-kit",
+      "version": "0.3.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "objc2",
+      "version": "0.6.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "obug",
+      "version": "2.2.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "once_cell",
+      "version": "1.21.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "open",
+      "version": "5.4.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "openssl-probe",
+      "version": "0.2.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "option-ext",
+      "version": "0.2.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "optionator",
+      "version": "0.9.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "ordered-stream",
+      "version": "0.2.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "osakit",
+      "version": "0.3.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "p-limit",
+      "version": "3.1.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "p-locate",
+      "version": "5.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "pango-sys",
+      "version": "0.18.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "pango",
+      "version": "0.18.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "parking_lot_core",
+      "version": "0.9.12"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "parking_lot",
+      "version": "0.12.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "parking",
+      "version": "2.2.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "parse5",
+      "version": "8.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "path-exists",
+      "version": "4.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "path-key",
+      "version": "3.1.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "percent-encoding",
+      "version": "2.3.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "phf_codegen",
+      "version": "0.13.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "phf_generator",
+      "version": "0.13.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "phf_macros",
+      "version": "0.13.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "phf_shared",
+      "version": "0.13.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "phf",
+      "version": "0.13.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "picocolors",
+      "version": "1.1.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "picomatch",
+      "version": "4.0.7",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "pin-project-lite",
+      "version": "0.2.17"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "piper",
+      "version": "0.2.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "pkg-config",
+      "version": "0.3.34"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "playwright-core",
+      "version": "1.63.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "playwright",
+      "version": "1.63.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "plist",
+      "version": "1.10.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "png",
+      "version": "0.17.16"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "png",
+      "version": "0.18.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "polling",
+      "version": "3.11.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "portable-atomic-util",
+      "version": "0.2.8"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "portable-atomic",
+      "version": "1.15.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "postcss-load-config",
+      "version": "3.1.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "postcss-safe-parser",
+      "version": "7.1.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "postcss-scss",
+      "version": "4.0.9",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "postcss-selector-parser",
+      "version": "7.1.6",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "postcss",
+      "version": "8.5.28",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "potential_utf",
+      "version": "0.1.6"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "powerfmt",
+      "version": "0.2.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "ppv-lite86",
+      "version": "0.2.21"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "precomputed-hash",
+      "version": "0.1.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "prelude-ls",
+      "version": "1.2.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "prettier-plugin-svelte",
+      "version": "4.1.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "prettier",
+      "version": "3.9.8",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "proc-macro-crate",
+      "version": "1.3.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "proc-macro-crate",
+      "version": "2.0.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "proc-macro-crate",
+      "version": "3.5.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "proc-macro-error-attr",
+      "version": "1.0.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "proc-macro-error",
+      "version": "1.0.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "proc-macro2",
+      "version": "1.0.107"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "proptest",
+      "version": "1.11.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "punycode",
+      "version": "2.3.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "qified",
+      "version": "0.10.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "quick-error",
+      "version": "1.2.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "quick-xml",
+      "version": "0.42.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "quote",
+      "version": "1.0.47"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "r-efi",
+      "version": "5.3.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "r-efi",
+      "version": "6.0.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "rand_chacha",
+      "version": "0.9.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "rand_core",
+      "version": "0.9.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "rand_xorshift",
+      "version": "0.4.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "rand",
+      "version": "0.9.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "raw-window-handle",
+      "version": "0.6.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "readdirp",
+      "version": "4.1.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "redox_syscall",
+      "version": "0.5.18"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "redox_users",
+      "version": "0.4.6"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "redox_users",
+      "version": "0.5.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "ref-cast-impl",
+      "version": "1.0.27"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "ref-cast",
+      "version": "1.0.27"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "regex-automata",
+      "version": "0.4.18"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "regex-syntax",
+      "version": "0.8.11"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "regex",
+      "version": "1.13.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "require-from-string",
+      "version": "2.0.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "reqwest",
+      "version": "0.13.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "rfd",
+      "version": "0.16.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "ring",
+      "version": "0.17.14"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "rolldown",
+      "version": "1.2.9",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "rsqlite-vfs",
+      "version": "0.1.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "rusqlite_migration",
+      "version": "2.6.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "rusqlite",
+      "version": "0.40.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "rustc_version",
+      "version": "0.4.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "rustc-hash",
+      "version": "2.1.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "rustix",
+      "version": "1.1.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "rustls-native-certs",
+      "version": "0.8.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "rustls-pki-types",
+      "version": "1.15.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "rustls-platform-verifier-android",
+      "version": "0.1.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "rustls-platform-verifier",
+      "version": "0.7.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "rustls-webpki",
+      "version": "0.103.15"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "rustls",
+      "version": "0.23.45"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "rustversion",
+      "version": "1.0.23"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "rusty-fork",
+      "version": "0.3.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "sade",
+      "version": "1.8.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "same-file",
+      "version": "1.0.6"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "saxes",
+      "version": "6.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "schannel",
+      "version": "0.1.29"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "schemars_derive",
+      "version": "0.8.22"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "schemars",
+      "version": "0.8.22"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "schemars",
+      "version": "0.9.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "schemars",
+      "version": "1.2.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "scopeguard",
+      "version": "1.2.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "security-framework-sys",
+      "version": "2.17.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "security-framework",
+      "version": "3.7.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "selectors",
+      "version": "0.36.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "semver",
+      "version": "1.0.28"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "semver",
+      "version": "7.8.5",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "serde_core",
+      "version": "1.0.229"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "serde_derive_internals",
+      "version": "0.29.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "serde_derive",
+      "version": "1.0.229"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "serde_json",
+      "version": "1.0.151"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "serde_repr",
+      "version": "0.1.21"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "serde_spanned",
+      "version": "0.6.9"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "serde_spanned",
+      "version": "1.1.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "serde_with_macros",
+      "version": "3.23.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "serde_with",
+      "version": "3.23.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "serde-untagged",
+      "version": "0.1.9"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "serde",
+      "version": "1.0.229"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "serialize-to-javascript-impl",
+      "version": "0.1.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "serialize-to-javascript",
+      "version": "0.1.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "servo_arc",
+      "version": "0.4.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "sha2",
+      "version": "0.10.9"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "sharded-slab",
+      "version": "0.1.7"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "shebang-command",
+      "version": "2.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "shebang-regex",
+      "version": "3.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "shlex",
+      "version": "2.0.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "NuGet"
+      },
+      "name": "Shouldly",
+      "version": "4.3.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "siginfo",
+      "version": "2.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "signal-hook-registry",
+      "version": "1.4.8"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "simd_cesu8",
+      "version": "1.2.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "simd-adler32",
+      "version": "0.3.10"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "simdutf8",
+      "version": "0.1.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "siphasher",
+      "version": "1.0.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "slab",
+      "version": "0.4.12"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "smallvec",
+      "version": "1.16.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "socket2",
+      "version": "0.6.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "softbuffer",
+      "version": "0.4.8"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "soup3-sys",
+      "version": "0.5.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "soup3",
+      "version": "0.5.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "source-map-js",
+      "version": "1.2.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "sqlite-wasm-rs",
+      "version": "0.5.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "stable_deref_trait",
+      "version": "1.2.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "stackback",
+      "version": "0.0.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "std-env",
+      "version": "4.2.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "string_cache_codegen",
+      "version": "0.6.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "string_cache",
+      "version": "0.9.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "strsim",
+      "version": "0.11.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "subtle",
+      "version": "2.6.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "svelte-check",
+      "version": "4.7.6",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "svelte-eslint-parser",
+      "version": "1.8.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "svelte",
+      "version": "5.57.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "swift-rs",
+      "version": "1.0.8"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "symlink",
+      "version": "0.1.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "syn",
+      "version": "1.0.109"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "syn",
+      "version": "2.0.119"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "syn",
+      "version": "3.0.6"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "sync_wrapper",
+      "version": "1.0.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "synstructure",
+      "version": "0.14.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "system-configuration-sys",
+      "version": "0.6.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "system-configuration",
+      "version": "0.7.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "system-deps",
+      "version": "6.2.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "NuGet"
+      },
+      "name": "System.CodeDom",
+      "version": "6.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "NuGet"
+      },
+      "name": "System.Management",
+      "version": "6.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "NuGet"
+      },
+      "name": "System.Security.AccessControl",
+      "version": "6.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tao-macros",
+      "version": "0.1.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tao",
+      "version": "0.35.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tar",
+      "version": "0.4.46"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "target-lexicon",
+      "version": "0.12.16"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tauri-build",
+      "version": "2.6.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tauri-codegen",
+      "version": "2.6.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tauri-macros",
+      "version": "2.6.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tauri-plugin-autostart",
+      "version": "2.5.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tauri-plugin-dialog",
+      "version": "2.7.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tauri-plugin-fs",
+      "version": "2.5.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tauri-plugin-notification",
+      "version": "2.4.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tauri-plugin-opener",
+      "version": "2.5.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tauri-plugin-single-instance",
+      "version": "2.4.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tauri-plugin-updater",
+      "version": "2.11.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tauri-plugin",
+      "version": "2.6.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tauri-runtime-wry",
+      "version": "2.11.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tauri-runtime",
+      "version": "2.11.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tauri-utils",
+      "version": "2.9.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tauri-winres",
+      "version": "0.3.6"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tauri-winrt-notification",
+      "version": "0.7.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tauri",
+      "version": "2.11.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tempfile",
+      "version": "3.27.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tendril",
+      "version": "0.5.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "thiserror-impl",
+      "version": "1.0.69"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "thiserror-impl",
+      "version": "2.0.20"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "thiserror",
+      "version": "1.0.69"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "thiserror",
+      "version": "2.0.20"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "thread_local",
+      "version": "1.1.10"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "throttlewatch",
+      "version": "0.1.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "time-core",
+      "version": "0.1.9"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "time-macros",
+      "version": "0.2.32"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "time",
+      "version": "0.3.55"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "tinybench",
+      "version": "6.1.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "tinyexec",
+      "version": "1.3.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "tinyglobby",
+      "version": "0.2.17",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "tinyrainbow",
+      "version": "3.1.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tinystr",
+      "version": "0.8.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tinyvec",
+      "version": "1.13.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "tldts-core",
+      "version": "7.4.13",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "tldts",
+      "version": "7.4.13",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tokio-rustls",
+      "version": "0.26.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tokio-util",
+      "version": "0.7.19"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tokio",
+      "version": "1.53.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "toml_datetime",
+      "version": "0.6.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "toml_datetime",
+      "version": "0.7.5+spec-1.1.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "toml_datetime",
+      "version": "1.1.1+spec-1.1.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "toml_edit",
+      "version": "0.19.15"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "toml_edit",
+      "version": "0.20.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "toml_edit",
+      "version": "0.25.15+spec-1.1.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "toml_parser",
+      "version": "1.1.3+spec-1.1.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "toml_writer",
+      "version": "1.1.2+spec-1.1.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "toml",
+      "version": "0.8.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "toml",
+      "version": "0.9.12+spec-1.1.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "toml",
+      "version": "1.1.6+spec-1.1.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "tough-cookie",
+      "version": "6.0.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tower-http",
+      "version": "0.6.11"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tower-layer",
+      "version": "0.3.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tower-service",
+      "version": "0.3.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tower",
+      "version": "0.5.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "tr46",
+      "version": "6.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tracing-appender",
+      "version": "0.2.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tracing-attributes",
+      "version": "0.1.31"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tracing-core",
+      "version": "0.1.36"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tracing-log",
+      "version": "0.2.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tracing-subscriber",
+      "version": "0.3.23"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tracing",
+      "version": "0.1.44"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "tray-icon",
+      "version": "0.24.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "try-lock",
+      "version": "0.2.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "ts-api-utils",
+      "version": "2.5.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "type-check",
+      "version": "0.4.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "typeid",
+      "version": "1.0.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "typenum",
+      "version": "1.20.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "typescript-eslint",
+      "version": "8.70.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "typescript",
+      "version": "6.0.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "uds_windows",
+      "version": "1.2.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "unarray",
+      "version": "0.1.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "undici",
+      "version": "8.10.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "unic-char-property",
+      "version": "0.9.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "unic-char-range",
+      "version": "0.9.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "unic-common",
+      "version": "0.9.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "unic-ucd-ident",
+      "version": "0.9.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "unic-ucd-version",
+      "version": "0.9.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "unicode-ident",
+      "version": "1.0.26"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "unicode-segmentation",
+      "version": "1.13.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "untrusted",
+      "version": "0.9.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "uri-js",
+      "version": "4.4.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-2-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "url",
+      "version": "2.5.8"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "urlpattern",
+      "version": "0.3.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "utf8_iter",
+      "version": "1.0.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "util-deprecate",
+      "version": "1.0.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "uuid",
+      "version": "1.26.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "valuable",
+      "version": "0.1.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "vcpkg",
+      "version": "0.2.15"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "version_check",
+      "version": "0.9.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "version-compare",
+      "version": "0.2.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "vite",
+      "version": "8.3.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "vitefu",
+      "version": "1.1.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "vitest",
+      "version": "5.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "vswhom-sys",
+      "version": "0.1.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "vswhom",
+      "version": "0.1.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "w3c-xmlserializer",
+      "version": "5.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "wait-timeout",
+      "version": "0.2.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "walkdir",
+      "version": "2.5.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "want",
+      "version": "0.3.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "wasi",
+      "version": "0.11.1+wasi-snapshot-preview1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "wasip2",
+      "version": "1.0.4+wasi-0.2.12"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "wasm-bindgen-futures",
+      "version": "0.4.78"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "wasm-bindgen-macro-support",
+      "version": "0.2.128"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "wasm-bindgen-macro",
+      "version": "0.2.128"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "wasm-bindgen-shared",
+      "version": "0.2.128"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "wasm-bindgen",
+      "version": "0.2.128"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "wasm-streams",
+      "version": "0.5.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "web_atoms",
+      "version": "0.2.6"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "web-sys",
+      "version": "0.3.105"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "webidl-conversions",
+      "version": "8.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-2-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "webkit2gtk-sys",
+      "version": "2.0.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "webkit2gtk",
+      "version": "2.0.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "webpki-root-certs",
+      "version": "1.0.9"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "webview2-com-macros",
+      "version": "0.8.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "webview2-com-sys",
+      "version": "0.38.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "webview2-com",
+      "version": "0.38.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "whatwg-mimetype",
+      "version": "5.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "whatwg-url",
+      "version": "16.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "whatwg-url",
+      "version": "17.1.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "which",
+      "version": "2.0.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "why-is-node-running",
+      "version": "2.3.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "winapi-i686-pc-windows-gnu",
+      "version": "0.4.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "winapi-util",
+      "version": "0.1.11"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "winapi-x86_64-pc-windows-gnu",
+      "version": "0.4.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "winapi",
+      "version": "0.3.9"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "window-vibrancy",
+      "version": "0.6.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows_aarch64_gnullvm",
+      "version": "0.42.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows_aarch64_gnullvm",
+      "version": "0.52.6"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows_aarch64_gnullvm",
+      "version": "0.53.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows_aarch64_msvc",
+      "version": "0.42.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows_aarch64_msvc",
+      "version": "0.52.6"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows_aarch64_msvc",
+      "version": "0.53.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows_i686_gnu",
+      "version": "0.42.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows_i686_gnu",
+      "version": "0.52.6"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows_i686_gnu",
+      "version": "0.53.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows_i686_gnullvm",
+      "version": "0.52.6"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows_i686_gnullvm",
+      "version": "0.53.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows_i686_msvc",
+      "version": "0.42.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows_i686_msvc",
+      "version": "0.52.6"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows_i686_msvc",
+      "version": "0.53.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows_x86_64_gnu",
+      "version": "0.42.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows_x86_64_gnu",
+      "version": "0.52.6"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows_x86_64_gnu",
+      "version": "0.53.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows_x86_64_gnullvm",
+      "version": "0.42.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows_x86_64_gnullvm",
+      "version": "0.52.6"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows_x86_64_gnullvm",
+      "version": "0.53.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows_x86_64_msvc",
+      "version": "0.42.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows_x86_64_msvc",
+      "version": "0.52.6"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows_x86_64_msvc",
+      "version": "0.53.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-collections",
+      "version": "0.2.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-collections",
+      "version": "0.3.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-core",
+      "version": "0.61.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-core",
+      "version": "0.62.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-future",
+      "version": "0.2.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-future",
+      "version": "0.3.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-implement",
+      "version": "0.60.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-interface",
+      "version": "0.59.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-link",
+      "version": "0.1.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-link",
+      "version": "0.2.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-numerics",
+      "version": "0.2.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-numerics",
+      "version": "0.3.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-registry",
+      "version": "0.6.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-result",
+      "version": "0.3.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-result",
+      "version": "0.4.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-strings",
+      "version": "0.4.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-strings",
+      "version": "0.5.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-sys",
+      "version": "0.45.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-sys",
+      "version": "0.52.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-sys",
+      "version": "0.59.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-sys",
+      "version": "0.60.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-sys",
+      "version": "0.61.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-targets",
+      "version": "0.42.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-targets",
+      "version": "0.52.6"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-targets",
+      "version": "0.53.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-threading",
+      "version": "0.1.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-threading",
+      "version": "0.2.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows-version",
+      "version": "0.1.7"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows",
+      "version": "0.61.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "windows",
+      "version": "0.62.2"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "winnow",
+      "version": "0.5.40"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "winnow",
+      "version": "0.7.15"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "winnow",
+      "version": "1.0.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "winreg",
+      "version": "0.10.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "winreg",
+      "version": "0.55.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "wit-bindgen",
+      "version": "0.57.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "word-wrap",
+      "version": "1.2.5",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "writeable",
+      "version": "0.6.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "wry",
+      "version": "0.55.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "x11-dl",
+      "version": "2.21.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "x11",
+      "version": "2.21.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "xattr",
+      "version": "1.6.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "xml-name-validator",
+      "version": "5.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "xmlchars",
+      "version": "2.2.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "NuGet"
+      },
+      "name": "xunit.analyzers",
+      "version": "2.1.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "NuGet"
+      },
+      "name": "xunit.v3.assert",
+      "version": "4.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "NuGet"
+      },
+      "name": "xunit.v3.common",
+      "version": "4.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "NuGet"
+      },
+      "name": "xunit.v3.core.mtp-v2",
+      "version": "4.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "NuGet"
+      },
+      "name": "xunit.v3.extensibility.core",
+      "version": "4.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "NuGet"
+      },
+      "name": "xunit.v3.mtp-v2",
+      "version": "4.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "NuGet"
+      },
+      "name": "xunit.v3.runner.common",
+      "version": "4.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "NuGet"
+      },
+      "name": "xunit.v3.runner.inproc.console",
+      "version": "4.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "yaml",
+      "version": "1.10.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "yocto-queue",
+      "version": "0.1.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "yoke-derive",
+      "version": "0.8.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "yoke",
+      "version": "0.8.3"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "zbus_macros",
+      "version": "5.19.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "zbus_names",
+      "version": "4.3.4"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "zbus",
+      "version": "5.19.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "zcheapstr",
+      "version": "1.1.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "zerocopy-derive",
+      "version": "0.8.57"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "zerocopy",
+      "version": "0.8.57"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "zerofrom-derive",
+      "version": "0.1.8"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "zerofrom",
+      "version": "0.1.8"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "zeroize",
+      "version": "1.9.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "zerotrie",
+      "version": "0.2.5"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "zerovec-derive",
+      "version": "0.11.6"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "zerovec",
+      "version": "0.11.8"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "zimmerframe",
+      "version": "1.1.5",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "zip",
+      "version": "4.6.1"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "zlib-rs",
+      "version": "0.6.8"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "zmij",
+      "version": "1.0.23"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "npm"
+      },
+      "name": "zod",
+      "version": "4.6.5",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "zvariant_derive",
+      "version": "5.15.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "zvariant_utils",
+      "version": "4.2.0"
+    },
+    {
+      "type": "library",
+      "supplier": {
+        "name": "crates.io"
+      },
+      "name": "zvariant",
+      "version": "5.15.0"
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+name: Release
+
+# Publishes a signed update to GitHub Releases (ADR-0005, T102). Manual only: nothing is
+# published from a push. The private signing key exists only as the repository secret
+# UPDATER_SIGNING_KEY; it is written to a temporary file inside the signing step, never printed
+# and never uploaded, and no step after it can read the workspace copy (it is deleted).
+# NOT YET RUN: it needs the production key pair (owner action) and the public key committed as
+# apps/desktop/src-tauri/keys/updater-release.pub, which release builds do not trust today.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to publish (semver, without the leading v)
+        required: true
+      notes:
+        description: Release notes shown in the update prompt
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-2025
+    steps:
+      - name: Refuse to run without the signing key
+        shell: pwsh
+        env:
+          KEY: ${{ secrets.UPDATER_SIGNING_KEY }}
+        run: |
+          if ([string]::IsNullOrEmpty($env:KEY)) { throw 'UPDATER_SIGNING_KEY is not configured' }
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.98.1
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/fetch-pawnio.mjs
+      - run: dotnet build apps/sensor-agent/SensorAgent.csproj -c Release
+      - run: pnpm --filter @throttlewatch/desktop tauri:build
+      - name: Sign the installer (the key never leaves this step)
+        shell: pwsh
+        env:
+          KEY: ${{ secrets.UPDATER_SIGNING_KEY }}
+          KEY_PASSWORD: ${{ secrets.UPDATER_SIGNING_KEY_PASSWORD }}
+        run: |
+          cargo install rsign2 --version 0.6.6 --locked
+          $installer = Get-ChildItem apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
+          $keyFile = Join-Path $env:RUNNER_TEMP 'updater.key'
+          Set-Content -Path $keyFile -Value $env:KEY -NoNewline
+          try {
+            $env:RSIGN_PASSWORD = $env:KEY_PASSWORD
+            rsign sign -s $keyFile -x "$($installer.FullName).minisig" $installer.FullName
+            if ($LASTEXITCODE -ne 0) { throw 'signing failed' }
+          } finally {
+            Remove-Item $keyFile -Force -ErrorAction SilentlyContinue
+          }
+          "INSTALLER=$($installer.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - name: Build the update manifest
+        shell: pwsh
+        env:
+          NOTES: ${{ inputs.notes }}
+        run: |
+          Set-Content -Path notes.txt -Value $env:NOTES
+          node scripts/generate-update-manifest.mjs `
+            --version "${{ inputs.version }}" `
+            --notes-file notes.txt `
+            --installer "$env:INSTALLER" `
+            --signature "$env:INSTALLER.minisig" `
+            --base-url "https://github.com/${{ github.repository }}/releases/download/v${{ inputs.version }}" `
+            --out update-manifest.json
+      - name: Publish the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ inputs.version }}" `
+            "$env:INSTALLER" "$env:INSTALLER.minisig" update-manifest.json `
+            --title "ThrottleWatch ${{ inputs.version }}" --notes "${{ inputs.notes }}"

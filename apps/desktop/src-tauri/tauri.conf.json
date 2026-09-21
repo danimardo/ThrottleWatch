@@ -10,16 +10,18 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [{
-      "label": "main",
-      "title": "ThrottleWatch",
-      "width": 1100,
-      "height": 760,
-      "minWidth": 480,
-      "minHeight": 600,
-      "decorations": false,
-      "create": false
-    }],
+    "windows": [
+      {
+        "label": "main",
+        "title": "ThrottleWatch",
+        "width": 1100,
+        "height": 760,
+        "minWidth": 480,
+        "minHeight": 600,
+        "decorations": false,
+        "create": false
+      }
+    ],
     "security": {
       "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'"
     }
@@ -27,13 +29,26 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
-    "resources": [
-      "resources/pawnio/PawnIO_setup_2.2.0.exe",
-      "resources/pawnio-manifest.json"
-    ],
+    "resources": {
+      "resources/pawnio/PawnIO_setup_2.2.0.exe": "resources/pawnio/PawnIO_setup_2.2.0.exe",
+      "resources/pawnio-manifest.json": "resources/pawnio-manifest.json",
+      "../../../docs/help/es.md": "help/es.md",
+      "../../../docs/help/en.md": "help/en.md"
+    },
     "windows": {
       "nsis": {
         "installMode": "currentUser"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": [
+        "https://github.com/ThrottleWatch/ThrottleWatch/releases/latest/download/update-manifest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
       }
     }
   }

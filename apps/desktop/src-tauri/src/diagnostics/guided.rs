@@ -538,6 +538,25 @@ impl LoadGenerator for FakeGenerator {
     }
 }
 
+/// How a guided session ends in storage: `completed` only for a finished test; every other end
+/// is `aborted` with the reason key the interface shows (never a silent, reason-less abort).
+pub fn session_outcome(
+    phase: GuidedPhase,
+    reason: Option<GuidedStopReason>,
+) -> (&'static str, Option<&'static str>) {
+    if phase == GuidedPhase::Result {
+        return ("completed", None);
+    }
+    let fallback = match phase {
+        GuidedPhase::Cancelled | GuidedPhase::Cancelling => "guided.user_requested",
+        GuidedPhase::SafetyStop => "guided.thermal_safety",
+        GuidedPhase::SensorLost => "guided.sensor_lost",
+        GuidedPhase::Error => "guided.error",
+        _ => "guided.interrupted",
+    };
+    ("aborted", Some(reason.map_or(fallback, GuidedStopReason::key)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -559,6 +578,28 @@ mod tests {
             generator: true,
         }
     }
+    #[test]
+    fn only_a_finished_test_is_completed_and_every_other_end_says_why() {
+        assert_eq!(session_outcome(GuidedPhase::Result, None), ("completed", None));
+        assert_eq!(
+            session_outcome(GuidedPhase::Cancelled, Some(GuidedStopReason::Battery)),
+            ("aborted", Some("guided.battery"))
+        );
+        assert_eq!(
+            session_outcome(GuidedPhase::SafetyStop, None),
+            ("aborted", Some("guided.thermal_safety"))
+        );
+        assert_eq!(
+            session_outcome(GuidedPhase::SensorLost, None),
+            ("aborted", Some("guided.sensor_lost"))
+        );
+        assert_eq!(
+            session_outcome(GuidedPhase::SteadyLoad, None),
+            ("aborted", Some("guided.interrupted")),
+            "a loop that ends while the test is still running was interrupted"
+        );
+    }
+
     #[test]
     fn state_machine_runs_all_phases_and_allows_skipping_rest() {
         let mut m = GuidedMachine::new(GuidedProfile::Short, config());

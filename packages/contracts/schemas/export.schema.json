@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://throttlewatch.local/contracts/export.schema.json",
+  "title": "ThrottleWatch session export",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "session", "samples", "events", "report"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "kind": { "type": "string", "const": "session" },
+    "session": { "$ref": "#/$defs/session" },
+    "samples": { "type": "array", "items": { "$ref": "#/$defs/sample" } },
+    "events": { "type": "array", "items": { "$ref": "#/$defs/event" } },
+    "report": { "$ref": "#/$defs/report" }
+  },
+  "$defs": {
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["session_id", "status", "started_at", "duration_ms", "coverage_tier", "cpu_vendor", "cpu_model", "topology", "ruleset_version"],
+      "properties": {
+        "session_id": { "type": "string", "minLength": 1 },
+        "status": { "type": "string" },
+        "started_at": { "type": "string", "format": "date-time" },
+        "ended_at": { "type": ["string", "null"], "format": "date-time" },
+        "duration_ms": { "type": ["integer", "null"], "minimum": 0 },
+        "coverage_tier": { "type": "string", "enum": ["A", "B", "C"] },
+        "cpu_vendor": { "type": "string" },
+        "cpu_model": { "type": "string" },
+        "topology": { "type": "string" },
+        "ruleset_version": { "type": "string" }
+      }
+    },
+    "sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["timestamp_utc", "monotonic_ms", "sensor_id", "metric", "scope", "value", "status", "quality"],
+      "properties": {
+        "timestamp_utc": { "type": "string", "format": "date-time" },
+        "monotonic_ms": { "type": "integer", "minimum": 0 },
+        "sensor_id": { "type": "string" },
+        "metric": { "type": "string" },
+        "scope": { "type": "string" },
+        "value": { "type": ["number", "null"] },
+        "boolean": { "type": ["boolean", "null"] },
+        "status": { "type": "string" },
+        "quality": { "type": "string" }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "start_ms", "end_ms", "severity"],
+      "properties": {
+        "kind": { "type": "string" },
+        "start_ms": { "type": "integer", "minimum": 0 },
+        "end_ms": { "type": "integer", "minimum": 0 },
+        "severity": { "type": ["string", "null"] }
+      }
+    },
+    "report": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["classification", "severity", "coverage_tier", "confidence", "analyzed_start_ms", "analyzed_end_ms", "duration_by_class_ms", "cooling_potential", "guided_result", "ruleset_version", "rules", "coverage_history", "events"],
+      "properties": {
+        "classification": { "type": "string" },
+        "severity": { "type": ["string", "null"] },
+        "coverage_tier": { "type": "string", "enum": ["A", "B", "C"] },
+        "confidence": { "type": "string" },
+        "analyzed_start_ms": { "type": "integer", "minimum": 0 },
+        "analyzed_end_ms": { "type": "integer", "minimum": 0 },
+        "duration_by_class_ms": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
+        "cooling_potential": {},
+        "guided_result": {},
+        "ruleset_version": { "type": "string" },
+        "rules": { "type": "object", "additionalProperties": { "type": "string" } },
+        "coverage_history": { "type": "array", "items": { "$ref": "#/$defs/coverage_change" } },
+        "events": { "type": "array", "items": { "$ref": "#/$defs/event" } }
+      }
+    },
+    "coverage_change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["at", "from_tier", "to_tier", "reason"],
+      "properties": {
+        "at": { "type": "integer", "minimum": 0 },
+        "from_tier": { "type": "string", "enum": ["A", "B", "C"] },
+        "to_tier": { "type": "string", "enum": ["A", "B", "C"] },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

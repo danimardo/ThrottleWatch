@@ -49,7 +49,7 @@
     coverageDescription?: string;
     /**
      * UI-side state of the low-level access (see lib/access.ts). Only
-     * `installable` renders the request button; `denied`/`error` render
+     * `installable`/`upgradable` render the request button; `denied`/`error` render
      * a warning/critical banner with `advancedAccessNote` and, for
      * `error`, an optional retry; `not_needed`/`available` render at
      * most a quiet status line. Omit to render nothing.
@@ -177,7 +177,7 @@
         />
       {/if}
 
-      {#if detection.advancedAccess === 'installable'}
+      {#if detection.advancedAccess === 'installable' || detection.advancedAccess === 'upgradable'}
         <Banner
           tone="info"
           title={detection.advancedAccessNote ?? ''}

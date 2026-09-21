@@ -46,6 +46,7 @@
   let { open = $bindable(false), title, description, tone = 'default', body, actions, onclose, size = 'default' }: Props = $props();
 
   let dialogEl: HTMLDialogElement | undefined = $state();
+  const titleId = `tw-dialog-title-${Math.random().toString(36).slice(2)}`;
 
   $effect(() => {
     if (!dialogEl) return;
@@ -62,12 +63,12 @@
   }
 </script>
 
-<dialog bind:this={dialogEl} class="tw-dialog" class:wide={size === 'wide'} onclose={handleNativeClose}>
+<dialog bind:this={dialogEl} class="tw-dialog" class:wide={size === 'wide'} aria-labelledby={titleId} onclose={handleNativeClose}>
   <div class="header">
     {#if tone === 'warning'}
       <span class="tone-icon"><StatusIcon kind="warning" /></span>
     {/if}
-    <h2 class="value-md">{title}</h2>
+    <h2 id={titleId} class="value-md">{title}</h2>
   </div>
   {#if body}
     {@render body()}

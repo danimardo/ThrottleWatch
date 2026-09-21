@@ -72,7 +72,8 @@ Estado del acceso avanzado que la UI recibe ya traducido desde `hello_ack.low_le
 | IPC | UI | Efecto |
 |---|---|---|
 | `available` | `available` | sin acción |
-| `reduced`, `missing` | `installable` | único estado que muestra «Instalar/Reparar acceso avanzado» |
+| `reduced`, `missing` | `installable` | muestra «Instalar acceso avanzado» |
+| `reduced`, `missing` con PawnIO anterior a la versión mínima | `upgradable` | muestra «Actualizar acceso avanzado» (solo con acción explícita, FR-089) |
 | `denied` | `denied` | explica que una política o el antivirus lo bloquea; enlace a ayuda |
 | `error`, `unknown` | `error` | ofrece reintentar y ver resumen técnico |
 | cualquiera, si `capabilities` ya cubre todas las magnitudes críticas sin acceso avanzado | `not_needed` | lo decide Rust; texto «No hace falta acceso avanzado en este equipo» |
@@ -99,6 +100,21 @@ Estado del acceso avanzado que la UI recibe ya traducido desde `hello_ack.low_le
 **Límites de una sesión pasiva** (FR-067): comienza al iniciar el muestreo; se cierra y abre otra tras un hueco > 60 s (suspensión, reinicio del sidecar, pausa) o al alcanzar 24 h continuas. Su `diagnostic_report` se congela al cerrarla; mientras está `running`, el diagnóstico mostrado se calcula en memoria y no se persiste. Con `history.retention = session`, todas las sesiones pasivas se eliminan al salir de la aplicación.
 
 **Mapeo a la UI (`SessionCard.status`)**: `preparing`+`running` → `active`; `completed` → `completed`; `cancelled` → `cancelled`; `aborted`+`failed` → `incomplete` (con `incomplete_reason` localizado en `statusLabel`); `kind=imported` → `imported`. Las sesiones `kind=replay` son de desarrollo y no se listan.
+
+### `coverage_change`
+
+Historial append-only de degradaciones o recuperaciones de cobertura dentro de una sesión (FR-090). `at` es el tiempo monotónico en milisegundos desde el inicio de la sesión; no depende del reloj civil.
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `id` | integer PK | Identidad local del cambio |
+| `session_id` | FK | Sesión afectada; se elimina con ella |
+| `at` | integer | Marca monotónica del cambio, ≥ 0 |
+| `from_tier` | enum | Nivel anterior: `A`, `B` o `C` |
+| `to_tier` | enum | Nivel vigente desde la marca: `A`, `B` o `C` |
+| `reason` | text | Código estable del motivo, no texto localizado |
+
+El informe JSON conserva la misma secuencia en `coverage_history`, y una importación la copia a la tabla de la sesión importada para que el historial no se pierda al reexportar.
 
 ### `sample_frame`
 

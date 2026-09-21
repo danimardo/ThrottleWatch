@@ -121,6 +121,19 @@ export const structuredErrorSchema = z.object({
   context: z.record(z.string(), z.unknown()).optional()
 });
 
+export const frontendLogEventSchema = z
+  .object({
+    level: z.enum(['trace', 'debug', 'info', 'warn', 'error']),
+    code: z
+      .string()
+      .regex(/^[A-Z0-9_]+$/)
+      .max(128),
+    target: z.string().min(1).max(128),
+    msg: z.string().min(1).max(256),
+    fields: z.record(z.string(), z.unknown()).optional()
+  })
+  .strict();
+
 export type IpcEnvelope = z.infer<typeof ipcEnvelopeSchema>;
 export type StructuredError = z.infer<typeof structuredErrorSchema>;
 
@@ -158,6 +171,7 @@ export const coverageSnapshotSchema = z.object({
     'not_needed',
     'available',
     'installable',
+    'upgradable',
     'denied',
     'error'
   ])
@@ -180,11 +194,15 @@ export const coverageMatrixSchema = z.object({
     'not_needed',
     'available',
     'installable',
+    'upgradable',
     'denied',
     'error'
   ]),
   rows: z.array(coverageRowSchema),
-  conclusion_key: z.string().min(1)
+  conclusion_key: z.string().min(1),
+  from_tier: z.enum(['A', 'B', 'C']).optional(),
+  to_tier: z.enum(['A', 'B', 'C']).optional(),
+  reason: z.string().min(1).optional()
 });
 
 export const onboardingStateSchema = z
@@ -223,6 +241,22 @@ export const windowStateSchema = z
     maximized: z.boolean(),
     display_fingerprint: z.string().nullable(),
     updated_at: z.string().pipe(z.iso.datetime({ offset: true }))
+  })
+  .strict();
+
+export const preferencesSnapshotSchema = z
+  .object({
+    schema_version: z.number().int().positive(),
+    values: z.record(z.string(), z.unknown()),
+    adjusted: z.array(z.string())
+  })
+  .strict();
+
+const setPreferenceRequestSchema = z
+  .object({
+    key: z.string().min(1),
+    value: z.unknown(),
+    expected_schema_version: z.number().int().positive()
   })
   .strict();
 
@@ -336,6 +370,71 @@ export const analysisWindowSchema = z.object({
   )
 });
 
+const exportScopeSchema = z.discriminatedUnion('kind', [
+  z
+    .object({ kind: z.literal('session'), session_id: z.string().min(1) })
+    .strict(),
+  z
+    .object({ kind: z.literal('report'), session_id: z.string().min(1) })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('range'),
+      session_id: z.string().min(1),
+      start_ms: z.number().int().nonnegative(),
+      end_ms: z.number().int().positive()
+    })
+    .strict()
+]);
+
+const exportRequestSchema = z
+  .object({
+    scope: exportScopeSchema,
+    format: z.enum(['csv', 'json']),
+    anonymize: z.boolean()
+  })
+  .strict();
+
+export const exportPreviewSchema = z
+  .object({
+    format: z.enum(['csv', 'json']),
+    included_fields: z.array(z.string()),
+    excluded_fields: z.array(z.string()),
+    estimated_bytes: z.number().int().nonnegative(),
+    proposed_file_name: z.string().min(1)
+  })
+  .strict();
+
+export const exportResultSchema = z
+  .object({
+    bytes: z.number().int().nonnegative(),
+    anonymized: z.boolean(),
+    warnings: z.array(z.string())
+  })
+  .strict();
+
+export const importResultSchema = z
+  .object({
+    session_id: z.string().min(1),
+    schema_version: z.number().int().positive(),
+    migrated: z.boolean(),
+    warnings: z.array(z.string())
+  })
+  .strict();
+
+export const importProgressSchema = z
+  .object({
+    phase: z.enum(['reading', 'validating', 'migrating', 'storing'])
+  })
+  .strict();
+
+export const exportProgressSchema = z
+  .object({
+    done: z.number().int().nonnegative(),
+    total: z.number().int().positive().optional()
+  })
+  .strict();
+
 export const cpuTopologySchema = z.object({
   cores: z.array(
     z.object({
@@ -369,6 +468,88 @@ export const powerContextEventSchema = z.object({
   battery_percent: z.number().int().min(0).max(100).nullable().optional()
 });
 
+export const trayStateSchema = z.object({
+  icon: z.enum(['normal', 'warning', 'critical', 'unknown', 'disconnected']),
+  paused: z.boolean()
+});
+
+export const sessionSummarySchema = z
+  .object({
+    session_id: z.string().min(1),
+    kind: z.enum(['passive', 'guided', 'imported']),
+    status: z.enum([
+      'active',
+      'completed',
+      'cancelled',
+      'incomplete',
+      'imported'
+    ]),
+    started_at: z.string().min(1),
+    ended_at: z.string().nullable(),
+    duration_ms: z.number().int().nonnegative().nullable(),
+    coverage_tier: z.enum(['A', 'B', 'C']),
+    is_reference: z.boolean(),
+    frame_count: z.number().int().nonnegative(),
+    report_classification: z.string().nullable()
+  })
+  .strict();
+
+export const sessionPageSchema = z
+  .object({
+    sessions: z.array(sessionSummarySchema),
+    next_cursor: z.string().nullable()
+  })
+  .strict();
+
+export const sessionDetailSchema = z
+  .object({
+    summary: sessionSummarySchema,
+    report: z.record(z.string(), z.unknown()).nullable()
+  })
+  .strict();
+
+export const diagnosticReportSchema = z
+  .object({
+    session_id: z.string().min(1),
+    schema_version: z.number().int().positive(),
+    report: z.record(z.string(), z.unknown()),
+    frozen_at: z.string().nullable()
+  })
+  .strict();
+
+export const sessionChangedEventSchema = z
+  .object({
+    session_id: z.string().min(1),
+    status: z.string().min(1)
+  })
+  .strict();
+
+export const reportFrozenEventSchema = z
+  .object({ session_id: z.string().min(1) })
+  .strict();
+
+export const updateStateSchema = z.object({
+  state: z.enum([
+    'idle',
+    'checking',
+    'up_to_date',
+    'available',
+    'downloading',
+    'verified',
+    'installing',
+    'error'
+  ]),
+  enabled: z.boolean(),
+  current_version: z.string().min(1),
+  last_check: z.string().nullable(),
+  version: z.string().nullable(),
+  notes: z.string().nullable(),
+  downloaded: z.number().int().nonnegative().nullable(),
+  total: z.number().int().nonnegative().nullable(),
+  error_code: z.string().nullable(),
+  recoverable: z.boolean().nullable()
+});
+
 export const commandResponseSchemas = {
   get_live_snapshot: liveSnapshotSchema,
   get_coverage: coverageMatrixSchema,
@@ -377,6 +558,41 @@ export const commandResponseSchemas = {
   set_onboarding_state: onboardingStateSchema,
   get_window_state: windowStateSchema,
   set_window_state: windowStateSchema,
+  get_preferences: preferencesSnapshotSchema,
+  get_storage_usage: z
+    .object({
+      database_bytes: z.number().int().nonnegative(),
+      logs_bytes: z.number().int().nonnegative(),
+      total_bytes: z.number().int().nonnegative(),
+      session_count: z.number().int().nonnegative()
+    })
+    .strict(),
+  get_technical_summary: z.object({ text: z.string().min(1) }).strict(),
+  get_third_party_notices: z
+    .object({
+      entries: z.array(
+        z
+          .object({
+            id: z.string().min(1),
+            name: z.string().min(1),
+            version: z.string().nullable(),
+            license: z.string().min(1),
+            text: z.string().min(1)
+          })
+          .strict()
+      )
+    })
+    .strict(),
+  log_frontend: z.null().or(z.undefined()),
+  delete_monitoring_data: z
+    .object({ cleared: z.array(z.string()), failed: z.array(z.string()) })
+    .strict(),
+  reset_application: z
+    .object({ cleared: z.array(z.string()), failed: z.array(z.string()) })
+    .strict(),
+  open_logs_folder: z.null(),
+  open_external_url: z.null(),
+  set_preference: preferencesSnapshotSchema,
   request_low_level_access: z.object({
     state: z.literal('install_requested'),
     action: z.enum(['install', 'upgrade', 'repair']),
@@ -387,7 +603,24 @@ export const commandResponseSchemas = {
   start_guided: guidedPhaseSchema,
   stop_guided: guidedPhaseSchema,
   get_analysis_window: analysisWindowSchema,
-  get_cpu_topology: cpuTopologySchema
+  preview_export: exportPreviewSchema,
+  export: exportResultSchema,
+  cancel_export: z.undefined(),
+  import_session: importResultSchema,
+  get_cpu_topology: cpuTopologySchema,
+  set_tray_paused: trayStateSchema,
+  list_sessions: sessionPageSchema,
+  get_session: sessionDetailSchema,
+  get_report: diagnosticReportSchema,
+  reevaluate_report: diagnosticReportSchema,
+  delete_session: z.null(),
+  set_session_reference: z.null(),
+  confirm_close: z.null(),
+  resolve_first_close: z.null(),
+  get_update_state: updateStateSchema,
+  check_for_update: updateStateSchema,
+  download_update: updateStateSchema,
+  install_update: updateStateSchema
 } as const;
 
 const noCommandArgs = z.undefined();
@@ -401,6 +634,30 @@ export const commandArgsSchemas = {
   // `invoke` args by parameter name, so the payload must be nested under that key, not flattened.
   set_onboarding_state: z.object({ request: onboardingStateSchema }).strict(),
   get_window_state: noCommandArgs,
+  get_preferences: noCommandArgs,
+  get_storage_usage: noCommandArgs,
+  get_technical_summary: noCommandArgs,
+  get_third_party_notices: noCommandArgs,
+  log_frontend: z
+    .object({ events: z.array(frontendLogEventSchema).max(60) })
+    .strict(),
+  delete_monitoring_data: z
+    .object({
+      request: z.object({ confirmation_token: z.string().min(1) }).strict()
+    })
+    .strict(),
+  reset_application: z
+    .object({
+      request: z.object({ confirmation_token: z.string().min(1) }).strict()
+    })
+    .strict(),
+  open_logs_folder: noCommandArgs,
+  open_external_url: z
+    .object({
+      request: z.object({ target: z.enum(['help', 'source']) }).strict()
+    })
+    .strict(),
+  set_preference: z.object({ request: setPreferenceRequestSchema }).strict(),
   set_window_state: z.object({ request: windowStateSchema }).strict(),
   request_low_level_access: z
     .object({
@@ -435,26 +692,124 @@ export const commandArgsSchemas = {
         .strict()
     })
     .strict(),
-  get_cpu_topology: noCommandArgs
+  preview_export: z.object({ request: exportRequestSchema }).strict(),
+  export: z.object({ request: exportRequestSchema }).strict(),
+  cancel_export: noCommandArgs,
+  import_session: noCommandArgs,
+  get_cpu_topology: noCommandArgs,
+  set_tray_paused: z
+    .object({ request: z.object({ paused: z.boolean() }).strict() })
+    .strict(),
+  list_sessions: z
+    .object({
+      request: z
+        .object({
+          cursor: z.string().nullable(),
+          limit: z.number().int().min(1).max(100)
+        })
+        .strict()
+    })
+    .strict(),
+  get_session: z
+    .object({ request: z.object({ session_id: z.string().min(1) }).strict() })
+    .strict(),
+  get_report: z
+    .object({ request: z.object({ session_id: z.string().min(1) }).strict() })
+    .strict(),
+  reevaluate_report: z
+    .object({ request: z.object({ session_id: z.string().min(1) }).strict() })
+    .strict(),
+  delete_session: z
+    .object({
+      request: z
+        .object({
+          session_id: z.string().min(1),
+          confirmation_token: z.string().min(1)
+        })
+        .strict()
+    })
+    .strict(),
+  set_session_reference: z
+    .object({
+      request: z
+        .object({ session_id: z.string().min(1), is_reference: z.boolean() })
+        .strict()
+    })
+    .strict(),
+  confirm_close: z
+    .object({ request: z.object({ stop_operation: z.boolean() }).strict() })
+    .strict(),
+  resolve_first_close: z
+    .object({
+      request: z
+        .object({ action: z.enum(['exit', 'tray', 'dismiss']) })
+        .strict()
+    })
+    .strict(),
+  get_update_state: noCommandArgs,
+  check_for_update: z
+    .object({ request: z.object({ manual: z.boolean() }).strict() })
+    .strict(),
+  download_update: noCommandArgs,
+  install_update: noCommandArgs
 } as const;
 
+const updateProgressSchema = z.object({
+  downloaded: z.number().int().nonnegative().nullable(),
+  total: z.number().int().nonnegative().nullable()
+});
+
+const updateAvailableSchema = z.object({
+  version: z.string().min(1),
+  notes: z.string()
+});
+
+const updateErrorSchema = z.object({
+  message_key: z.string().min(1),
+  code: z.string().min(1),
+  recoverable: z.boolean()
+});
+
+const closeBlockedEventSchema = z.object({
+  reason: z.enum(['guided', 'export', 'download', 'install'])
+});
+
 export const eventSchemas = {
+  'lifecycle:close-blocked': closeBlockedEventSchema,
+  'lifecycle:close-decision-required': z.null(),
+  'update:state-changed': updateStateSchema,
+  'update:progress': updateProgressSchema,
+  'update:available': updateAvailableSchema,
+  'update:error': updateErrorSchema,
   'telemetry:snapshot': liveSnapshotSchema,
   'collector:state': collectorStateEventSchema,
   'coverage:changed': coverageMatrixSchema,
   'power:context': powerContextEventSchema,
   'guided:phase': guidedPhaseSchema,
-  'guided:finished': guidedFinishedEventSchema
+  'guided:finished': guidedFinishedEventSchema,
+  'tray:state': trayStateSchema,
+  'session:changed': sessionChangedEventSchema,
+  'report:frozen': reportFrozenEventSchema,
+  'import:progress': importProgressSchema,
+  'export:progress': exportProgressSchema
 } as const;
 
+export type UpdateState = z.infer<typeof updateStateSchema>;
 export type TelemetrySnapshot = z.infer<typeof telemetrySnapshotSchema>;
 export type CoverageSnapshot = z.infer<typeof coverageSnapshotSchema>;
 export type CoverageMatrix = z.infer<typeof coverageMatrixSchema>;
 export type OnboardingState = z.infer<typeof onboardingStateSchema>;
 export type WindowState = z.infer<typeof windowStateSchema>;
+export type PreferencesSnapshot = z.infer<typeof preferencesSnapshotSchema>;
 export type LiveSnapshot = z.infer<typeof liveSnapshotSchema>;
 export type CollectorStateEvent = z.infer<typeof collectorStateEventSchema>;
 export type PowerContextEvent = z.infer<typeof powerContextEventSchema>;
+export type TrayState = z.infer<typeof trayStateSchema>;
+export type SessionSummary = z.infer<typeof sessionSummarySchema>;
+export type SessionPage = z.infer<typeof sessionPageSchema>;
+export type SessionDetail = z.infer<typeof sessionDetailSchema>;
+export type DiagnosticReport = z.infer<typeof diagnosticReportSchema>;
+export type SessionChangedEvent = z.infer<typeof sessionChangedEventSchema>;
 export type AccessRequestResult = z.infer<
   typeof commandResponseSchemas.request_low_level_access
 >;
@@ -463,6 +818,12 @@ export type CpuTopology = z.infer<typeof cpuTopologySchema>;
 export type GuidedFinishedEvent = z.infer<typeof guidedFinishedEventSchema>;
 export type GuidedPhase = z.infer<typeof guidedPhaseSchema>;
 export type AnalysisWindow = z.infer<typeof analysisWindowSchema>;
+export type ExportPreview = z.infer<typeof exportPreviewSchema>;
+export type ExportResult = z.infer<typeof exportResultSchema>;
+export type ImportResult = z.infer<typeof importResultSchema>;
+export type ImportProgress = z.infer<typeof importProgressSchema>;
+export type ExportProgress = z.infer<typeof exportProgressSchema>;
+export type CloseBlockedEvent = z.infer<typeof closeBlockedEventSchema>;
 
 export function parseIpcEnvelope(value: unknown): IpcEnvelope {
   return ipcEnvelopeSchema.parse(value);

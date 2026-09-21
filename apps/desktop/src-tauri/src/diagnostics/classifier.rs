@@ -23,6 +23,31 @@ pub enum Severity {
     BelowBase,
 }
 
+impl Classification {
+    /// The identifier shared with the bridge and the report (`design-system/lib/classification.ts`).
+    pub const fn key(self) -> &'static str {
+        match self {
+            Self::Normal => "normal",
+            Self::HotUnproven => "hot_unproven",
+            Self::ThermalProbable => "thermal_probable",
+            Self::ThermalConfirmed => "thermal_confirmed",
+            Self::PowerLimited => "power_limited",
+            Self::PlatformLimited => "platform_limited",
+            Self::MixedLimit => "mixed_limit",
+            Self::Indeterminate => "indeterminate",
+        }
+    }
+}
+
+impl Severity {
+    pub const fn key(self) -> &'static str {
+        match self {
+            Self::Boost => "boost",
+            Self::BelowBase => "below_base",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PlatformSubtype {
     ChassisThermal,
@@ -265,8 +290,12 @@ fn result(
 
 #[cfg(test)]
 mod tests {
-    use super::{Classification, Severity, diagnose};
-    use crate::diagnostics::{CoverageSignals, DiagnosticSample, rules::Ruleset};
+    use super::{Classification, Severity, confidence, diagnose};
+    use crate::diagnostics::{
+        CoverageSignals, DiagnosticSample,
+        rules::{CoverageTier, Ruleset},
+    };
+    use proptest::prelude::*;
 
     fn sample(index: u64, thermal: bool, power: bool) -> DiagnosticSample {
         DiagnosticSample {
@@ -363,5 +392,62 @@ mod tests {
         let power = diagnose(&power_samples, level_b, &rules);
         assert_eq!(power.classification, Classification::PowerLimited);
         Ok(())
+    }
+
+    proptest! {
+        #[test]
+        fn property_level_b_never_emits_mixed_limit(
+            thermal_flag in any::<bool>(),
+            power_flag in any::<bool>(),
+            temperature in 55.0_f64..99.0,
+        ) {
+            let rules = match Ruleset::v1() {
+                Ok(value) => value,
+                Err(error) => return Err(TestCaseError::fail(error.to_string())),
+            };
+            let samples: Vec<_> = (0..=60).map(|index| DiagnosticSample {
+                temperature_c: Some(temperature),
+                thermal_flag,
+                power_flag,
+                ..sample(index, false, false)
+            }).collect();
+            let level_b = CoverageSignals { power_limit: false, limit_reasons: false, ..coverage() };
+            let result = diagnose(&samples, level_b, &rules);
+            prop_assert_ne!(result.classification, Classification::MixedLimit);
+        }
+
+        #[test]
+        fn property_diagnosis_is_deterministic(
+            thermal_flag in any::<bool>(),
+            power_flag in any::<bool>(),
+            temperature in 55.0_f64..99.0,
+        ) {
+            let rules = match Ruleset::v1() {
+                Ok(value) => value,
+                Err(error) => return Err(TestCaseError::fail(error.to_string())),
+            };
+            let samples: Vec<_> = (0..=60).map(|index| DiagnosticSample {
+                temperature_c: Some(temperature),
+                thermal_flag,
+                power_flag,
+                ..sample(index, false, false)
+            }).collect();
+            let first = diagnose(&samples, coverage(), &rules);
+            let second = diagnose(&samples, coverage(), &rules);
+            prop_assert_eq!(first, second);
+        }
+
+        #[test]
+        fn property_confidence_never_exceeds_tier_ceiling(
+            tier in prop_oneof![Just(CoverageTier::A), Just(CoverageTier::B), Just(CoverageTier::C)],
+            score in 0.0_f64..2.0,
+        ) {
+            let ceiling = match tier {
+                CoverageTier::A => 1.0,
+                CoverageTier::B => 0.75,
+                CoverageTier::C => 0.45,
+            };
+            prop_assert!(confidence(tier, score) <= ceiling);
+        }
     }
 }

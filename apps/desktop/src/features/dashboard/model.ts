@@ -4,7 +4,12 @@ import type { LiveSnapshot } from '../../lib/bridge/schemas';
 export type CoverageTier = 'A' | 'B' | 'C';
 export type Freshness = 'fresh' | 'stale' | 'disconnected';
 export type AdvancedAccess =
-  'not_needed' | 'available' | 'installable' | 'denied' | 'error';
+  | 'not_needed'
+  | 'available'
+  | 'installable'
+  | 'upgradable'
+  | 'denied'
+  | 'error';
 export type Translate = (key: string) => string;
 
 /** Catalog key of every collector state the backend can report (`collector_state`). */

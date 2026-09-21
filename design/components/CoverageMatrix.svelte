@@ -6,7 +6,7 @@
    * is missing — why. The footer states the strongest conclusion the
    * machine allows ("confianza máxima alcanzable") and the state of
    * the low-level access, with the install/repair action rendered
-   * only for `installable` (see lib/access.ts).
+   * only for `installable`/`upgradable` (see lib/access.ts).
    *
    * Reused in two places: as the panel `ContextStrip`'s "Ver cobertura"
    * opens on "Ahora", and embedded in Ajustes → Sensores y cobertura.
@@ -95,9 +95,9 @@
   }: Props = $props();
 
   let accessTone = $derived<'info' | 'warning' | 'critical'>(
-    accessState === 'installable' ? 'info' : accessState === 'denied' ? 'warning' : accessState === 'error' ? 'critical' : 'info'
+    accessState === 'installable' || accessState === 'upgradable' ? 'info' : accessState === 'denied' ? 'warning' : accessState === 'error' ? 'critical' : 'info'
   );
-  let showAccessBanner = $derived(accessState === 'installable' || accessState === 'denied' || accessState === 'error');
+  let showAccessBanner = $derived(accessState === 'installable' || accessState === 'upgradable' || accessState === 'denied' || accessState === 'error');
 </script>
 
 {#snippet requestAction()}
@@ -171,7 +171,7 @@
       <Banner
         tone={accessTone}
         title={accessLabel}
-        action={accessState === 'installable' && onRequestAccess ? requestAction : accessState === 'error' && onAccessRetry ? retryAction : undefined}
+        action={(accessState === 'installable' || accessState === 'upgradable') && onRequestAccess ? requestAction : accessState === 'error' && onAccessRetry ? retryAction : undefined}
       />
     {:else}
       <span class="body access-line">{accessLabel}</span>
