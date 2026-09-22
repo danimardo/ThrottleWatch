@@ -37,7 +37,10 @@
     },
     "windows": {
       "nsis": {
-        "installMode": "currentUser"
+        "installMode": "currentUser",
+        "languages": ["English", "Spanish"],
+        "displayLanguageSelector": true,
+        "installerHooks": "installer/pawnio-uninstall-notice.nsh"
       }
     }
   },

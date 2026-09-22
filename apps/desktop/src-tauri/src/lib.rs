@@ -134,6 +134,7 @@ pub fn run() {
                     msg = "the database could not be opened and was moved aside; a new one was created"
                 );
             }
+            app.manage(commands::CorruptBackupNotice(std::sync::Mutex::new(recovered)));
             let mut preferences = storage
                 .user_preferences()
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
@@ -168,6 +169,16 @@ pub fn run() {
             app.manage(commands::GuidedController::default());
             app.manage(commands::TrayController::default());
             app.manage(commands::RecorderHandle::new());
+            {
+                // FR-075: retry cadence for storage writes, read once at startup from
+                // `ruleset-v1` — never a literal. `Ruleset::v1()` is cheap (an embedded JSON
+                // parse); the collector's own copy loads a moment later, at line ~209.
+                let retry_s = diagnostics::Ruleset::v1()
+                    .ok()
+                    .and_then(|rules| rules.parameter("storage.retry_s"))
+                    .unwrap_or(60.0);
+                app.manage(commands::StorageResilience::new((retry_s * 1_000.0) as u64));
+            }
             app.manage(commands::ExportController::default());
             app.manage(alerting::AlertHandle::new());
             app.manage(updates_app::BusyOperations::default());
@@ -257,6 +268,7 @@ pub fn run() {
             commands::import_session,
             commands::get_preferences,
             commands::get_storage_usage,
+            commands::export_corrupt_backup,
             commands::get_technical_summary,
             commands::get_third_party_notices,
             commands::log_frontend,

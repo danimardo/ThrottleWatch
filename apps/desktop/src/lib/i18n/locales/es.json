@@ -4,7 +4,9 @@
     "minimize": "Minimizar",
     "maximize": "Maximizar",
     "restore": "Restaurar",
-    "close": "Cerrar"
+    "close": "Cerrar",
+    "storageDegradedTitle": "No se puede guardar en disco",
+    "storageDegradedDescription": "Las lecturas siguen tomándose en memoria y no se pierden; se reintenta guardar automáticamente cada minuto. Comprueba el espacio libre en disco."
   },
   "nav": {
     "now": "Ahora",
@@ -136,6 +138,9 @@
     "retention": "Retención del historial",
     "sessionOnly": "Solo esta sesión",
     "storage": "Almacenamiento",
+    "corruptBackup": "Base de datos anterior dañada",
+    "corruptBackupNotice": "Al arrancar, la base de datos anterior no se pudo abrir y se dejó aparte sin borrarla ({file}). Puedes exportarla antes de que la olvides.",
+    "corruptBackupExport": "Exportar",
     "export": "Exportar",
     "deleteData": "Borrar datos",
     "cancel": "Cancelar",

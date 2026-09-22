@@ -18,6 +18,7 @@ use crate::telemetry::runtime::{Change, LiveObserver};
 use crate::telemetry::session::SplitReason;
 use crate::telemetry::sink;
 use crate::telemetry::snapshot::{Freshness, aggregate_snapshot};
+use crate::telemetry::write_backlog::{Transition, WriteBacklog};
 use serde_json::json;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
@@ -103,6 +104,7 @@ pub fn snapshot_dto(
                 advanced_access_enabled,
                 summary.advanced_access,
                 detect_pawnio,
+                live.sidecar_low_level_access(),
             ),
         },
         confidence_label: crate::i18n::text(
@@ -143,12 +145,18 @@ pub fn detect_pawnio() -> Option<PawnIoInstallation> {
 }
 
 /// Derives the advanced-access state from the tier and, only when the tier asks for it, from
-/// what is installed: a missing PawnIO is `installable`, an older one `upgradable`, and a current
-/// one that still does not deliver tier A needs `error` (repair) rather than a new install.
+/// what is installed: a missing PawnIO is `installable`, an older one `upgradable`. A current
+/// installation that still does not deliver tier A needs `error` (repair) — unless the sidecar's
+/// own live probe (T156: `hello_ack.low_level_access.state`, `LowLevelAccessProbe` in the .NET
+/// sidecar) says `denied`, which Rust's own installer/registry check has no way to tell on its
+/// own: a policy or antivirus blocking PawnIO looks identical to it as "a current install", but
+/// there is nothing to repair by retrying, so the interface must offer help instead (FR-090,
+/// T161).
 pub(super) fn resolve_advanced_access(
     enabled: bool,
     computed: AdvancedAccess,
     detect: impl FnOnce() -> Option<PawnIoInstallation>,
+    sidecar_state: Option<&str>,
 ) -> AdvancedAccessDto {
     if !enabled {
         return AdvancedAccessDto::Denied;
@@ -159,6 +167,9 @@ pub(super) fn resolve_advanced_access(
     match detect() {
         None | Some(PawnIoInstallation::Missing) => AdvancedAccessDto::Installable,
         Some(PawnIoInstallation::Upgradable { .. }) => AdvancedAccessDto::Upgradable,
+        Some(PawnIoInstallation::Current { .. }) if sidecar_state == Some("denied") => {
+            AdvancedAccessDto::Denied
+        }
         Some(PawnIoInstallation::Current { .. }) => AdvancedAccessDto::Error,
     }
 }
@@ -202,6 +213,7 @@ pub fn coverage_dto(
             advanced_access_enabled,
             summary.advanced_access,
             detect,
+            live.sidecar_low_level_access(),
         ),
         rows: coverage_rows(live, signals),
         conclusion_key: match summary.tier {
@@ -336,14 +348,64 @@ impl Default for RecorderHandle {
     }
 }
 
+/// FR-075: a write that fails (a full disk, most commonly) must not lose the sample or go
+/// silent. It queues in [`StorageResilience`] and the interface is told once, not on every
+/// tick; [`StorageResilience::retry_ms`] (`storage.retry_s`) paces the retries that follow,
+/// oldest action first, until the backlog fully drains.
 fn write_actions(app: &AppHandle, cpu: &sink::CpuIdentity, actions: &[RecorderAction]) {
     if actions.is_empty() {
         return;
     }
     let Some(state) = app.try_state::<AppState>() else { return };
+    let Some(resilience) = app.try_state::<StorageResilience>() else { return };
     let Ok(storage) = state.storage.lock() else { return };
-    if let Err(error) = sink::execute(&storage, cpu, actions) {
-        tracing::warn!(component = "storage", msg = "session recording failed", error = %error);
+    let Ok(mut backlog) = resilience.backlog.lock() else { return };
+    let transition = backlog.submit(epoch_ms(), actions, |action| {
+        match sink::execute(&storage, cpu, std::slice::from_ref(action)) {
+            Ok(()) => true,
+            Err(error) => {
+                tracing::warn!(
+                    component = "storage",
+                    msg = "session recording failed",
+                    error = %error
+                );
+                false
+            }
+        }
+    });
+    drop(backlog);
+    drop(storage);
+    match transition {
+        Transition::EnteredDegraded => {
+            tracing::warn!(
+                component = "storage",
+                code = "STORAGE_WRITE_DEGRADED",
+                msg = "storage stopped accepting writes; sampling continues in memory and retries"
+            );
+            let _ = app.emit("storage:degraded", ());
+        }
+        Transition::Recovered => {
+            tracing::info!(
+                component = "storage",
+                code = "STORAGE_WRITE_RECOVERED",
+                msg = "storage accepts writes again; the in-memory backlog is drained"
+            );
+            let _ = app.emit("storage:recovered", ());
+        }
+        Transition::None => {}
+    }
+}
+
+/// Owns the retry/backlog policy for storage writes (FR-075). One instance for the whole
+/// process, managed alongside [`AppState`]; `retry_ms` comes from `storage.retry_s` in
+/// `ruleset-v1` so the cadence is never a literal.
+pub struct StorageResilience {
+    backlog: Mutex<WriteBacklog>,
+}
+
+impl StorageResilience {
+    pub fn new(retry_ms: u64) -> Self {
+        Self { backlog: Mutex::new(WriteBacklog::new(retry_ms)) }
     }
 }
 
@@ -632,7 +694,7 @@ mod tests {
             ),
         ];
         for (installation, computed, expected) in cases {
-            let actual = resolve_advanced_access(true, computed, || installation.clone());
+            let actual = resolve_advanced_access(true, computed, || installation.clone(), None);
             assert_eq!(
                 format!("{actual:?}"),
                 format!("{expected:?}"),
@@ -643,18 +705,53 @@ mod tests {
 
     #[test]
     fn a_disabled_advanced_access_never_probes_the_machine() {
-        let actual = resolve_advanced_access(false, AdvancedAccess::Installable, || {
-            panic!("the probe must not run when advanced access is disabled")
-        });
+        let actual = resolve_advanced_access(
+            false,
+            AdvancedAccess::Installable,
+            || panic!("the probe must not run when advanced access is disabled"),
+            None,
+        );
         assert!(matches!(actual, AdvancedAccessDto::Denied));
     }
 
     #[test]
     fn a_tier_a_machine_does_not_probe_the_installation() {
-        let actual = resolve_advanced_access(true, AdvancedAccess::NotNeeded, || {
-            panic!("tier A needs no probe")
-        });
+        let actual = resolve_advanced_access(
+            true,
+            AdvancedAccess::NotNeeded,
+            || panic!("tier A needs no probe"),
+            None,
+        );
         assert!(matches!(actual, AdvancedAccessDto::NotNeeded));
+    }
+
+    #[test]
+    fn a_current_install_the_sidecar_reports_denied_offers_help_not_repair() {
+        // T156: Rust's own installer/registry check cannot distinguish "PawnIO installed but
+        // blocked by policy or antivirus" from "installed and merely misbehaving" — both look
+        // like `Current`. Only the sidecar's live probe (`hello_ack.low_level_access.state`)
+        // knows the difference, and `denied` must not offer "repair" (T161): there is nothing to
+        // retry.
+        let actual = resolve_advanced_access(
+            true,
+            AdvancedAccess::Installable,
+            || Some(PawnIoInstallation::Current { version: "2.2.0".to_owned() }),
+            Some("denied"),
+        );
+        assert!(matches!(actual, AdvancedAccessDto::Denied));
+    }
+
+    #[test]
+    fn a_current_install_the_sidecar_has_not_reported_yet_still_offers_repair() {
+        // No handshake seen this run (`None`), or the sidecar said anything other than `denied`:
+        // today's behaviour (offer repair) must not regress.
+        let actual = resolve_advanced_access(
+            true,
+            AdvancedAccess::Installable,
+            || Some(PawnIoInstallation::Current { version: "2.2.0".to_owned() }),
+            None,
+        );
+        assert!(matches!(actual, AdvancedAccessDto::Error));
     }
 
     #[test]

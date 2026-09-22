@@ -205,6 +205,14 @@
     storageValue: string;
     /** e.g. "Base de datos 31 MB · Registros 7 MB · 12 sesiones · desde el 10 sept" */
     storageDescription?: string;
+    /**
+     * FR-075: set only on the run that just recovered from a corrupt database — offers
+     * exporting the file moved aside instead of silently forgetting it happened.
+     */
+    corruptBackupRowLabel: string;
+    corruptBackupNotice?: string;
+    corruptBackupExportLabel: string;
+    onExportCorruptBackup: () => void;
     exportRowLabel: string;
     exportRowDescription?: string;
     exportButtonLabel: string;
@@ -799,6 +807,20 @@
         >
       {/snippet}
     </OptionRow>
+    {#if privacy.corruptBackupNotice}
+      <OptionRow
+        label={privacy.corruptBackupRowLabel}
+        description={privacy.corruptBackupNotice}
+      >
+        {#snippet control()}
+          <Button
+            variant="secondary"
+            label={privacy.corruptBackupExportLabel}
+            onclick={privacy.onExportCorruptBackup}
+          />
+        {/snippet}
+      </OptionRow>
+    {/if}
     <OptionRow
       label={privacy.anonymizeExportsLabel}
       description={privacy.anonymizeExportsDescription}

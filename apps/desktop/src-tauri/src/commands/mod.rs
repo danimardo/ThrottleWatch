@@ -31,7 +31,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_dialog::DialogExt;
 
 mod live;
-pub use live::{LiveHandle, RecorderHandle, TauriObserver, epoch_ms};
+pub use live::{LiveHandle, RecorderHandle, StorageResilience, TauriObserver, epoch_ms};
 
 /// Owns the flag [`cancel_export`] sets and `export` checks (T172's export cancellation): reset
 /// at the start of every export, so a stale cancellation can never affect the next one.
@@ -682,7 +682,17 @@ pub struct StorageUsageDto {
     pub logs_bytes: u64,
     pub total_bytes: u64,
     pub session_count: u64,
+    /// FR-075: the file name of `<original>.corrupt-<fecha>` moved aside at startup, when this
+    /// run recovered from a corrupt database — `None` once it has been exported or on any run
+    /// where storage opened cleanly. Only the name is exposed; the full path never leaves Rust.
+    pub corrupt_backup: Option<String>,
 }
+
+/// Remembers, for this run only, the corrupt database [`open_recovering_corruption`] moved
+/// aside at startup (FR-075) — so Ajustes can offer to export it once, and `export_corrupt_backup`
+/// knows where to read it from without the frontend ever seeing the real path.
+#[derive(Default)]
+pub struct CorruptBackupNotice(pub Mutex<Option<std::path::PathBuf>>);
 
 #[derive(Debug, Clone, Serialize)]
 pub struct DataOperationDto {
@@ -1514,12 +1524,50 @@ pub fn get_storage_usage(
         app.path().app_data_dir().map_err(|_| CommandError::operation_failed())?.join("logs");
     let logs_bytes =
         crate::logging::directory_bytes(logs).map_err(|_| CommandError::operation_failed())?;
+    let corrupt_backup = app.try_state::<CorruptBackupNotice>().and_then(|notice| {
+        notice
+            .0
+            .lock()
+            .ok()
+            .and_then(|guard| guard.clone())
+            .and_then(|path| path.file_name().map(|name| name.to_string_lossy().into_owned()))
+    });
     Ok(StorageUsageDto {
         database_bytes: usage.database_bytes,
         logs_bytes,
         total_bytes: usage.database_bytes.saturating_add(logs_bytes),
         session_count: usage.session_count,
+        corrupt_backup,
     })
+}
+
+/// FR-075 ("se ofrece exportar la dañada"): copies the corrupt backup this run recovered from
+/// to a location the person chooses, leaving the original in place — exporting is read-only,
+/// never the "destructive intervention" the FR forbids. Cancelling the dialog is not an error.
+#[tauri::command]
+pub async fn export_corrupt_backup(
+    app: AppHandle,
+    notice: State<'_, CorruptBackupNotice>,
+) -> Result<(), CommandError> {
+    let source = notice.0.lock().map_err(|_| CommandError::operation_failed())?.clone();
+    let Some(source) = source else {
+        return Err(CommandError {
+            code: "storage.no_corrupt_backup",
+            message_key: "storage.no_corrupt_backup",
+        });
+    };
+    let file_name = source
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "throttlewatch.db.corrupt".to_owned());
+    let Some(target) = pick_save_path(&app, &file_name).await else {
+        return Err(CommandError { code: "export.cancelled", message_key: "export.cancelled" });
+    };
+    tauri::async_runtime::spawn_blocking(move || std::fs::copy(&source, &target))
+        .await
+        .map_err(|_| CommandError::operation_failed())?
+        .map_err(|_| CommandError::operation_failed())?;
+    Ok(())
 }
 
 #[tauri::command]

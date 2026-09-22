@@ -4,7 +4,9 @@
     "minimize": "Minimize",
     "maximize": "Maximize",
     "restore": "Restore",
-    "close": "Close"
+    "close": "Close",
+    "storageDegradedTitle": "Can't save to disk",
+    "storageDegradedDescription": "Readings keep being taken in memory and are not lost; saving is retried automatically every minute. Check your free disk space."
   },
   "nav": {
     "now": "Now",
@@ -136,6 +138,9 @@
     "retention": "History retention",
     "sessionOnly": "This session only",
     "storage": "Storage",
+    "corruptBackup": "Previous database was corrupt",
+    "corruptBackupNotice": "At startup, the previous database could not be opened and was set aside without deleting it ({file}). You can export it before you forget about it.",
+    "corruptBackupExport": "Export",
     "export": "Export",
     "deleteData": "Delete data",
     "cancel": "Cancel",

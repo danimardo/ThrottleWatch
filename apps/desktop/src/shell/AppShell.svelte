@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import {
+    Banner,
     BottomBar,
     Button,
     CloseBlockedDialog,
@@ -103,6 +104,7 @@
     'guided'
   );
   let firstCloseOpen = $state(false);
+  let storageDegraded = $state(false);
   let detectionStarted = false;
   const compactDestinations = destinations.slice(0, 3);
   const overflowDestinations = destinations.slice(3);
@@ -225,12 +227,22 @@
     void listenValidated('lifecycle:close-decision-required', () => {
       firstCloseOpen = true;
     }).then((stop) => (stopFirstCloseListener = stop));
+    let stopStorageDegradedListener: () => void = () => undefined;
+    void listenValidated('storage:degraded', () => {
+      storageDegraded = true;
+    }).then((stop) => (stopStorageDegradedListener = stop));
+    let stopStorageRecoveredListener: () => void = () => undefined;
+    void listenValidated('storage:recovered', () => {
+      storageDegraded = false;
+    }).then((stop) => (stopStorageRecoveredListener = stop));
     return () => {
       stopAppearanceListener();
       stopGeometryListener();
       stopGuidedSessionListener();
       stopCloseBlockedListener();
       stopFirstCloseListener();
+      stopStorageDegradedListener();
+      stopStorageRecoveredListener();
       window.removeEventListener('keydown', onShortcut);
       window.removeEventListener(
         'throttlewatch:request-export',
@@ -492,6 +504,13 @@
     {/if}
 
     <div class="content">
+      {#if storageDegraded}
+        <Banner
+          tone="warning"
+          title={t('app.storageDegradedTitle')}
+          description={t('app.storageDegradedDescription')}
+        />
+      {/if}
       {#if onboardingActive}
         <main class="onboarding" aria-label={t('onboarding.ariaLabel')}>
           <OnboardingFlow

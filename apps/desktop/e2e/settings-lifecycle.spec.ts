@@ -89,3 +89,23 @@ test('@critical una sesión activa no expone la acción de borrado', async ({
     page.getByRole('button', { name: /delete session|eliminar sesión/i })
   ).toHaveCount(0);
 });
+
+test('@critical ajustes ofrece exportar la base de datos anterior solo si se recuperó una dañada (FR-075)', async ({
+  page
+}) => {
+  await page.goto('/?with-history');
+  await page.keyboard.press('Control+6');
+  await expect(
+    page.getByRole('main', { name: /settings|ajustes/i })
+  ).toBeVisible();
+  await expect(page.getByText(/dañada|corrupt/i)).toHaveCount(0);
+
+  await page.goto('/?with-history&corrupt-backup');
+  await page.keyboard.press('Control+6');
+  const corruptRow = page.locator('.row', { hasText: /dañada|corrupt/i });
+  await expect(corruptRow).toBeVisible();
+  await expect(
+    corruptRow.getByText('throttlewatch.db.corrupt-2026-09-22T00-00-00Z')
+  ).toBeVisible();
+  await corruptRow.getByRole('button', { name: /export|exportar/i }).click();
+});

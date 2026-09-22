@@ -41,6 +41,7 @@
     logs_bytes: number;
     total_bytes: number;
     session_count: number;
+    corrupt_backup: string | null;
   } | null>(null);
   let loading = $state(true);
   let updateState = $state<UpdateState | null>(null);
@@ -173,6 +174,14 @@
       deleteStatus = 'error';
       deleteErrorMessage = t('settings.operationFailed');
     }
+  }
+
+  async function exportCorruptBackup(): Promise<void> {
+    await invokeValidated(
+      'export_corrupt_backup',
+      undefined,
+      commandResponseSchemas.export_corrupt_backup
+    );
   }
 
   async function resetApplication(): Promise<void> {
@@ -489,6 +498,15 @@
         storageDescription: storageUsage
           ? `${formatBytes(storageUsage.database_bytes)} + ${formatBytes(storageUsage.logs_bytes)} · ${storageUsage.session_count}`
           : undefined,
+        corruptBackupRowLabel: t('settings.corruptBackup'),
+        corruptBackupNotice: storageUsage?.corrupt_backup
+          ? t('settings.corruptBackupNotice').replace(
+              '{file}',
+              storageUsage.corrupt_backup
+            )
+          : undefined,
+        corruptBackupExportLabel: t('settings.corruptBackupExport'),
+        onExportCorruptBackup: () => void exportCorruptBackup(),
         exportRowLabel: t('settings.export'),
         exportButtonLabel: t('settings.export'),
         onExport: () =>

@@ -19,6 +19,9 @@ export const test = base.extend({
       const activeFixture = new URLSearchParams(window.location.search).has(
         'active-session'
       );
+      const corruptBackupFixture = new URLSearchParams(
+        window.location.search
+      ).has('corrupt-backup');
       let accessState = new URLSearchParams(window.location.search).get(
         'access'
       );
@@ -48,6 +51,7 @@ export const test = base.extend({
         'get_window_state',
         'get_preferences',
         'get_storage_usage',
+        'export_corrupt_backup',
         'get_technical_summary',
         'get_third_party_notices',
         'open_logs_folder',
@@ -379,8 +383,14 @@ export const test = base.extend({
               database_bytes: 4096,
               logs_bytes: 1024,
               total_bytes: 5120,
-              session_count: historyFixture ? 2 : 0
+              session_count: historyFixture ? 2 : 0,
+              corrupt_backup: corruptBackupFixture
+                ? 'throttlewatch.db.corrupt-2026-09-22T00-00-00Z'
+                : null
             };
+          }
+          if (command === 'export_corrupt_backup') {
+            return null;
           }
           if (command === 'get_technical_summary') {
             return {

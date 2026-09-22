@@ -13,3 +13,4 @@ pub mod session;
 pub mod sink;
 pub mod snapshot;
 pub mod timeline;
+pub mod write_backlog;

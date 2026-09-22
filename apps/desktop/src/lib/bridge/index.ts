@@ -86,6 +86,8 @@ function argsSchemaFor(command: string): z.ZodType | undefined {
       return commandArgsSchemas.get_preferences;
     case 'get_storage_usage':
       return commandArgsSchemas.get_storage_usage;
+    case 'export_corrupt_backup':
+      return commandArgsSchemas.export_corrupt_backup;
     case 'get_technical_summary':
       return commandArgsSchemas.get_technical_summary;
     case 'get_third_party_notices':

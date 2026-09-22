@@ -225,14 +225,26 @@ export class FakeBridge implements BridgeTransport {
     adjusted: []
   });
   private trayPaused = false;
-  private storageUsage = {
+  private storageUsage: {
+    database_bytes: number;
+    logs_bytes: number;
+    total_bytes: number;
+    session_count: number;
+    corrupt_backup: string | null;
+  } = {
     database_bytes: 4096,
     logs_bytes: 0,
     total_bytes: 4096,
-    session_count: 1
+    session_count: 1,
+    corrupt_backup: null
   };
   private sessionsValue: SessionSummary[];
   private readonly reports = new Map<string, Record<string, unknown>>();
+
+  /** Test-only: simulate a corrupt database recovered at startup (FR-075). */
+  public setCorruptBackup(fileName: string | null): void {
+    this.storageUsage = { ...this.storageUsage, corrupt_backup: fileName };
+  }
 
   public constructor(
     snapshotValue = liveSnapshot(),
@@ -351,12 +363,14 @@ export class FakeBridge implements BridgeTransport {
             database_bytes: 4096,
             logs_bytes: 0,
             total_bytes: 4096,
-            session_count: 0
+            session_count: 0,
+            corrupt_backup: null
           };
           return { cleared: ['data_and_preferences', 'logs'], failed: [] };
         case 'open_logs_folder':
         case 'open_external_url':
         case 'log_frontend':
+        case 'export_corrupt_backup':
           return null;
         case 'set_preference': {
           const request = args?.request;

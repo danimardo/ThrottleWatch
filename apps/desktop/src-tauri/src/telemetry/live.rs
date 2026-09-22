@@ -81,6 +81,20 @@ struct CapabilitiesPayload {
     sensors: Vec<SensorDescriptor>,
 }
 
+/// T156: the sidecar's own, live detection of PawnIO (service, `ROOT\PAWNIO` device,
+/// `PawnIo.Version` — `LowLevelAccessProbe.Run()` in the .NET sidecar), sent once per
+/// handshake (`contracts/ipc-protocol.md` § Handshake). `state` is one of `available`,
+/// `reduced`, `missing`, `denied`, `error`, `unknown` — Rust never invents a seventh.
+#[derive(Debug, Deserialize)]
+struct HelloAckPayload {
+    low_level_access: LowLevelAccessPayload,
+}
+
+#[derive(Debug, Deserialize)]
+struct LowLevelAccessPayload {
+    state: String,
+}
+
 #[derive(Debug, Deserialize)]
 struct SamplePayload {
     values: Vec<SampleValue>,
@@ -133,6 +147,9 @@ pub struct LiveState {
     evaluator: Option<LiveEvaluator>,
     host_clock: Option<HostClockReading>,
     sampling_interval_ms: Option<u64>,
+    /// T156: the sidecar's own PawnIO detection from its last handshake — `None` before the
+    /// first `hello_ack` of this process, or if it sent a payload Rust could not parse.
+    sidecar_low_level_access: Option<String>,
 }
 
 impl Default for LiveState {
@@ -155,7 +172,25 @@ impl LiveState {
             evaluator: Ruleset::v1().ok().map(LiveEvaluator::new),
             host_clock: None,
             sampling_interval_ms: None,
+            sidecar_low_level_access: None,
         }
+    }
+
+    /// T156: records the sidecar's own PawnIO detection from `hello_ack.low_level_access.state`
+    /// so `advanced_access` can reflect it (`commands::live::resolve_advanced_access`) instead of
+    /// only Rust's own installer/registry check, which cannot tell a driver that is installed but
+    /// blocked by policy or antivirus (`denied`) from one that is merely misbehaving (`error`).
+    /// Never fatal: an old sidecar or a payload Rust cannot parse just leaves this `None`, exactly
+    /// as if it had not handshaked yet — a raw `hello_ack` that fails another check already
+    /// invalidates the message elsewhere.
+    pub fn apply_hello_ack(&mut self, payload: &Value) {
+        self.sidecar_low_level_access = serde_json::from_value::<HelloAckPayload>(payload.clone())
+            .ok()
+            .map(|parsed| parsed.low_level_access.state);
+    }
+
+    pub fn sidecar_low_level_access(&self) -> Option<&str> {
+        self.sidecar_low_level_access.as_deref()
     }
 
     /// Replaces the catalog (a restart or a change of detail generates a new one) and forgets the
@@ -529,6 +564,39 @@ mod tests {
             ]))
             .unwrap_or_else(|error| panic!("capabilities: {error:?}"));
         state
+    }
+
+    #[test]
+    fn a_hello_ack_records_the_sidecars_low_level_access_state() {
+        let mut state = LiveState::new();
+        assert_eq!(state.sidecar_low_level_access(), None);
+        state.apply_hello_ack(&json!({
+            "agent_version": "0.1.0",
+            "selected_protocol": 1,
+            "runtime": ".NET",
+            "low_level_access": {"state": "denied", "provider": "pawnio", "details_code": "X"}
+        }));
+        assert_eq!(state.sidecar_low_level_access(), Some("denied"));
+    }
+
+    #[test]
+    fn a_later_hello_ack_replaces_the_earlier_low_level_access_state() {
+        let mut state = LiveState::new();
+        state.apply_hello_ack(&json!({"low_level_access": {"state": "denied"}}));
+        state.apply_hello_ack(&json!({"low_level_access": {"state": "available"}}));
+        assert_eq!(state.sidecar_low_level_access(), Some("available"));
+    }
+
+    #[test]
+    fn a_hello_ack_rust_cannot_parse_leaves_the_state_as_if_none_had_arrived() {
+        let mut state = LiveState::new();
+        state.apply_hello_ack(&json!({"low_level_access": {"state": "denied"}}));
+        state.apply_hello_ack(&json!({"nothing_useful": true}));
+        assert_eq!(
+            state.sidecar_low_level_access(),
+            None,
+            "a malformed hello_ack must not keep stale access state around either"
+        );
     }
 
     #[test]

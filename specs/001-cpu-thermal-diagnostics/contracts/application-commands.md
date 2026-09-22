@@ -38,7 +38,13 @@ Segunda instancia: el backend usa el plugin de instancia única; la nueva instan
 
 - `delete_monitoring_data({ confirmation_token }) -> DataOperationResult`
 - `reset_application({ confirmation_token }) -> DataOperationResult`
-- `get_storage_usage() -> { database_bytes, logs_bytes, total_bytes, session_count }`
+- `get_storage_usage() -> { database_bytes, logs_bytes, total_bytes, session_count, corrupt_backup }`:
+  `corrupt_backup` es el nombre de fichero (no la ruta) de `<original>.corrupt-<fecha>` cuando esta
+  misma ejecución recuperó una base de datos dañada al arrancar (FR-075); `null` en cualquier otro
+  caso, incluida una ejecución posterior sin nueva recuperación.
+- `export_corrupt_backup() -> void`: copia (no mueve) el fichero de `corrupt_backup` al destino que
+  la persona elige en el diálogo nativo de guardar; sin fichero pendiente, error
+  `storage.no_corrupt_backup`; diálogo cancelado, error `export.cancelled`, no destructivo (FR-075).
 - `open_logs_folder() -> void`
 - `open_external_url({ target: "help" | "source" }) -> void`
 - `get_technical_summary() -> TechnicalSummary`: versiones, protocolo, estado del colector,
@@ -46,6 +52,16 @@ Segunda instancia: el backend usa el plugin de instancia única; la nueva instan
 - `get_third_party_notices() -> Notice[]`: avisos empaquetados, sin rutas recibidas de la UI.
 
 Los tokens son efímeros y nacen de un diálogo local. `delete_monitoring_data` conserva las preferencias tipadas. `reset_application` borra todo el perfil local, desregistra inicio con Windows, elimina artefactos de actualización y provoca cierre/reinicio limpio. `DataOperationResult` informa por separado de los pasos `cleared` y `failed`; no acepta rutas ni URLs.
+
+Eventos (FR-075, disco lleno u otro fallo de escritura mientras se muestrea):
+
+- `storage:degraded` — una escritura falló por primera vez; el muestreo sigue en memoria y no se
+  pierde nada, la interfaz avisa de forma persistente.
+- `storage:recovered` — la cola en memoria se ha vaciado del todo; el aviso desaparece.
+
+Sin payload en ninguno de los dos: es un estado binario, `AppShell` solo necesita saber cuál de los
+dos ocurrió. El reintento no lo pide la interfaz: Rust reintenta solo, como mucho cada
+`storage.retry_s` (`ruleset-v1`), en orden y sin saltarse ni reordenar nada.
 
 ## Telemetría en vivo y cobertura
 

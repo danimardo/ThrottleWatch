@@ -306,7 +306,10 @@ fn handle_message(
     coverage: &mut Option<CoverageTier>,
 ) -> Handled {
     match message_type {
-        "hello_ack" => Handled::Progress,
+        "hello_ack" => {
+            lock(live).apply_hello_ack(payload);
+            Handled::Progress
+        }
         "capabilities" => {
             let mut guard = lock(live);
             if guard.apply_capabilities(payload).is_err() {
@@ -821,6 +824,9 @@ mod tests {
         let state = lock(&live);
         assert_eq!(state.collector(), CollectorState::Running);
         assert_eq!(state.cpu().map(|cpu| cpu.display_name.as_str()), Some("Test CPU"));
+        // T156: the sidecar's own `hello_ack.low_level_access.state` reaches `LiveState`, not
+        // just the handshake's bare acknowledgement.
+        assert_eq!(state.sidecar_low_level_access(), Some("missing"));
         assert_eq!(state.snapshot_input().and_then(|input| input.load_percent), Some(60.0));
         assert_eq!(state.cores().len(), 1);
         // hello first, then `start` asking for per-core detail at the ruleset interval

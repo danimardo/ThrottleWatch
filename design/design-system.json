@@ -1200,7 +1200,7 @@
           "name": "privacy",
           "type": "SettingsPrivacySection",
           "required": true,
-          "notes": "retención (4 spec values), espacio usado, anonimizar exportaciones, Exportar…, eliminar datos. NO crash-report switch — zero network besides the updater"
+          "notes": "retención (4 spec values), espacio usado, aviso opcional de base de datos anterior dañada con exportar (FR-075, oculto salvo recuperación real), anonimizar exportaciones, Exportar…, eliminar datos. NO crash-report switch — zero network besides the updater"
         },
         {
           "name": "sensors",

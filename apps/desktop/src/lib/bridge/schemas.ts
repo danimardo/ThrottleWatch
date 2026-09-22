@@ -564,9 +564,11 @@ export const commandResponseSchemas = {
       database_bytes: z.number().int().nonnegative(),
       logs_bytes: z.number().int().nonnegative(),
       total_bytes: z.number().int().nonnegative(),
-      session_count: z.number().int().nonnegative()
+      session_count: z.number().int().nonnegative(),
+      corrupt_backup: z.string().min(1).nullable()
     })
     .strict(),
+  export_corrupt_backup: z.null(),
   get_technical_summary: z.object({ text: z.string().min(1) }).strict(),
   get_third_party_notices: z
     .object({
@@ -636,6 +638,7 @@ export const commandArgsSchemas = {
   get_window_state: noCommandArgs,
   get_preferences: noCommandArgs,
   get_storage_usage: noCommandArgs,
+  export_corrupt_backup: noCommandArgs,
   get_technical_summary: noCommandArgs,
   get_third_party_notices: noCommandArgs,
   log_frontend: z
@@ -777,6 +780,8 @@ const closeBlockedEventSchema = z.object({
 export const eventSchemas = {
   'lifecycle:close-blocked': closeBlockedEventSchema,
   'lifecycle:close-decision-required': z.null(),
+  'storage:degraded': z.null(),
+  'storage:recovered': z.null(),
   'update:state-changed': updateStateSchema,
   'update:progress': updateProgressSchema,
   'update:available': updateAvailableSchema,
