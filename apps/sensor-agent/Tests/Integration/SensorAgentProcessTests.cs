@@ -160,9 +160,11 @@ public sealed class SensorAgentProcessTests
         capabilities.GetProperty("type").GetString().ShouldBe("capabilities");
         var sensors = capabilities.GetProperty("payload").GetProperty("sensors").EnumerateArray()
             .Select(sensor => sensor.GetProperty("id").GetString()).ToArray();
-        // What is published depends on the host: load on most, physical sensors only on real hardware, and
-        // nothing when the library cannot even open (seen on virtualized CI runners). All are valid.
-        sensors.ShouldAllBe(id => id!.StartsWith("cpu.package.", StringComparison.Ordinal));
+        // What is published depends on the host: load on most, physical sensors only on real hardware,
+        // nothing when the library cannot even open (seen on virtualized CI runners), and MSR-derived
+        // limit-reason sensors on a real Intel host with PawnIO installed (T028b). All are valid.
+        sensors.ShouldAllBe(id =>
+            id!.StartsWith("cpu.package.", StringComparison.Ordinal) || id.StartsWith("msr/", StringComparison.Ordinal));
         capabilities.GetProperty("payload").GetProperty("cpu").GetProperty("virtualized").GetBoolean().ShouldBe(HypervisorPresent);
 
         await SendAsync("start", "{\"interval_ms\":250,\"detail\":\"representative\"}", 1);
@@ -176,8 +178,16 @@ public sealed class SensorAgentProcessTests
         values.Select(value => value.GetProperty("sensor_id").GetString()).ShouldBe(sensors);
         foreach (var value in values.Where(value => value.GetProperty("status").GetString() == "ok"))
         {
-            value.TryGetProperty("number", out var number).ShouldBeTrue();
-            number.GetDouble().ShouldBeGreaterThanOrEqualTo(0);
+            // An "ok" value carries exactly one of number or boolean (ipc-protocol.md § Muestreo);
+            // MSR limit-reason flags on a real Intel host with PawnIO installed are booleans.
+            if (value.TryGetProperty("number", out var number))
+            {
+                number.GetDouble().ShouldBeGreaterThanOrEqualTo(0);
+            }
+            else
+            {
+                value.TryGetProperty("boolean", out _).ShouldBeTrue();
+            }
         }
 
         await SendAsync("stop", "{}", 2);

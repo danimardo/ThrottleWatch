@@ -109,7 +109,8 @@ public static class LowLevelAccessProbe
 
     public static int DecodeTjMaxCelsius(ulong value) => (int)((value >> 16) & 0xFF);
 
-    public static int DecodeTccOffsetCelsius(ulong value) => (int)((value >> 24) & 0x3F);
+    // MSR_TEMPERATURE_TARGET bits 27:24 (Intel SDM): a 4-bit field; matches LimitReasonNormalizer.ReadIntelLimits.
+    public static int DecodeTccOffsetCelsius(ulong value) => (int)((value >> 24) & 0xF);
 
     public static bool IsPlausibleTemperatureTarget(ulong value)
     {

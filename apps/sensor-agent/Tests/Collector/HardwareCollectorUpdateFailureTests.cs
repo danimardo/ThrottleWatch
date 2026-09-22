@@ -21,7 +21,7 @@ public sealed class HardwareCollectorUpdateFailureTests
     {
         var hardware = new FakeHardware("/amdcpu/0", throwOnUpdate: true);
         var logger = new CapturingLogger();
-        using var collector = new HardwareCollector(new FakeSource(hardware), logger);
+        using var collector = new HardwareCollector(new FakeSource(hardware), logger, detectVendor: () => "amd");
         collector.Open();
 
         var first = collector.ReadSample();
@@ -41,7 +41,7 @@ public sealed class HardwareCollectorUpdateFailureTests
     {
         var hardware = new FakeHardware("/amdcpu/0", throwOnUpdate: true);
         var logger = new CapturingLogger();
-        using var collector = new HardwareCollector(new FakeSource(hardware), logger);
+        using var collector = new HardwareCollector(new FakeSource(hardware), logger, detectVendor: () => "amd");
         collector.Open();
 
         _ = collector.ReadSample();

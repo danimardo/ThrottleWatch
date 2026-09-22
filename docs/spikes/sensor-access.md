@@ -51,7 +51,7 @@ registros de una máquina real. No registrar números de serie, nombres de usuar
 | Equipo | CPU/familia | Windows/build | Alimentación | PawnIO antes | Lectura sin proveedor | PawnIO instalado una vez | Tras reinicio sin UAC | Resultado A/B/C | Evidencia |
 |---|---|---|---|---|---|---|---|---|---|
 | Desarrollo | AMD Ryzen 5 2600X / Zen+ (Pinnacle Ridge, Family 17h Model 8) | Windows 11 Pro / 26200 | CA (sin batería detectada) | no instalado | \`missing\`, sin acceso avanzado | \`available\` (elevado): SMU \`0x002B1800\`; tabla PM no fiable | \`denied\` (usuario estándar): SMU \`0x00000000\`, \`SMU_VERSION_ZERO\` → resultado **(b)** | nivel A solo elevado; sin limpieza de bits | probes 2026-09-19 |
-| Intel híbrido | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente | salida JSON |
+| Intel híbrido | Intel(R) Core(TM) Ultra 7 155H / Meteor Lake (Family 6 Model 170), 16 núcleos/22 hilos P+E+LP-E | Windows 11 Pro / 26200 | batería 76 % | ya instalado (PawnIO 2.2.0.0, servicio `Running/Manual`) | pendiente (requiere desinstalar PawnIO, no realizado) | `denied`, `MSR_READ_FAILED`, `0x64F`/`0x1A2`/`0x610` legibles pero devuelven `0x0` sin proveedor elevado | `available`: `0x1A2`=`0x0F6E0000` (TjMax 110 °C, plausible), `0x610`=`0x0042820000DD80E0` (PL1≈28 W, PL2≈64 W, ambos plausibles para este equipo), `0x64F`=`0x0` (sin razón de limitación activa en el instante de lectura); `log_clear_supported: false` (misma limitación de LHM 0.9.6 que en AMD) | nivel A de **lectura** alcanzable con sidecar elevado en Intel, con valores utilizables (mejor que AMD, que nunca superó una tabla PM no fiable); limpieza de `0x64F` sigue sin demostrarse; no probado tras reinicio | probes 2026-09-22 |
 | Intel anterior | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente | salida JSON |
 | Portátil OEM | pendiente | pendiente | batería/CA | pendiente | pendiente | pendiente | pendiente | pendiente | salida JSON |
 | AMD Zen 4 | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente | salida JSON |
@@ -243,6 +243,99 @@ Para cada equipo de la tabla «Matriz de ejecución» que siga en `pendiente`, e
 5. Traer los tres JSON (no contienen identificadores) y rellenar la fila. El contraste con
    APERF/MPERF sigue pendiente: el sidecar todavía no lee `0xE7`/`0xE8`; cuando lo haga, el
    guion añadirá esa columna.
+
+### 2026-09-22 — equipo Intel híbrido, usuario estándar, PawnIO ya instalado
+
+Máquina nueva: Intel(R) Core(TM) Ultra 7 155H (Meteor Lake, Family 6 Model 170), 16
+núcleos/22 hilos, Windows 11 Pro 26200, con PawnIO 2.2.0.0 ya instalado y el servicio
+`PawnIO` en `Running/Manual` de una sesión anterior a este spike (no se instaló nada
+para esta prueba). Proceso sin elevar, nivel de integridad **medio** confirmado con
+`whoami /groups` (`S-1-16-8192`) y `IsInRole(Administrator)` → `False`.
+
+Comando: `SensorAgent.exe --probe-low-level`.
+
+\`\`\`json
+{
+  "cpu_vendor": "intel",
+  "state": "denied",
+  "provider": "pawnio",
+  "provider_version": "2.2.0.0",
+  "registers": [
+    { "name": "core_perf_limit_reasons", "address": "0x64F", "readable": true, "value_hex": "0x0000000000000000" },
+    { "name": "temperature_target", "address": "0x1A2", "readable": true, "value_hex": "0x0000000000000000" },
+    { "name": "package_power_limit", "address": "0x610", "readable": true, "value_hex": "0x0000000000000000" }
+  ],
+  "log_clear_supported": false,
+  "details_code": "MSR_READ_FAILED"
+}
+\`\`\`
+
+Lectura: mismo patrón que AMD (T152): sin proceso elevado, el registro se declara
+`readable` pero el valor vuelve `0x0`, lo que por el criterio 4 de este spike no cuenta
+como lectura válida (en Intel, `0x1A2` debería traer un TjMax plausible, p. ej. 100).
+**Pendiente para cerrar la fila**: repetir en proceso elevado (UAC) para contrastar con
+`0x002B1800`-tipo de valor no nulo, y repetir tras reinicio sin elevar. No se ha probado
+aquí la fase «antes de instalar PawnIO» porque el proveedor ya estaba instalado de una
+sesión previa; desinstalarlo para repetir esa fase no se ha hecho por ser una acción
+destructiva de estado del sistema sin necesidad clara.
+
+Ejecutado también `sensor-access-matrix.ps1 -Phase installed` (`docs/spikes/tools/sensor-access-installed.json`,
+no versionado, contiene contadores locales). Hallazgo relevante para T028c
+(`active_clock`/`base_clock`): `\Processor Information(*)\% Processor Performance` supera
+ampliamente el 100 % en régimen turbo (hasta 371 % observado) mientras
+`\Processor Information(*)\Processor Frequency` permanece clavado en tres valores fijos
+por grupo de núcleo (1400 MHz en los P-core, 900 MHz en los E-core, 700 MHz en los
+LP E-core), sin variar con la carga real. Esto confirma la sospecha de `research.md`: en
+este equipo `Processor Frequency` es un valor nominal por grupo (no un reloj en vivo) y
+el reloj activo real solo puede derivarse como `base_clock_nominal × percent_performance / 100`,
+nunca leyendo `frequency_mhz` como reloj instantáneo. También confirma que
+`hypervisor_present=true` en este portátil físico (VBS activo, sin hipervisor real),
+corroborando la nota de `T-INT-005` sobre el bit de hipervisor de CPUID.
+
+El contraste con APERF/MPERF sigue pendiente: el sidecar aún no lee `0xE7`/`0xE8`.
+
+### 2026-09-22 — equipo Intel híbrido, proceso elevado (UAC), primer nivel A con valores utilizables
+
+Mismo equipo que la entrada anterior. Elevación mediante `Start-Process -Verb RunAs`
+lanzando un `.cmd` que ejecuta la sonda y redirige su salida a fichero (la política de
+elevación de este equipo corporativo no mostró un cuadro de diálogo interactivo bloqueante;
+el token resultante confirma `Nivel obligatorio alto` y pertenencia a
+`BUILTIN\Administradores`).
+
+\`\`\`json
+{
+  "cpu_vendor": "intel",
+  "state": "available",
+  "provider": "pawnio",
+  "provider_version": "2.2.0.0",
+  "registers": [
+    { "name": "core_perf_limit_reasons", "address": "0x64F", "readable": true, "value_hex": "0x0000000000000000" },
+    { "name": "temperature_target", "address": "0x1A2", "readable": true, "value_hex": "0x000000000F6E0000" },
+    { "name": "package_power_limit", "address": "0x610", "readable": true, "value_hex": "0x0042820000DD80E0" }
+  ],
+  "log_clear_supported": false,
+  "details_code": "MSR_READ_OK_LOG_CLEAR_UNSUPPORTED"
+}
+\`\`\`
+
+Decodificación manual (criterio 4 de este spike: un registro no cuenta como válido solo
+por ser distinto de cero, hay que comprobar que el valor es plausible):
+
+- `0x1A2` bits 23:16 = `0x6E` = **110 °C** de TjMax. Plausible para este chip móvil (rango
+  habitual 100–110 °C en Meteor Lake).
+- `0x610` bits 14:0 = `0xE0` (224 × 1/8 W) = **PL1 ≈ 28 W**; bits 46:32 = `0x200` (512 × 1/8 W)
+  = **PL2 ≈ 64 W**; ambos bits de habilitación (15 y 47) a 1. Ambas cifras son plausibles para
+  un Core Ultra 7 155H en un portátil (PL1 sostenido bajo, PL2 de turbo moderado).
+- `0x64F` en `0x0` es coherente: sin ninguna razón de limitación activa en el instante exacto
+  de la lectura (equipo en reposo relativo), no indica fallo de lectura.
+
+A diferencia de AMD (T152: SMU con tabla PM no fiable incluso elevado), en Intel el nivel A
+de **lectura** es alcanzable con el sidecar elevado y produce cifras utilizables de inmediato.
+Sigue sin demostrarse la **limpieza** de `0x64F` (misma limitación conocida de la API pública
+de LHM 0.9.6 que en la entrada del 19/09) y no se ha repetido tras un reinicio del equipo.
+Con esto, el resultado para Intel se acerca a **(a)** en lectura pura, aunque el ADR-0004
+(resultado (b), sidecar elevado exclusivo) sigue siendo la decisión vigente porque ya
+contempla el caso general (AMD no llega ni a lectura fiable sin elevar) y no se ha reabierto.
 
 ### Hallazgo 2026-09-19 — contadores PDH localizados
 

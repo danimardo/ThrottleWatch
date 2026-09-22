@@ -27,7 +27,7 @@ public sealed class HostVirtualizationTests
     public void HidesPhysicalSensorsOnAVirtualizedHostAndKeepsLoad()
     {
         var logger = new CapturingLogger();
-        using var collector = new HardwareCollector(new FakeSource(new FakeHardware("/amdcpu/0")), logger, () => true);
+        using var collector = new HardwareCollector(new FakeSource(new FakeHardware("/amdcpu/0")), logger, () => true, () => "amd");
         collector.Open();
 
         var catalog = collector.ReadCatalog();
@@ -40,10 +40,33 @@ public sealed class HostVirtualizationTests
 
     [Fact]
     [Trait("Category", "Unit")]
+    public void MsrSensorsAreStillDeclaredForIntelOnAVirtualizedHost()
+    {
+        // The four limit-reason flags and the power-limit descriptor are declared unconditionally
+        // for Intel (IntelLimitCatalog.Descriptors), unlike the LHM physical sensors this collector
+        // hides under virtualization: a guest never fabricates a value for them either way, it just
+        // reports "missing" per sample when PawnIO cannot really back them (T-INT-005, T028b).
+        var logger = new CapturingLogger();
+        using var collector = new HardwareCollector(new FakeSource(new FakeHardware("/intelcpu/0")), logger, () => true, () => "intel");
+        collector.Open();
+
+        var metrics = collector.ReadCatalog().Select(descriptor => descriptor.Metric).ToArray();
+
+        metrics.ShouldContain("load");
+        metrics.ShouldNotContain("temperature"); // hidden physical LHM sensor
+        foreach (var flag in new[] { "thermal_flag", "prochot_flag", "power_flag", "current_flag" })
+        {
+            metrics.ShouldContain(flag);
+        }
+        metrics.ShouldContain("power_limit_direct");
+    }
+
+    [Fact]
+    [Trait("Category", "Unit")]
     public void KeepsEverySensorOnARealHost()
     {
         var logger = new CapturingLogger();
-        using var collector = new HardwareCollector(new FakeSource(new FakeHardware("/amdcpu/0")), logger, () => false);
+        using var collector = new HardwareCollector(new FakeSource(new FakeHardware("/amdcpu/0")), logger, () => false, () => "amd");
         collector.Open();
 
         collector.ReadCatalog().Select(descriptor => descriptor.Metric).ShouldBe(["temperature", "load"]);

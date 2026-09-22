@@ -98,6 +98,46 @@ public sealed class SensorNormalizerTests
 
     [Fact]
     [Trait("Category", "Unit")]
+    public void DecodesTjMaxOffsetAndPowerLimitsFromRawMsrValues()
+    {
+        // temperatureTarget: TjMax=100 °C (bits 23:16), TCC offset=5 °C (bits 27:24).
+        var limits = LimitReasonNormalizer.ReadIntelLimits(
+            temperatureTarget: 0x05640000,
+            // packagePowerLimit: PL1=224 (28 W, bits 14:0), PL2=512 (64 W, bits 46:32), Tau encoded=6 (64 s, bits 23:17).
+            packagePowerLimit: 0x00000200000C00E0);
+
+        limits.TjMaxC.ShouldBe(100.0);
+        limits.TccOffsetC.ShouldBe(5.0);
+        limits.EffectiveLimitC.ShouldBe(95.0);
+        limits.Pl1W.ShouldBe(28.0);
+        limits.Pl2W.ShouldBe(64.0);
+        limits.TauS.ShouldBe(64.0);
+    }
+
+    [Fact]
+    [Trait("Category", "Unit")]
+    public void AReservedBitAboveTheTccOffsetFieldNeverLeaksIntoTheDecodedOffset()
+    {
+        // Bit 28 is reserved (the field is bits 27:24, 4 bits wide); a real chip may leave it at 1.
+        var limits = LimitReasonNormalizer.ReadIntelLimits(temperatureTarget: 0x1F640000, packagePowerLimit: 0);
+
+        limits.TjMaxC.ShouldBe(100.0);
+        limits.TccOffsetC.ShouldBe(15.0);
+    }
+
+    [Fact]
+    [Trait("Category", "Unit")]
+    public void AZeroPowerLimitRegisterProducesNoFabricatedZeroWattValue()
+    {
+        var limits = LimitReasonNormalizer.ReadIntelLimits(temperatureTarget: 0, packagePowerLimit: 0);
+
+        limits.Pl1W.ShouldBeNull();
+        limits.Pl2W.ShouldBeNull();
+        limits.TauS.ShouldBeNull();
+    }
+
+    [Fact]
+    [Trait("Category", "Unit")]
     public void AppliesTheAmdThermalEquivalenceOnlyForVersionedTables()
     {
         LimitReasonNormalizer.IsAmdThermalFlag("zen4", "thermal-limits-v1", 99, 90, 90, 90).ShouldBeTrue();

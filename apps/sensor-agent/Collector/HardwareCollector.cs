@@ -15,7 +15,7 @@ public sealed record SensorDescriptor(
     string Quality = "direct",
     IReadOnlyDictionary<string, object?>? Metadata = null);
 
-public sealed record SensorReading(string SensorId, float? Number, string Status);
+public sealed record SensorReading(string SensorId, float? Number, string Status, bool? Boolean = null);
 
 /// <summary>What the protocol server needs from the hardware layer (a fake in tests).</summary>
 public interface ISensorSource : ICollectorSession
@@ -81,21 +81,26 @@ public sealed class HardwareCollector : ISensorSource, IDisposable
     private readonly ILogger logger;
     private readonly HashSet<string> failedUpdates = [];
     private readonly Func<bool> isVirtualized;
+    private readonly Func<string> detectVendor;
     private bool opened;
     private bool catalogRead;
     private bool virtualizedHost;
     private bool openFailed;
+    private string vendor = "unknown";
+    private bool intelMsrAccessConfirmed;
 
     public HardwareCollector()
         : this(new ComputerHardwareSource(), Log.Create("sensor-agent.collector"), HostVirtualization.IsVirtualized)
     {
     }
 
-    internal HardwareCollector(IHardwareSource source, ILogger logger, Func<bool>? isVirtualized = null)
+    /// <param name="detectVendor">Seam over <see cref="LowLevelAccessProbe.DetectCpuVendor"/> (constitution XIII): tests fix the vendor instead of depending on the real CPU running the suite.</param>
+    internal HardwareCollector(IHardwareSource source, ILogger logger, Func<bool>? isVirtualized = null, Func<string>? detectVendor = null)
     {
         this.source = source;
         this.logger = logger;
         this.isVirtualized = isVirtualized ?? (() => false);
+        this.detectVendor = detectVendor ?? LowLevelAccessProbe.DetectCpuVendor;
     }
 
     public bool IsOpen => opened;
@@ -140,6 +145,8 @@ public sealed class HardwareCollector : ISensorSource, IDisposable
         {
             logger.HostVirtualized("HOST_VIRTUALIZED");
         }
+
+        vendor = detectVendor();
     }
 
     public IReadOnlyList<SensorDescriptor> ReadCatalog()
@@ -164,6 +171,16 @@ public sealed class HardwareCollector : ISensorSource, IDisposable
                     "direct",
                     new Dictionary<string, object?> { ["provenance"] = "LibreHardwareMonitorLib" })))
             .ToArray();
+
+        if (vendor == "intel")
+        {
+            // Safe alongside the already-open Computer (T162): IntelMsr never touches LHM's PCI bus mutex.
+            var temperatureMetadata = IntelLimitCatalog.ReadTemperatureMetadata(logger: logger);
+            intelMsrAccessConfirmed = temperatureMetadata is not null;
+            var powerLimitMetadata = intelMsrAccessConfirmed ? IntelLimitCatalog.ReadPowerLimitMetadata(logger: logger) : null;
+            catalog = catalog.Concat(IntelLimitCatalog.Descriptors(temperatureMetadata, powerLimitMetadata)).ToArray();
+        }
+
         catalogRead = true;
         return catalog;
     }
@@ -209,6 +226,12 @@ public sealed class HardwareCollector : ISensorSource, IDisposable
                     : new SensorReading(id, null, "invalid"));
             }
         }
+
+        if (vendor == "intel")
+        {
+            readings.AddRange(IntelLimitCatalog.ReadSample(intelMsrAccessConfirmed, logger: logger));
+        }
+
         return readings;
     }
 

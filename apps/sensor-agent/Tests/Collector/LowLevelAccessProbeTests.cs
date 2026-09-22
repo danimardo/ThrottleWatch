@@ -8,6 +8,8 @@ public sealed class LowLevelAccessProbeTests
     [Theory]
     [InlineData(0x00640000UL, 100, 0)]
     [InlineData(0x035A0000UL, 90, 3)]
+    // Bit 28 (reserved, outside the 4-bit 27:24 field) set: must not leak into the decoded offset.
+    [InlineData(0x1F640000UL, 100, 15)]
     [Trait("Category", "Unit")]
     public void DecodesIntelTemperatureTarget(ulong value, int expectedTjMax, int expectedOffset)
     {

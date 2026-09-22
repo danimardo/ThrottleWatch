@@ -83,6 +83,17 @@ fn the_real_sidecar_feeds_the_live_state_and_stops_cleanly() {
             // Per-core detail was negotiated: the catalog carries one entry per core.
             assert!(!state.cores().is_empty(), "no per-core sensors on a physical host");
         }
+        // T173: whatever this host's coverage tier turns out to be, if the sidecar claims level A
+        // (limit reasons and the effective power limit both present) it must also have published
+        // the effective thermal limit — the whole point of wiring MSR_TEMPERATURE_TARGET (T028b).
+        // On an unelevated CI runner or an AMD host this stays vacuously true (tier B/C).
+        let coverage = state.coverage_signals();
+        if coverage.limit_reasons && coverage.power_limit {
+            assert!(
+                state.thermal_limit_c().is_some(),
+                "level A without an effective thermal limit: {coverage:?}"
+            );
+        }
     }
 
     let stopping = Instant::now();

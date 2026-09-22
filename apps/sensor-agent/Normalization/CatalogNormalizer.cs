@@ -13,12 +13,14 @@ public sealed record SensorInfo(
     [property: JsonPropertyName("scope")] string Scope,
     [property: JsonPropertyName("scope_ref")] string? ScopeRef,
     [property: JsonPropertyName("unit")] string Unit,
-    [property: JsonPropertyName("quality")] string Quality);
+    [property: JsonPropertyName("quality")] string Quality,
+    [property: JsonPropertyName("metadata"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyDictionary<string, object?>? Metadata = null);
 
 public sealed record SampleValue(
     [property: JsonPropertyName("sensor_id")] string SensorId,
     [property: JsonPropertyName("number"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] double? Number,
-    [property: JsonPropertyName("status")] string Status);
+    [property: JsonPropertyName("status")] string Status,
+    [property: JsonPropertyName("boolean"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? Boolean = null);
 
 /// <summary>
 /// The catalog the sidecar publishes with detail "representative": one sensor per magnitude the
@@ -33,6 +35,7 @@ public sealed class NormalizedCatalog
     private readonly string? powerRawId;
     private readonly IReadOnlyList<string> clockRawIds;
     private readonly IReadOnlyList<CoreSource> cores;
+    private readonly IReadOnlyCollection<string> passthroughIds;
 
     internal NormalizedCatalog(
         IReadOnlyList<SensorInfo> sensors,
@@ -40,7 +43,8 @@ public sealed class NormalizedCatalog
         string? loadRawId,
         string? powerRawId,
         IReadOnlyList<string> clockRawIds,
-        IReadOnlyList<CoreSource> cores)
+        IReadOnlyList<CoreSource> cores,
+        IReadOnlyCollection<string>? passthroughIds = null)
     {
         Sensors = sensors;
         this.temperatures = temperatures;
@@ -48,6 +52,7 @@ public sealed class NormalizedCatalog
         this.powerRawId = powerRawId;
         this.clockRawIds = clockRawIds;
         this.cores = cores;
+        this.passthroughIds = passthroughIds ?? Array.Empty<string>();
     }
 
     public IReadOnlyList<SensorInfo> Sensors { get; }
@@ -66,6 +71,7 @@ public sealed class NormalizedCatalog
                 CatalogNormalizer.LoadId => MapSingle(sensor.Id, loadRawId, byId),
                 CatalogNormalizer.PowerId => MapSingle(sensor.Id, powerRawId, byId),
                 CatalogNormalizer.ClockId => MapClock(byId),
+                _ when passthroughIds.Contains(sensor.Id) => MapPassthrough(sensor.Id, byId),
                 _ => MapCore(sensor.Id, byId)
             });
         }
@@ -136,6 +142,29 @@ public sealed class NormalizedCatalog
         return new SampleValue(CatalogNormalizer.ClockId, null, readable.Length > 0 ? "invalid" : "missing");
     }
 
+    /// <summary>Fixed-id sensors that need no representative selection (MSR limit-reason flags, effective power limit): pass the reading through as-is.</summary>
+    private static SampleValue MapPassthrough(string id, Dictionary<string, SensorReading> byId)
+    {
+        if (!byId.TryGetValue(id, out var reading))
+        {
+            return new SampleValue(id, null, "missing");
+        }
+
+        if (reading.Status != "ok")
+        {
+            return new SampleValue(id, null, reading.Status);
+        }
+
+        if (reading.Boolean is { } flag)
+        {
+            return new SampleValue(id, null, "ok", flag);
+        }
+
+        return reading.Number is { } number && IsMeasurement(number)
+            ? new SampleValue(id, number, "ok")
+            : new SampleValue(id, null, "invalid");
+    }
+
     private SampleValue MapCore(string id, Dictionary<string, SensorReading> byId)
     {
         var core = cores.FirstOrDefault(candidate => candidate.Id == id);
@@ -168,6 +197,12 @@ public static class CatalogNormalizer
 
     public const string DetailRepresentative = "representative";
     public const string DetailPerCore = "per_core";
+
+    /// <summary>MSR limit-reason wire metrics (contracts/ipc-protocol.md § Muestreo): the raw descriptor's own <c>Metric</c> already carries the final name, unlike every other magnitude here.</summary>
+    private static readonly HashSet<string> LimitReasonMetrics = new(StringComparer.Ordinal)
+    {
+        "thermal_flag", "prochot_flag", "power_flag", "current_flag"
+    };
 
     private static readonly Regex CoreName = new(
         @"^(?:(?<kind>P|E|LPE|LP-E)-)?(?:CPU )?Core #(?<n>\d+)$",
@@ -223,7 +258,48 @@ public static class CatalogNormalizer
             AddPerCore(raw, sensors, cores);
         }
 
-        return new NormalizedCatalog(sensors, temperatures, load?.Id, power?.Id, clocks, cores);
+        var passthroughIds = AddLimitReasonSensors(raw, sensors);
+
+        return new NormalizedCatalog(sensors, temperatures, load?.Id, power?.Id, clocks, cores, passthroughIds);
+    }
+
+    /// <summary>
+    /// MSR-derived sensors (nivel A): fixed final ids, already normalized by the collector
+    /// (<c>IntelLimitCatalog</c>), so they pass straight through instead of going through
+    /// representative selection. The temperature-target metadata (TjMax, TCC offset, effective
+    /// limit) merges into the existing <see cref="TemperatureId"/> sensor rather than becoming
+    /// one of its own (contracts/ipc-protocol.md § Descubrimiento).
+    /// </summary>
+    private static List<string> AddLimitReasonSensors(IReadOnlyList<SensorDescriptor> raw, List<SensorInfo> sensors)
+    {
+        var passthroughIds = new List<string>();
+
+        var temperatureMetadata = raw.FirstOrDefault(descriptor => descriptor.Metric == "temperature_limit_metadata")?.Metadata;
+        if (temperatureMetadata is not null)
+        {
+            var temperatureIndex = sensors.FindIndex(sensor => sensor.Id == TemperatureId);
+            if (temperatureIndex >= 0)
+            {
+                sensors[temperatureIndex] = sensors[temperatureIndex] with { Metadata = temperatureMetadata };
+            }
+        }
+
+        foreach (var reason in raw.Where(descriptor => LimitReasonMetrics.Contains(descriptor.Metric)))
+        {
+            // The wire metric is the sensor's own name (thermal_flag, …), never a generic label:
+            // telemetry/catalog.rs::known_sensor and LiveState::flag look it up by (metric, scope).
+            sensors.Add(new SensorInfo(reason.Id, reason.Id, reason.SourceName, reason.Metric, "package", null, "boolean", "direct", reason.Metadata));
+            passthroughIds.Add(reason.Id);
+        }
+
+        var powerLimit = raw.FirstOrDefault(descriptor => descriptor.Metric == "power_limit_direct");
+        if (powerLimit is not null)
+        {
+            sensors.Add(new SensorInfo(powerLimit.Id, powerLimit.Id, powerLimit.SourceName, "power_limit", "package", null, "watt", "direct", powerLimit.Metadata));
+            passthroughIds.Add(powerLimit.Id);
+        }
+
+        return passthroughIds;
     }
 
     /// <summary>

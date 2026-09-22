@@ -42,7 +42,10 @@ public static class LimitReasonNormalizer
     public static IntelThermalLimits ReadIntelLimits(ulong temperatureTarget, ulong packagePowerLimit)
     {
         var tjMax = (temperatureTarget >> 16) & 0xFF;
-        var tccOffset = (temperatureTarget >> 24) & 0xFF;
+        // MSR_TEMPERATURE_TARGET bits 27:24 (Intel SDM): a 4-bit field, not the 8 bits this used
+        // to mask — a reserved bit 31:28 set would otherwise fabricate a wrong TCC offset (and so
+        // a wrong effective thermal limit) for a field never intended to reach that width.
+        var tccOffset = (temperatureTarget >> 24) & 0xF;
         var pl1 = DecodePowerLimit(packagePowerLimit & 0x7FFF);
         var pl2 = DecodePowerLimit((packagePowerLimit >> 32) & 0x7FFF);
         var tau = DecodeTau((packagePowerLimit >> 17) & 0x7F);

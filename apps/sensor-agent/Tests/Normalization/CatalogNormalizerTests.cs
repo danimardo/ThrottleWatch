@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Shouldly;
 using ThrottleWatch.SensorAgent.Collector;
@@ -150,4 +151,78 @@ public sealed class CatalogNormalizerTests
 
         catalog.Map([Ok("CPU Total", 5f), Ok("CPU Total", 9f)]).Single().Number.ShouldBe(5);
     }
+
+    [Fact]
+    [Trait("Category", "Unit")]
+    public void MsrLimitReasonFlagsAndPowerLimitPassThroughAsFixedIds()
+    {
+        var catalog = CatalogNormalizer.Build([
+            Raw("CPU Package", "temperature"),
+            LimitReason("msr/thermal_flag"),
+            LimitReason("msr/prochot_flag"),
+            PowerLimitDescriptor()
+        ]);
+
+        catalog.Sensors.Select(sensor => sensor.Id).ShouldBe(
+            [CatalogNormalizer.TemperatureId, "msr/thermal_flag", "msr/prochot_flag", "cpu.package.power_limit"]);
+
+        var values = catalog.Map([
+            Ok("CPU Package", 70f),
+            new SensorReading("msr/thermal_flag", null, "ok", true),
+            new SensorReading("msr/prochot_flag", null, "ok", false),
+            new SensorReading("cpu.package.power_limit", 28.0f, "ok")
+        ]).ToDictionary(value => value.SensorId);
+
+        values["msr/thermal_flag"].ShouldBe(new SampleValue("msr/thermal_flag", null, "ok", true));
+        values["msr/prochot_flag"].ShouldBe(new SampleValue("msr/prochot_flag", null, "ok", false));
+        values["cpu.package.power_limit"].ShouldBe(new SampleValue("cpu.package.power_limit", 28.0, "ok"));
+    }
+
+    [Fact]
+    [Trait("Category", "Unit")]
+    public void AnUndeclaredMsrReadingIsMissingNeverFabricated()
+    {
+        var catalog = CatalogNormalizer.Build([Raw("CPU Package", "temperature"), LimitReason("msr/thermal_flag")]);
+
+        // No low-level access this sample: the collector emits nothing for the flag, never a false value.
+        var values = catalog.Map([Ok("CPU Package", 70f)]).ToDictionary(value => value.SensorId);
+
+        values["msr/thermal_flag"].ShouldBe(new SampleValue("msr/thermal_flag", null, "missing"));
+    }
+
+    [Fact]
+    [Trait("Category", "Unit")]
+    public void TemperatureTargetMetadataMergesIntoThePackageTemperatureSensor()
+    {
+        var catalog = CatalogNormalizer.Build([
+            Raw("CPU Package", "temperature"),
+            new SensorDescriptor(
+                "msr/temperature_target", "msr/temperature_target", "MSR Temperature Target",
+                "temperature_limit_metadata", "celsius", "package", null, "direct",
+                new Dictionary<string, object?> { ["tjmax_c"] = 100.0, ["tcc_offset_c"] = 5.0, ["thermal_limit_c"] = 95.0 })
+        ]);
+
+        var temperature = catalog.Sensors.Single(sensor => sensor.Id == CatalogNormalizer.TemperatureId);
+        temperature.Metadata.ShouldNotBeNull();
+        temperature.Metadata!["tjmax_c"].ShouldBe(100.0);
+        temperature.Metadata!["thermal_limit_c"].ShouldBe(95.0);
+    }
+
+    [Fact]
+    [Trait("Category", "Unit")]
+    public void ZeroPowerLimitIsInvalidLikeEveryOtherPackageMagnitude()
+    {
+        var catalog = CatalogNormalizer.Build([PowerLimitDescriptor()]);
+
+        catalog.Map([new SensorReading("cpu.package.power_limit", 0f, "ok")]).Single()
+            .ShouldBe(new SampleValue("cpu.package.power_limit", null, "invalid"));
+    }
+
+    private static SensorDescriptor LimitReason(string id) =>
+        new(id, id, id, id["msr/".Length..], "boolean", "package", null, "direct",
+            new Dictionary<string, object?> { ["flag_semantics"] = "instantaneous" });
+
+    private static SensorDescriptor PowerLimitDescriptor() =>
+        new("cpu.package.power_limit", "cpu.package.power_limit", "MSR effective package power limit",
+            "power_limit_direct", "watt", "package", null, "direct", null);
 }

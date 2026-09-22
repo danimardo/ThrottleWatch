@@ -1,8 +1,8 @@
 # Spike T019c: coste del vidrio en WebView2
 
-**Estado:** medido en el Ryzen 5 2600X (cota inferior); **pendiente el equipo de referencia**
-(Intel híbrido 12.ª gen o posterior, `plan.md` § Matriz), que no está disponible.
-**Fecha:** 2026-09-19
+**Estado:** medido en el Ryzen 5 2600X (cota inferior) y en un Intel Core Ultra 7 155H
+(Meteor Lake, equipo de referencia híbrido; ver § «Equipo de referencia Intel» más abajo).
+**Fecha:** 2026-09-19 (AMD), 2026-09-22 (Intel)
 
 ## Banco de medida
 
@@ -106,17 +106,73 @@ tablas: el guion sobrescribió sus ficheros).
    cambio de nivel o de tamaño) o usar `PerformanceObserver`/eventos `long-animation-frame`,
    no un bucle permanente.
 
+## Equipo de referencia Intel (Core Ultra 7 155H) — 2026-09-22
+
+**Equipo:** Intel(R) Core(TM) Ultra 7 155H (Meteor Lake, 16 núcleos/22 hilos P+E+LP-E),
+gráfica integrada Intel Arc, Windows 11 Pro 26200, WebView2 Evergreen **153.0.4234.48**
+(muy próxima a la 153.0.4234.32 del equipo AMD), ventana 1100×760, batería al 76 %.
+Mismo banco de medida (`glass-bench/`), mismos parámetros; resultados en
+`results/intel-ultra-7-155h/`. `% máquina` = tiempo de CPU / (ventana × 22).
+
+### 1. Shell completo (fondo `.tw-ambient` animado, por defecto)
+
+| Vidrio | Actualización | fps mín/p10/mediana | CPU % máquina | CPU % núcleo |
+|---|---|---|---|---|
+| full | reposo | 60/60/60 | 7,93 | 174 |
+| full | 1 s | 60/60/60 | 8,72 | 192 |
+| full | 200 ms | 60/60/60 | 8,57 | 189 |
+| reduced | reposo | 60/60/60 | 23,29 | 512 |
+| reduced | 1 s | 60/60/60 | 14,64 | 322 |
+| off | reposo | 55/60/60 | 19,13 | 421 |
+| off | 1 s | 60/60/60 | 23,22 | 511 |
+| off | 200 ms | 60/60/60 | 17,46 | 384 |
+
+### 2. Aislamiento del fondo animado (reposo, `measure=0`, 15 s)
+
+| Configuración | CPU % máquina | CPU % núcleo |
+|---|---|---|
+| full, `.tw-ambient` animado | 13,85 | 304,6 |
+| full, fondo estático | 0,35 | 7,6 |
+| off, `.tw-ambient` animado | 16,35 | 359,7 |
+| off, fondo estático | 0,87 | 19,2 |
+
+### Conclusiones (Intel híbrido)
+
+1. **Confirma la conclusión 1 del equipo AMD**: con fondo estático el coste es marginal
+   (0,35–0,87 % máquina) independientemente del nivel de vidrio; degradar `full` → `off` no
+   ahorra nada por sí solo. La gráfica integrada no cambia esta conclusión.
+2. **El coste absoluto de `tw-ambient-drift` es 3–5× mayor que en el equipo AMD** con GPU
+   discreta (13,85–23,29 % máquina aquí frente a 2,76–8,47 % en el 2600X con RTX 4060 Ti para
+   configuraciones equivalentes). La gráfica integrada compone la animación con más coste de
+   CPU/proceso GPU de WebView2 que una discreta. Esto **refuerza**, no contradice, la
+   recomendación de pausar `tw-ambient-drift` por defecto: en el peor caso observado hasta
+   ahora (iGPU) el coste ronda una cuarta parte de la máquina solo por el fondo, muy por
+   encima de cualquier lectura razonable de `glass.degrade_idle_cpu_pct`.
+3. **fps se mantiene en 60 en casi todos los casos** (un único mínimo de 55 en `off`/reposo,
+   sin patrón claro de degradación sostenida); el umbral `glass.degrade_fps = 50` sigue sin
+   poder ejercitarse con hardware real — esta iGPU tampoco lo satura con la carga del banco.
+4. Con `webview2_version` casi idéntica entre equipos (153.0.4234.32 vs .48), la diferencia de
+   coste se atribuye al hardware gráfico (discreta vs integrada), no a la versión del runtime.
+
 ## Umbrales `glass.*` de `spec.md`
 
 - `glass.degrade_idle_cpu_pct = 1`: **se mantiene** como valor, pero la especificación debe
-  fijar la unidad: con estos datos, «1 % de la máquina» (12 núcleos) equivale a 12 % de un
-  núcleo y se excede solo con el fondo animado; «1 % de un núcleo» quedaría al borde incluso
-  sin vidrio (0,6 % en reposo con y sin desenfoque) y saltaría con cualquier ruido. Propuesta:
-  % de la máquina, medido sobre los procesos de WebView2, con el fondo ambiental pausado.
-- `glass.degrade_fps = 50` / `restore_fps = 55` y sus ventanas: **sin cambios**; no hay datos
-  que los contradigan ni los confirmen en el equipo de referencia.
+  fijar la unidad: con estos datos, «1 % de la máquina» equivale a 12 % de un núcleo en el
+  equipo AMD (12 hilos) o 22 % en el equipo Intel (22 hilos) y se excede solo con el fondo
+  animado en ambos equipos (0,35–0,87 % en Intel y 0,05–0,08 % en AMD con fondo estático,
+  frente a 7,9–23,3 % en Intel y 2,5–8,5 % en AMD con el fondo animado); «1 % de un núcleo»
+  quedaría al borde incluso sin vidrio y saltaría con cualquier ruido. Propuesta confirmada
+  con dos equipos: % de la máquina, medido sobre los procesos de WebView2, **con el fondo
+  ambiental pausado** (T131 no puede medir este umbral con `tw-ambient-drift` activo tal
+  como está hoy, en ningún equipo; corregirlo en `design/` es requisito previo a T131).
+- `glass.degrade_fps = 50` / `restore_fps = 55` y sus ventanas: **sin cambios**; los dos
+  equipos de referencia (discreta y ahora integrada) se mantienen a 60 fps bajo la carga de
+  este banco, así que ninguno permite ejercitar el umbral de degradación por fps.
 - Los valores siguen siendo provisionales (`spec.md` los marca así hasta este spike); el
-  cambio de unidad exige nueva versión de reglas cuando se decida.
+  cambio de unidad exige nueva versión de reglas cuando se decida. Con el equipo Intel medido,
+  la excepción E2 de `plan.md`/CHK-L03 puede darse por resuelta en su mitad Intel para T019c;
+  sigue pendiente un portátil con gráfica integrada de generación anterior si se quiere acotar
+  el peor caso con más precisión.
 
 ## Pendiente
 
