@@ -4,8 +4,12 @@ name: Release
 # published from a push. The private signing key exists only as the repository secret
 # UPDATER_SIGNING_KEY; it is written to a temporary file inside the signing step, never printed
 # and never uploaded, and no step after it can read the workspace copy (it is deleted).
-# NOT YET RUN: it needs the production key pair (owner action) and the public key committed as
-# apps/desktop/src-tauri/keys/updater-release.pub, which release builds do not trust today.
+# The production key pair exists (2026-09-22, owner action) and its public half is committed at
+# apps/desktop/src-tauri/keys/updater-release.pub, trusted by release builds since T102. The key
+# is unencrypted (same choice as the development key, docs/dev/release-signing.md) — rsign's
+# password prompt cannot be scripted, so confidentiality rests entirely on the GitHub secret
+# store; UPDATER_SIGNING_KEY_PASSWORD stays unset (an empty RSIGN_PASSWORD is a no-op against an
+# unencrypted key). STILL NOT RUN as an actual workflow: nobody has published a release yet.
 
 on:
   workflow_dispatch:

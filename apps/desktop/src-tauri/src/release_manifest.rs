@@ -22,12 +22,25 @@ use std::path::{Component, Path, PathBuf};
 /// [`trusted_public_key`].
 pub const DEV_PUBLIC_KEY: &str = include_str!("../keys/dev-release.pub");
 
+/// Public half of the PRODUCTION signing key (T102): trusted only in release builds, never in
+/// debug or `e2e` — those always trust [`DEV_PUBLIC_KEY`] instead, so a developer's machine can
+/// never accidentally verify something signed with the production secret half, and a release
+/// build can never be fooled by the development key. The secret half lives only as the
+/// `UPDATER_SIGNING_KEY` GitHub Actions secret (`.github/workflows/release.yml`) — nowhere in
+/// this repository, nowhere on a developer's machine.
+pub const PRODUCTION_PUBLIC_KEY: &str = include_str!("../keys/updater-release.pub");
+
 const MAX_MANIFEST_BYTES: usize = 64 * 1024;
 const SUPPORTED_MANIFEST_VERSION: u32 = 1;
 
-/// Public key the launcher trusts in this build, or `None` when no key may be trusted yet.
+/// Public key this build trusts: the development key in debug and `e2e` builds, the production
+/// key otherwise. Never `None` since T102 — before it, a release build trusted nothing at all.
 pub fn trusted_public_key() -> Option<&'static str> {
-    if cfg!(any(debug_assertions, feature = "e2e")) { Some(DEV_PUBLIC_KEY) } else { None }
+    if cfg!(any(debug_assertions, feature = "e2e")) {
+        Some(DEV_PUBLIC_KEY)
+    } else {
+        Some(PRODUCTION_PUBLIC_KEY)
+    }
 }
 
 #[derive(Debug)]
@@ -294,8 +307,23 @@ mod tests {
     }
 
     #[test]
-    fn a_release_build_trusts_no_key_and_test_builds_trust_the_development_key() {
+    fn test_builds_trust_the_development_key_not_the_production_one() {
+        // `cargo test` always compiles with `debug_assertions` on, so this can only exercise the
+        // development branch — the production branch needs an actual release compile to flip
+        // `cfg!(debug_assertions)`, which `production_and_development_keys_are_not_the_same_key`
+        // below at least keeps honest without one.
         assert_eq!(trusted_public_key(), Some(DEV_PUBLIC_KEY));
+    }
+
+    #[test]
+    fn production_and_development_keys_are_not_the_same_key() {
+        // T102: if these ever matched, a debug build's manifest would also verify against the
+        // production key, and vice versa — the whole point of having two.
+        assert_ne!(DEV_PUBLIC_KEY, PRODUCTION_PUBLIC_KEY);
+        assert!(
+            PublicKey::decode(PRODUCTION_PUBLIC_KEY).is_ok(),
+            "keys/updater-release.pub must be a real minisign public key, not a placeholder"
+        );
     }
 
     #[test]

@@ -1,4 +1,4 @@
-# Firma del manifiesto de release (desarrollo)
+# Firma del manifiesto de release (desarrollo y producción)
 
 Cubre la condición R2/C3 de ADR-0004: el lanzador elevado solo arranca un sidecar cuya ruta y SHA-256
 figuren en un **manifiesto firmado con minisign**. Un proceso del mismo usuario puede reescribir el
@@ -11,7 +11,9 @@ binario y un manifiesto sin firma; no puede falsificar la firma.
 | Módulo de verificación | `apps/desktop/src-tauri/src/release_manifest.rs` (crate `minisign-verify` 0.2.5, constitución 1.5.3) |
 | Clave pública de **desarrollo** | `apps/desktop/src-tauri/keys/dev-release.pub` (ID `B88B5B4C27FA8BBF`) |
 | Clave secreta de desarrollo | `%LOCALAPPDATA%\ThrottleWatch\dev-signing\dev-release.key` — fuera del repositorio, sin contraseña, solo para esta máquina de desarrollo |
-| Firmante | `node scripts/sign-release-manifest.mjs --dev …` (necesita `cargo install rsign2 --locked`, probado con 0.6.6) |
+| Clave pública de **producción** (T102) | `apps/desktop/src-tauri/keys/updater-release.pub` (ID `B14ADB960F8C52B4`) — la confía `trusted_public_key()` en toda compilación que no sea `debug`/`e2e`; también verifica el instalador firmado que publica `.github/workflows/release.yml` |
+| Clave secreta de producción | Solo existe como el secreto de GitHub `UPDATER_SIGNING_KEY` (`.github/workflows/release.yml`); no vive en ningún repositorio ni en ninguna máquina de desarrollo. Sin contraseña (`rsign generate` pide la contraseña por consola, no admite automatización — no se ha podido cifrar desde una sesión de agente; ver «Generarla de nuevo» más abajo si hace falta rotarla con contraseña) |
+| Firmante | `node scripts/sign-release-manifest.mjs --dev …` para el manifiesto del sidecar (necesita `cargo install rsign2 --locked`, probado con 0.6.6); `rsign sign` directo sobre el instalador para el release (paso «Sign the installer» de `release.yml`) |
 | Vectores de prueba | `apps/desktop/src-tauri/tests/fixtures/release-manifest/` (manifiesto, firma válida, firma de otra clave y la clave ajena) |
 
 ## Formato del manifiesto (versión 1)
@@ -36,6 +38,31 @@ node scripts/sign-release-manifest.mjs --dev --dir apps\sensor-agent\bin\Debug\n
 
 Produce `release-manifest.json` y `release-manifest.json.minisig`. Comprobación cruzada con la
 herramienta de referencia: `rsign verify -p apps\desktop\src-tauri\keys\dev-release.pub -x release-manifest.json.minisig release-manifest.json`.
+
+## Clave de producción: cómo se generó y cómo rotarla (T102)
+
+Generada el 2026-09-22 con `rsign generate --unencrypted -c "ThrottleWatch updater/release signing
+key (production)" -p keys\updater-release.pub -s <fuera del repositorio>`. Sin contraseña porque
+`rsign generate` la pide por consola (`ReadConsole`, no por `stdin` ni por la variable
+`RSIGN_PASSWORD` — esa variable solo la respeta `rsign sign`/`verify`) y no hay forma de
+automatizarlo desde una sesión sin terminal interactiva; es la misma limitación, y la misma
+decisión, que ya existía para la clave de desarrollo.
+
+Para **rotarla** (clave comprometida, o para añadirle contraseña ejecutándolo tú mismo en una
+terminal interactiva en vez de sin contraseña):
+
+```powershell
+rsign generate -f -c "ThrottleWatch updater/release signing key (production)" `
+  -p apps\desktop\src-tauri\keys\updater-release.pub -s <ruta fuera del repositorio>\updater-release.key
+```
+
+1. Sustituir `apps/desktop/src-tauri/keys/updater-release.pub` por el nuevo fichero público (sí se
+   commitea).
+2. Subir el contenido íntegro del nuevo `.key` como el secreto de GitHub `UPDATER_SIGNING_KEY`
+   (Settings → Secrets and variables → Actions), y su contraseña, si la tiene, como
+   `UPDATER_SIGNING_KEY_PASSWORD`.
+3. Borrar el `.key` antiguo de donde estuviera guardado localmente; con la clave pública ya
+   sustituida en el repositorio, nada firmado con la clave vieja vuelve a verificar.
 
 ## Cómo conectarlo en el lanzador
 
