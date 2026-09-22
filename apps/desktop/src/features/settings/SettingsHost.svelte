@@ -82,6 +82,13 @@
           isDetailedLoggingActive(result.value.values['logging.detailed_until'])
         );
       }
+      if (key.startsWith('appearance.')) {
+        window.dispatchEvent(
+          new CustomEvent('throttlewatch:appearance-changed', {
+            detail: { key, value }
+          })
+        );
+      }
     }
   }
 

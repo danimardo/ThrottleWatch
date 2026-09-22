@@ -52,8 +52,14 @@
   } from '../features/onboarding/repository';
   import {
     applyAppearance,
-    listenToSystemAppearance
+    listenToSystemAppearance,
+    type ThemePreference
   } from '../features/appearance/appearance';
+  import {
+    applyGlassLevel,
+    type GlassLevel,
+    type MotionLevel
+  } from '../design-system/tokens/tokens';
   import {
     stopGuidedSession,
     subscribeGuidedSession
@@ -79,6 +85,11 @@
     { id: 'settings', icon: 'settings', label: t('nav.settings') }
   ];
 
+  let appearance = $state<{
+    theme: ThemePreference;
+    motion: MotionLevel;
+    glass: GlassLevel | 'system';
+  }>({ theme: 'system', motion: 'system', glass: 'system' });
   let active = $state<Destination['id']>('now');
   let maximized = $state(false);
   let windowAdapter: WindowAdapter = createWindowAdapter();
@@ -107,6 +118,18 @@
   );
 
   onMount(() => {
+    const onAppearanceChanged = (event: Event): void => {
+      const detail = (event as CustomEvent<{ key: string; value: unknown }>)
+        .detail;
+      if (detail.key === 'appearance.theme') {
+        appearance.theme = detail.value as ThemePreference;
+      } else if (detail.key === 'appearance.motion') {
+        appearance.motion = detail.value as MotionLevel;
+      } else if (detail.key === 'appearance.glass') {
+        appearance.glass = detail.value as GlassLevel | 'system';
+      }
+      applyStoredAppearance();
+    };
     const onExportRequest = (): void => {
       active = 'sessions';
       window.setTimeout(() => {
@@ -157,7 +180,7 @@
     void windowAdapter
       .watchGeometryChanges(() => void windowAdapter.persistGeometry())
       .then((stop) => (stopGeometryListener = stop));
-    applyAppearance('system', 'system', locale);
+    applyStoredAppearance();
     const stopGuidedSessionListener = subscribeGuidedSession((phase) => {
       guidedRunning =
         phase !== null &&
@@ -171,8 +194,12 @@
         ].includes(phase.phase);
     });
     const stopAppearanceListener = listenToSystemAppearance('system', () => {
-      applyAppearance('system', 'system', locale);
+      if (appearance.theme === 'system') applyStoredAppearance();
     });
+    window.addEventListener(
+      'throttlewatch:appearance-changed',
+      onAppearanceChanged
+    );
     void loadOnboardingState().then((state) => {
       onboardingState = state;
       if (state.status === 'pending' && initialStepFor(state) === 4) {
@@ -180,6 +207,7 @@
       }
     });
     void loadDetailedLoggingState();
+    void loadAppearanceState();
     let stopCloseBlockedListener: () => void = () => undefined;
     void listenValidated('lifecycle:close-blocked', (value) => {
       const reason = (value as { reason?: string }).reason;
@@ -208,6 +236,10 @@
         'throttlewatch:request-export',
         onExportRequest
       );
+      window.removeEventListener(
+        'throttlewatch:appearance-changed',
+        onAppearanceChanged
+      );
     };
   });
 
@@ -217,6 +249,29 @@
 
   function closeWindow(): void {
     void windowAdapter.persistGeometry().then(() => windowAdapter.close());
+  }
+
+  function applyStoredAppearance(): void {
+    applyAppearance(appearance.theme, appearance.motion, locale);
+    applyGlassLevel(appearance.glass === 'system' ? 'full' : appearance.glass);
+  }
+
+  async function loadAppearanceState(): Promise<void> {
+    const result = await invokeValidated(
+      'get_preferences',
+      undefined,
+      commandResponseSchemas.get_preferences
+    );
+    if (!result.ok) return;
+    const values = result.value.values;
+    appearance = {
+      theme: (values['appearance.theme'] as ThemePreference | undefined) ?? 'system',
+      motion: (values['appearance.motion'] as MotionLevel | undefined) ?? 'system',
+      glass:
+        (values['appearance.glass'] as GlassLevel | 'system' | undefined) ??
+        'system'
+    };
+    applyStoredAppearance();
   }
 
   async function loadDetailedLoggingState(): Promise<void> {
@@ -604,7 +659,12 @@
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    background: var(--bg);
+    /* `background-color`, not the `background` shorthand: the shorthand resets
+       `background-image` (and `-attachment`/`-size`) to their initial values,
+       which silently erased the `.tw-ambient` gradient this element also
+       carries — same specificity fight `design/mockup/src/App.svelte` avoids
+       by never re-declaring `background` on its own shell root. */
+    background-color: var(--bg);
   }
   .visually-hidden {
     position: absolute;
@@ -646,8 +706,11 @@
     flex-direction: column;
     gap: var(--space-1);
     padding: var(--space-4) var(--space-3);
-    border-right: 1px solid var(--hairline);
-    background: var(--glass-bg-subtle);
+    border-right: 1px solid var(--glass-border);
+    background-color: var(--glass-bg);
+    background-image: var(--glass-sheen);
+    -webkit-backdrop-filter: var(--glass-filter);
+    backdrop-filter: var(--glass-filter);
   }
   .content {
     min-width: 0;

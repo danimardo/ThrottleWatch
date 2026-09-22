@@ -305,7 +305,6 @@ Versiones de partida verificadas el 2026-09-18. Los archivos de bloqueo son la f
 | `@tauri-apps/plugin-updater` | 2.11.0 |
 | `@tauri-apps/plugin-dialog` | 2.7.3 |
 | `@tauri-apps/plugin-opener` | 2.5.5 |
-| `@tauri-apps/plugin-process` | 2.3.1 |
 
 TypeScript 7 no se adopta hasta que `svelte-check` y `typescript-eslint` lo admitan (hoy aceptan como máximo la 6.0).
 
@@ -320,7 +319,6 @@ TypeScript 7 no se adopta hasta que `svelte-check` y `typescript-eslint` lo admi
 | `tauri-plugin-single-instance` | 2.4.4 | instancia única |
 | `tauri-plugin-dialog` | 2.7.3 | diálogos de archivo nativos |
 | `tauri-plugin-opener` | 2.5.5 | abrir la documentación en el navegador |
-| `tauri-plugin-process` | 2.3.1 | reinicio tras instalar |
 | `rusqlite` (`bundled`) | 0.40.2 | acceso a SQLite |
 | `rusqlite_migration` | 2.6.0 | migraciones versionadas |
 | `serde` / `serde_json` | 1.0.229 / 1.0.151 | serialización |
@@ -468,5 +466,6 @@ Esta constitución prevalece sobre decisiones locales de implementación. Toda e
 - **1.5.1 (2026-09-18):** aclaración del principio XII: con escala 200 % en monitores cuya altura útil no alcanza 600 px lógicos, la ventana mínima pasa a 480×500. Documentos afectados: `spec.md` (escenario 8 de la historia 9, NFR-011, parámetro «Ventana»), `plan.md`, `research.md`, `data-model.md`, `ux-visual-spec.md`, `tasks.md`.
 - **1.5.2 (2026-09-18):** aclaraciones derivadas de `/speckit-analyze`: el principio XV admite `TW_DEV_*` en la compilación de pruebas `e2e` de CI (nunca distribuida), en coherencia con el principio XVII; el principio XII fija el comportamiento con altura útil inferior a 500 px lógicos (ventana maximizada con desplazamiento). Documentos afectados: `spec.md`, `plan.md`, `tasks.md`, `ux-visual-spec.md`, `historias.md`.
 - **1.5.3 (2026-09-19):** enmienda PARCHE autorizada por la persona propietaria: entra en la tabla de crates `minisign-verify` 0.2.5 (MIT, sin dependencias) para verificar la firma minisign del manifiesto de release en el lanzador elevado exigida por ADR-0004 (R2, C3); no cambia ningún principio ni puerta de calidad. Documentos afectados: `AGENTS.md`, `.agents/meta/detected-stack.yaml`, `apps/desktop/src-tauri/Cargo.toml`.
+- **1.5.4 (2026-09-22):** enmienda PARCHE autorizada por la persona propietaria (T175): se retiran de la tabla de pila fijada `@tauri-apps/plugin-process` y `tauri-plugin-process` 2.3.1 («reinicio tras instalar»). El motivo original —que el backend pidiera un reinicio tras instalar una actualización— no aplica a la implementación real: el instalador NSIS relanza la aplicación él mismo (`docs/adr/0005-actualizador-firmado.md`), así que Rust nunca necesita ese plugin; mantenerlo habría documentado una dependencia que no se iba a añadir nunca. No cambia ningún principio ni puerta de calidad. Documentos afectados: `specs/001-cpu-thermal-diagnostics/tasks.md` (T175).
 
-**Versión**: 1.5.3 | **Ratificada**: 2026-09-17 | **Última modificación**: 2026-09-19
+**Versión**: 1.5.4 | **Ratificada**: 2026-09-17 | **Última modificación**: 2026-09-22
