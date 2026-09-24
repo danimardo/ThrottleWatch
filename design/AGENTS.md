@@ -14,7 +14,8 @@ approximating it with an unrelated component.
 Eleven batches, covering every screen in the spec. Batch 1 (8 components) is the "Ahora" screen and
 its navigation chrome. Batch 2 (5 components) is the generic
 primitives: `Button`, `Switch`, `SegmentedControl`, `Dialog`,
-`OptionRow`. Batch 3 is brand assets: the app icon (`brand/app-icon/`),
+`OptionRow`. Batch 3 is brand assets: the app icon (`brand/app-icon/`), the five
+system-tray state icons in dark/light variants (`brand/tray/`, T068/FR-059),
 6 custom nav glyphs (`icons/NavIcon.svelte`), and 5 onboarding
 illustrations (`illustrations/Onboarding*.svelte`). Batch 4 is more
 generic primitives, added specifically to avoid raw HTML elements

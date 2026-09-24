@@ -18,8 +18,9 @@ everything below.
 
 ```
 brand/
-  README.md         Tauri wiring instructions for the app icon
+  README.md         Tauri wiring instructions for the app icon and the tray icons
   app-icon/          icon.png (1024 master), icon.ico, 32/128/256 PNGs, source.html
+  tray/              five system-tray states (T068, FR-059), dark/light variants, generate.mjs
 tokens/
   tokens.css        CSS custom properties, both themes + type styles
   tokens.ts         the same values as typed data, for non-CSS contexts

@@ -41,6 +41,7 @@
     ],
     "batch3_brandAssets": [
       "brand/app-icon (Windows .ico + PNGs)",
+      "brand/tray (5 tray states x dark/light PNGs, T068/FR-059)",
       "icons/NavIcon.svelte (6 destination glyphs)",
       "illustrations/Onboarding*.svelte (5 illustrations)"
     ],
@@ -2765,6 +2766,15 @@
         "source.html (editable)"
       ],
       "concept": "partial ring gauge on a rounded-square dark backdrop, same motif as StatusHero and the Cover component in the separate visual Design System artifact"
+    },
+    "trayIcons": {
+      "path": "brand/tray/",
+      "files": [
+        "generate.mjs (source of truth — regenerates every .svg/.png)",
+        "<state>-<variant>.svg (normal|warning|critical|unknown|disconnected x dark|light)",
+        "<state>-<variant>-<size>.png (16/20/24/32/48px)"
+      ],
+      "concept": "full ring (not a partial arc — a tray state is not a live percentage) with a state-specific shape mark so no state depends on colour alone (T068, FR-059); wired into apps/desktop/src-tauri/src/tray.rs via include_bytes! of the 32px PNGs"
     },
     "navIcons": "icons/NavIcon.svelte (see components.NavIcon)",
     "onboardingIllustrations": "illustrations/Onboarding*.svelte (see components.Onboarding*)"

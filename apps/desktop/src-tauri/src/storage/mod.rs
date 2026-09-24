@@ -283,6 +283,14 @@ static MIGRATION_LIST: &[M<'static>] = &[
                     payload_json TEXT NOT NULL
                  );",
     ),
+    // T107: `sample_value` had no index at all — every query that reads a session's values
+    // (`frames_with_values`, `export_snapshot`, `analysis_points`, all filtered by `session_id`
+    // and joined to `sample_frame` on `(session_id, sequence)`) was a full table scan. With
+    // continuous passive monitoring this table is the single biggest one in the database (NFR-016).
+    M::up(
+        "CREATE INDEX IF NOT EXISTS idx_sample_value_session_sequence
+             ON sample_value (session_id, sequence);",
+    ),
 ];
 static MIGRATIONS: Migrations<'static> = Migrations::from_slice(MIGRATION_LIST);
 
@@ -1943,8 +1951,8 @@ mod tests {
     fn the_migration_list_is_valid_and_a_new_database_reaches_the_latest_version()
     -> rusqlite::Result<()> {
         MIGRATIONS.validate().map_err(|_| rusqlite::Error::InvalidQuery)?;
-        assert_eq!(MIGRATION_LIST.len(), 9);
-        assert_eq!(Storage::in_memory()?.schema_version()?, 9);
+        assert_eq!(MIGRATION_LIST.len(), 10);
+        assert_eq!(Storage::in_memory()?.schema_version()?, 10);
         Ok(())
     }
 
@@ -1967,7 +1975,7 @@ mod tests {
 
         let upgraded = Storage::from_connection(connection)?;
 
-        assert_eq!(upgraded.schema_version()?, 9);
+        assert_eq!(upgraded.schema_version()?, 10);
         assert_eq!(
             upgraded.user_preferences()?.get("appearance.theme"),
             Some(&serde_json::json!("dark"))
