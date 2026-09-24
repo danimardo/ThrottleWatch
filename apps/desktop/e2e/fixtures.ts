@@ -28,6 +28,9 @@ export const test = base.extend({
       const updatesProfile = new URLSearchParams(window.location.search).get(
         'updates'
       );
+      const glassFixture = new URLSearchParams(window.location.search).get(
+        'glass'
+      );
       let imported = false;
       const updateState = {
         state: 'idle',
@@ -63,7 +66,8 @@ export const test = base.extend({
         'get_cpu_topology',
         'get_update_state',
         'download_update',
-        'install_update'
+        'install_update',
+        'get_effective_glass_level'
       ]);
       const requestCommands = new Set([
         'set_onboarding_state',
@@ -86,7 +90,8 @@ export const test = base.extend({
         'reevaluate_report',
         'check_for_update',
         'confirm_close',
-        'resolve_first_close'
+        'resolve_first_close',
+        'report_glass_fps'
       ]);
       const validateCommandArguments = (
         command: string,
@@ -357,7 +362,7 @@ export const test = base.extend({
               'locale.mode': 'system',
               'appearance.theme': 'system',
               'appearance.motion': 'system',
-              'appearance.glass': 'system',
+              'appearance.glass': glassFixture ?? 'system',
               'sampling.profile': 'normal',
               'sampling.on_battery': 'keep',
               'sampling.per_core_history': false,
@@ -377,6 +382,18 @@ export const test = base.extend({
             };
             if (request?.key) values[request.key] = request.value;
             return { schema_version: 1, values, adjusted: [] };
+          }
+          if (command === 'get_effective_glass_level') {
+            const level = glassFixture ?? 'full';
+            return {
+              level:
+                level === 'full' || level === 'reduced' || level === 'off'
+                  ? level
+                  : 'full'
+            };
+          }
+          if (command === 'report_glass_fps') {
+            return null;
           }
           if (command === 'get_storage_usage') {
             return {

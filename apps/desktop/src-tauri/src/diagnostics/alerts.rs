@@ -2,8 +2,10 @@
 //!
 //! This module has no Windows or Tauri dependency. It turns a stream of already classified
 //! observations into at most one notification per episode, applying the persistence and cooldown
-//! parameters from `ruleset-v1`. The platform adapter is responsible for rendering the returned
-//! event and for handling a later `notification:opened` action.
+//! parameters from `ruleset-v1`. The platform adapter renders the returned event; there is no
+//! `notification:opened` action to handle (accepted limitation, 2026-09-22, T069/T070:
+//! `tauri-plugin-notification` never exposes the click on Windows — see
+//! `contracts/application-commands.md` § Bandeja y notificaciones).
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
 use super::Ruleset;

@@ -129,7 +129,7 @@ Ocultar la ventana o una suspensión del sistema provocan `stop_guided` implíci
 Eventos:
 
 - `tray:state { icon: "normal" | "warning" | "critical" | "unknown" | "disconnected", paused }`.
-- `notification:opened { kind, session_id?, event_id? }` cuando el usuario pulsa una notificación; la UI navega a `Análisis` (térmica), `Sesiones` (prueba terminada) o `Ajustes` (actualización).
+- `notification:opened { kind, session_id?, event_id? }`: **no se emite en esta versión** (decisión 2026-09-22, T069/T070). `tauri-plugin-notification` 2.4.0 usa `notify-rust` 4.18.0 internamente, cuya implementación en Windows sí captura el clic (`NotificationHandle::wait_for_action()`), pero el propio plugin descarta ese resultado (`desktop.rs::imp::Notification::show`, `let _ = notification.show();`, sin exponer el handle) — no hay forma de recibir el clic sin abandonar el plugin fijado por la constitución. Pulsar una notificación de ThrottleWatch abre la ventana (comportamiento nativo de Windows) pero no navega a una pantalla concreta. Aceptado como límite conocido en vez de registrar una excepción de constitución para sustituir el plugin.
 
 ## Diagnóstico técnico y ayuda
 

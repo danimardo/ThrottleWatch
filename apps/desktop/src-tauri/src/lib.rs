@@ -1,5 +1,6 @@
 pub mod access;
 pub mod alerting;
+pub mod appearance;
 mod commands;
 mod config;
 pub mod diagnostics;
@@ -246,6 +247,12 @@ pub fn run() {
             }
             app.manage(CollectorHandle(Mutex::new(runtime)));
             sampling_control::spawn_power_watch(app.handle().clone());
+            let glass_thresholds = appearance::GlassThresholds::from_ruleset(&rules)
+                .ok_or_else(|| std::io::Error::other("ruleset lacks the glass parameters"))?;
+            let glass_monitor =
+                std::sync::Arc::new(appearance::GlassMonitorState::new(glass_thresholds));
+            app.manage(glass_monitor.clone());
+            appearance::spawn_glass_monitor(app.handle().clone(), glass_monitor);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -290,7 +297,9 @@ pub fn run() {
             updates_app::get_update_state,
             updates_app::check_for_update,
             updates_app::download_update,
-            updates_app::install_update
+            updates_app::install_update,
+            appearance::report_glass_fps,
+            appearance::get_effective_glass_level
         ])
         .build(tauri::generate_context!())
         .expect("error while building ThrottleWatch")

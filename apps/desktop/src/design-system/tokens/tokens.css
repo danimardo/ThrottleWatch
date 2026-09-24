@@ -197,6 +197,11 @@
   --ambient-2: transparent;
   --ambient-3: transparent;
 }
+/* `off` also stops animating the now-invisible ambient layer: no reason to
+   keep a compositor layer live for three transparent gradients (T131). */
+[data-glass='off'] .tw-ambient::before {
+  animation: none;
+}
 /* No backdrop-filter support (old WebView2): fall back to near-solid
    surfaces so text never sits on unblurred content. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -335,15 +340,34 @@
 
 /* Ambient background the glass refracts: three soft tinted blobs
    drifting very slowly. Apply to the app shell (the element behind
-   every glass surface). Drift is disabled under reduced motion. */
+   every glass surface). Drift is disabled under reduced motion.
+   The gradients live on ::before, animated with `transform` (compositor-only,
+   no repaint) instead of animating `background-position` on this element
+   directly: T019c (docs/spikes/glass-cost.md) measured the previous
+   background-position version costing 2.5–23 % of the whole machine at
+   idle on two different GPUs — by far the dominant cost of any glass
+   level, `off` included, and enough to make T131's idle-CPU degradation
+   threshold unmeasurable while it ran. `isolation: isolate` keeps the
+   pseudo-element's z-index scoped to this element, never affecting
+   stacking elsewhere; `inset: -15%` gives the drift room without ever
+   revealing an edge. */
 .tw-ambient {
+  position: relative;
+  isolation: isolate;
   background-color: var(--bg);
+}
+.tw-ambient::before {
+  content: '';
+  position: absolute;
+  inset: -15%;
+  z-index: -1;
+  pointer-events: none;
   background-image:
     radial-gradient(70% 60% at 10% 5%, var(--ambient-1), transparent 68%),
     radial-gradient(65% 55% at 92% 95%, var(--ambient-2), transparent 68%),
     radial-gradient(45% 40% at 70% 25%, var(--ambient-3), transparent 68%);
-  background-attachment: fixed;
-  background-size: 140% 140%;
+  background-repeat: no-repeat;
+  will-change: transform;
   animation: tw-ambient-drift var(--motion-ambient) var(--motion-ease-in-out) infinite alternate;
 }
 
@@ -434,16 +458,10 @@
 }
 @keyframes tw-ambient-drift {
   from {
-    background-position:
-      0% 0%,
-      100% 100%,
-      50% 50%;
+    transform: translate3d(0, 0, 0);
   }
   to {
-    background-position:
-      30% 20%,
-      70% 80%,
-      40% 70%;
+    transform: translate3d(4%, 3%, 0);
   }
 }
 @keyframes tw-ripple {
@@ -466,6 +484,7 @@
   .tw-ds,
   .tw-ds *,
   .tw-ambient,
+  .tw-ambient::before,
   .tw-enter,
   .tw-pop {
     animation-duration: 0.001ms !important;
@@ -476,6 +495,7 @@
 [data-motion='reduced'] .tw-ds,
 [data-motion='reduced'] .tw-ds *,
 [data-motion='reduced'] .tw-ambient,
+[data-motion='reduced'] .tw-ambient::before,
 [data-motion='reduced'] .tw-enter,
 [data-motion='reduced'] .tw-pop {
   animation-duration: 0.001ms !important;
@@ -488,6 +508,7 @@
   [data-motion='full'] .tw-ds,
   [data-motion='full'] .tw-ds *,
   [data-motion='full'] .tw-ambient,
+  [data-motion='full'] .tw-ambient::before,
   [data-motion='full'] .tw-enter,
   [data-motion='full'] .tw-pop {
     animation-duration: revert !important;

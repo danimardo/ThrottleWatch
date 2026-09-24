@@ -622,7 +622,11 @@ export const commandResponseSchemas = {
   get_update_state: updateStateSchema,
   check_for_update: updateStateSchema,
   download_update: updateStateSchema,
-  install_update: updateStateSchema
+  install_update: updateStateSchema,
+  report_glass_fps: z.null(),
+  get_effective_glass_level: z
+    .object({ level: z.enum(['full', 'reduced', 'off']) })
+    .strict()
 } as const;
 
 const noCommandArgs = z.undefined();
@@ -754,7 +758,11 @@ export const commandArgsSchemas = {
     .object({ request: z.object({ manual: z.boolean() }).strict() })
     .strict(),
   download_update: noCommandArgs,
-  install_update: noCommandArgs
+  install_update: noCommandArgs,
+  report_glass_fps: z
+    .object({ request: z.object({ fps: z.number().nonnegative() }).strict() })
+    .strict(),
+  get_effective_glass_level: noCommandArgs
 } as const;
 
 const updateProgressSchema = z.object({
@@ -777,8 +785,13 @@ const closeBlockedEventSchema = z.object({
   reason: z.enum(['guided', 'export', 'download', 'install'])
 });
 
+const glassEffectiveEventSchema = z.object({
+  level: z.enum(['full', 'reduced', 'off'])
+});
+
 export const eventSchemas = {
   'lifecycle:close-blocked': closeBlockedEventSchema,
+  'appearance:glass-effective': glassEffectiveEventSchema,
   'lifecycle:close-decision-required': z.null(),
   'storage:degraded': z.null(),
   'storage:recovered': z.null(),
@@ -829,6 +842,7 @@ export type ImportResult = z.infer<typeof importResultSchema>;
 export type ImportProgress = z.infer<typeof importProgressSchema>;
 export type ExportProgress = z.infer<typeof exportProgressSchema>;
 export type CloseBlockedEvent = z.infer<typeof closeBlockedEventSchema>;
+export type GlassEffectiveEvent = z.infer<typeof glassEffectiveEventSchema>;
 
 export function parseIpcEnvelope(value: unknown): IpcEnvelope {
   return ipcEnvelopeSchema.parse(value);

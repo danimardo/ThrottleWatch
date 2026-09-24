@@ -1,5 +1,15 @@
 import { expect, test } from './fixtures';
 
+type Call = { command: string; args?: Record<string, unknown> };
+
+async function calls(page: import('@playwright/test').Page): Promise<Call[]> {
+  return page.evaluate(
+    () =>
+      (window as unknown as { __THROTTLEWATCH_CALLS__: Call[] })
+        .__THROTTLEWATCH_CALLS__
+  );
+}
+
 test('@critical ajustes conserva el flujo de exportación de una sesión', async ({
   page
 }) => {
@@ -108,4 +118,46 @@ test('@critical ajustes ofrece exportar la base de datos anterior solo si se rec
     corruptRow.getByText('throttlewatch.db.corrupt-2026-09-22T00-00-00Z')
   ).toBeVisible();
   await corruptRow.getByRole('button', { name: /export|exportar/i }).click();
+});
+
+test('@critical ajustes ofrece las 24 horas para el periodo de silencio, no solo 22 y 07 (T174)', async ({
+  page
+}) => {
+  await page.setViewportSize({ width: 1100, height: 760 });
+  await page.goto('/?with-history');
+  await page.keyboard.press('Control+6');
+  await expect(
+    page.getByRole('main', { name: /settings|ajustes/i })
+  ).toBeVisible();
+
+  // Three sections fold under "Avanzado"/"Advanced" (monitoring, tray, about, in that prop
+  // order); the quiet period lives in the tray section's, the second one on the page.
+  await page
+    .getByRole('button', { name: /^advanced$|^avanzado$/i })
+    .nth(1)
+    .click();
+
+  const quietSwitch = page.getByRole('switch', {
+    name: /quiet period|periodo de silencio/i
+  });
+  await quietSwitch.click();
+  await expect(quietSwitch).toBeChecked();
+
+  const startSelect = page.getByRole('button', { name: /^start$|^inicio$/i });
+  await startSelect.click();
+  const options = page.getByRole('option');
+  await expect(options).toHaveCount(24);
+  await expect(options.filter({ hasText: '00:00' })).toHaveCount(1);
+  await expect(options.filter({ hasText: '23:00' })).toHaveCount(1);
+
+  await options.filter({ hasText: '15:00' }).click();
+  await expect(startSelect).toHaveText('15:00');
+
+  const setCalls = (await calls(page)).filter(
+    (call) => call.command === 'set_preference'
+  );
+  const quietPeriodCall = setCalls.at(-1)?.args?.request as
+    { key?: string; value?: { start?: string; end?: string } } | undefined;
+  expect(quietPeriodCall?.key).toBe('notifications.quiet_period');
+  expect(quietPeriodCall?.value?.start).toBe('15');
 });

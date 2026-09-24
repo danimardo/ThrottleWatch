@@ -364,6 +364,15 @@
     ['standard', t('settings.standard')],
     ['long', t('settings.long')]
   ]);
+  // Every hour, not just the default 22/07 (T174): the backend already accepts any 0-23 pair
+  // (preferences.rs::quiet_period) and setQuietPeriod already sends whatever is picked here — the
+  // options list was the only thing still fixed to the two default values.
+  const quietPeriodHourOptions = options(
+    Array.from({ length: 24 }, (_, hour) => {
+      const value = hour.toString().padStart(2, '0');
+      return [value, `${value}:00`] as [string, string];
+    })
+  );
 
   let sensorStatus: SettingsSensorStatus = $derived(
     coverage === null
@@ -473,10 +482,7 @@
         quietPeriodEndLabel: t('settings.quietEnd'),
         quietPeriodStart: quietPeriod?.start ?? '22',
         quietPeriodEnd: quietPeriod?.end ?? '07',
-        quietPeriodOptions: options([
-          ['22', '22:00'],
-          ['07', '07:00']
-        ]),
+        quietPeriodOptions: quietPeriodHourOptions,
         onQuietPeriodChange: setQuietPeriod
       }}
       privacy={{

@@ -61,6 +61,7 @@
     type GlassLevel,
     type MotionLevel
   } from '../design-system/tokens/tokens';
+  import { startGlassPerformanceReporting } from '../features/appearance/glass-performance';
   import {
     stopGuidedSession,
     subscribeGuidedSession
@@ -235,6 +236,24 @@
     void listenValidated('storage:recovered', () => {
       storageDegraded = false;
     }).then((stop) => (stopStorageRecoveredListener = stop));
+    // T131: the local `appearance.glass === 'system' ? 'full' : ...` guess above paints
+    // immediately; Rust's real answer (the OS transparency setting plus the automatic
+    // performance ceiling) supersedes it as soon as either arrives.
+    void invokeValidated(
+      'get_effective_glass_level',
+      undefined,
+      commandResponseSchemas.get_effective_glass_level
+    ).then((result) => {
+      if (result.ok) applyGlassLevel(result.value.level);
+    });
+    let stopGlassEffectiveListener: () => void = () => undefined;
+    void listenValidated('appearance:glass-effective', (value) => {
+      const level = (value as { level?: GlassLevel }).level;
+      if (level === 'full' || level === 'reduced' || level === 'off') {
+        applyGlassLevel(level);
+      }
+    }).then((stop) => (stopGlassEffectiveListener = stop));
+    const stopGlassPerformanceReporting = startGlassPerformanceReporting();
     return () => {
       stopAppearanceListener();
       stopGeometryListener();
@@ -243,6 +262,8 @@
       stopFirstCloseListener();
       stopStorageDegradedListener();
       stopStorageRecoveredListener();
+      stopGlassEffectiveListener();
+      stopGlassPerformanceReporting();
       window.removeEventListener('keydown', onShortcut);
       window.removeEventListener(
         'throttlewatch:request-export',
@@ -277,8 +298,10 @@
     if (!result.ok) return;
     const values = result.value.values;
     appearance = {
-      theme: (values['appearance.theme'] as ThemePreference | undefined) ?? 'system',
-      motion: (values['appearance.motion'] as MotionLevel | undefined) ?? 'system',
+      theme:
+        (values['appearance.theme'] as ThemePreference | undefined) ?? 'system',
+      motion:
+        (values['appearance.motion'] as MotionLevel | undefined) ?? 'system',
       glass:
         (values['appearance.glass'] as GlassLevel | 'system' | undefined) ??
         'system'
