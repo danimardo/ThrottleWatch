@@ -361,6 +361,16 @@ fn write_actions(app: &AppHandle, cpu: &sink::CpuIdentity, actions: &[RecorderAc
     let Ok(storage) = state.storage.lock() else { return };
     let Ok(mut backlog) = resilience.backlog.lock() else { return };
     let transition = backlog.submit(epoch_ms(), actions, |action| {
+        // E2E-13: `TW_DEV_STORAGE_FAIL_WRITES` makes the write fail as if the disk were full,
+        // without touching storage. Always false outside debug/`e2e` builds.
+        if crate::dev_faults::storage_write_should_fail() {
+            tracing::warn!(
+                component = "storage",
+                code = "STORAGE_WRITE_FAULT_INJECTED",
+                msg = "TW_DEV_STORAGE_FAIL_WRITES forced this write to fail"
+            );
+            return false;
+        }
         match sink::execute(&storage, cpu, std::slice::from_ref(action)) {
             Ok(()) => true,
             Err(error) => {

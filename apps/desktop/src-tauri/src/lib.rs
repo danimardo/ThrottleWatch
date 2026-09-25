@@ -3,6 +3,7 @@ pub mod alerting;
 pub mod appearance;
 mod commands;
 mod config;
+pub mod dev_faults;
 pub mod diagnostics;
 pub mod export;
 pub mod i18n;
@@ -119,6 +120,15 @@ pub fn run() {
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
             std::fs::create_dir_all(&data_dir)?;
             let database = data_dir.join("throttlewatch.db");
+            // E2E-13: `TW_DEV_CORRUPT_DB=1` damages the existing database on purpose so the
+            // recovery below is the real one, not a simulation. No-op outside debug/`e2e`.
+            if dev_faults::corrupt_database_if_requested(&database) {
+                tracing::warn!(
+                    component = "core",
+                    code = "STORAGE_CORRUPTION_FAULT_INJECTED",
+                    msg = "TW_DEV_CORRUPT_DB damaged the database before opening it"
+                );
+            }
             let (mut storage, recovered) = storage::Storage::open_recovering_corruption(
                 database,
                 &jiff::Timestamp::now().to_string(),

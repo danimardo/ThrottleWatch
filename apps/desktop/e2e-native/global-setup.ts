@@ -44,7 +44,14 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
       `${exePath} does not exist. Build it first: cargo build --locked --features e2e,custom-protocol --manifest-path src-tauri/Cargo.toml (and pnpm exec vite build for the embedded frontend).`
     );
   }
-  const child = spawn(exePath, [], { stdio: 'ignore', windowsHide: true });
+  // E2E-13: the `TW_DEV_*` fault variables reach the app from whoever runs the suite, so the
+  // same harness covers the healthy run and the two injected failures without a second config.
+  // They are read only by debug/`e2e` builds (`src-tauri/src/dev_faults.rs`).
+  const child = spawn(exePath, [], {
+    stdio: 'ignore',
+    windowsHide: true,
+    env: process.env
+  });
   const startupError = new Promise<never>((_resolve, reject) => {
     child.once('exit', (code) =>
       reject(new Error(`throttlewatch.exe exited early with code ${code}`))
