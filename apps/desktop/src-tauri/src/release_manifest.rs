@@ -33,14 +33,27 @@ pub const PRODUCTION_PUBLIC_KEY: &str = include_str!("../keys/updater-release.pu
 const MAX_MANIFEST_BYTES: usize = 64 * 1024;
 const SUPPORTED_MANIFEST_VERSION: u32 = 1;
 
-/// Public key this build trusts: the development key in debug and `e2e` builds, the production
-/// key otherwise. Never `None` since T102 — before it, a release build trusted nothing at all.
+/// Public key this build trusts: the development key in debug, `e2e` and `dev-signing` builds,
+/// the production key otherwise. Never `None` since T102 — before it, a release build trusted
+/// nothing at all.
+///
+/// `dev-signing` (T112) exists because the production secret lives only in the
+/// `UPDATER_SIGNING_KEY` GitHub secret, so a locally built installer could never start a
+/// collector: its bundled manifest can only be signed with the development key. The feature is
+/// off by default and `release.yml` never passes it, so a real release trusts the production key
+/// by construction. [`built_for_testing_only`] lets the application say so out loud at startup.
 pub fn trusted_public_key() -> Option<&'static str> {
-    if cfg!(any(debug_assertions, feature = "e2e")) {
+    if cfg!(any(debug_assertions, feature = "e2e", feature = "dev-signing")) {
         Some(DEV_PUBLIC_KEY)
     } else {
         Some(PRODUCTION_PUBLIC_KEY)
     }
+}
+
+/// True when this is an optimised build that nonetheless trusts the development key — an
+/// installer meant for testing, never for release. Always false in a real release.
+pub fn built_for_testing_only() -> bool {
+    !cfg!(debug_assertions) && cfg!(any(feature = "e2e", feature = "dev-signing"))
 }
 
 #[derive(Debug)]
@@ -313,6 +326,39 @@ mod tests {
         // `cfg!(debug_assertions)`, which `production_and_development_keys_are_not_the_same_key`
         // below at least keeps honest without one.
         assert_eq!(trusted_public_key(), Some(DEV_PUBLIC_KEY));
+    }
+
+    #[test]
+    fn a_build_without_dev_signing_never_trusts_the_development_key() {
+        // The property T102 bought and T112 must not sell: an optimised build with no explicit
+        // testing feature trusts the production key only. Meaningless under `cargo test` alone
+        // (always debug), so it is exercised on purpose with `cargo test --release`, and again
+        // with `--release --features dev-signing` to see the other branch.
+        if cfg!(any(debug_assertions, feature = "e2e", feature = "dev-signing")) {
+            return;
+        }
+        assert_eq!(trusted_public_key(), Some(PRODUCTION_PUBLIC_KEY));
+        assert_ne!(trusted_public_key(), Some(DEV_PUBLIC_KEY));
+    }
+
+    #[test]
+    fn dev_signing_swaps_the_trusted_key_and_flags_the_build() {
+        if !cfg!(feature = "dev-signing") || cfg!(debug_assertions) {
+            return;
+        }
+        assert_eq!(trusted_public_key(), Some(DEV_PUBLIC_KEY));
+        assert!(super::built_for_testing_only(), "a test installer must announce itself");
+    }
+
+    #[test]
+    fn a_debug_build_is_not_flagged_as_a_test_only_installer() {
+        // `built_for_testing_only` is about an *optimised* build that trusts the development key
+        // (T112's `dev-signing`). A debug build already trusts it for other reasons and is never
+        // distributed, so flagging it would only cry wolf on every developer's run.
+        if !cfg!(debug_assertions) {
+            return; // `cargo test --release` is exactly the case this test must not judge.
+        }
+        assert!(!super::built_for_testing_only());
     }
 
     #[test]

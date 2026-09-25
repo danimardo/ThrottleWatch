@@ -172,6 +172,16 @@ pub fn run() {
                 let _ = logging::clear_directory(data_dir.join("logs"));
             }
             let log_guard = logging::init(data_dir.join("logs"), false)?;
+            if release_manifest::built_for_testing_only() {
+                // T112: an optimised build that trusts the development key. It can start a
+                // locally signed collector, which a real release must never do — say so, so a
+                // test installer is never mistaken for a release one.
+                tracing::warn!(
+                    component = "core",
+                    code = "BUILD_TRUSTS_DEVELOPMENT_KEY",
+                    msg = "this build trusts the development signing key and must not be distributed"
+                );
+            }
             let logging_control = log_guard.control();
             app.manage(log_guard);
             app.manage(logging_control);

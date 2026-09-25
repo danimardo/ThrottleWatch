@@ -9,6 +9,11 @@ default-run = "throttlewatch"
 
 [features]
 e2e = []
+# T112: makes a release build trust the DEVELOPMENT signing key instead of the production one, so
+# an installer can be built and tested end to end on a machine that does not hold the production
+# secret (it lives only in the UPDATER_SIGNING_KEY GitHub secret). Never enabled by a real
+# release: `release.yml` does not pass it, so production trust holds by construction.
+dev-signing = []
 # Embeds the built interface (`../dist`) instead of loading the dev server; `tauri build` enables it.
 custom-protocol = ["tauri/custom-protocol"]
 

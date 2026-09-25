@@ -5,7 +5,7 @@
 //        --file SensorAgent.exe [--file other.dll ...] [--out <dir>] [--key <secret key>] [--rsign <rsign.exe>]
 //
 // Writes release-manifest.json and release-manifest.json.minisig into --out (default: --dir).
-// The signature is made with the DEVELOPMENT key (default: %LOCALAPPDATA%\ThrottleWatch\dev-signing\
+// The signature is made with the DEVELOPMENT key (default: %LOCALAPPDATA%\ThrottleWatch-signing\
 // dev-release.key, public half in apps/desktop/src-tauri/keys/dev-release.pub). Release manifests are
 // signed in protected CI with the updater key (Tauri signer), never with this script or this key.
 // Requires the minisign-compatible tool: `cargo install rsign2 --locked` (tested with 0.6.6).
@@ -49,12 +49,15 @@ if (!dir || !version || files.length === 0) {
   );
 }
 const out = option('--out') ?? dir;
+// Deliberately NOT under %LOCALAPPDATA%\ThrottleWatch: that is where the NSIS installer puts the
+// application (`installMode: currentUser` resolves to `$LOCALAPPDATA\ThrottleWatch`), so private
+// signing keys used to sit inside the install directory — one template change away from being
+// removed by an uninstall (T112, 2026-09-25).
 const key =
   option('--key') ??
   path.join(
     process.env.LOCALAPPDATA ?? '',
-    'ThrottleWatch',
-    'dev-signing',
+    'ThrottleWatch-signing',
     'dev-release.key'
   );
 const rsign = option('--rsign') ?? 'rsign';
