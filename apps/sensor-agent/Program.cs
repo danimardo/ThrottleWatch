@@ -35,6 +35,14 @@ internal static class Program
             return 0;
         }
 
+        // T028b2: raw AMD PM table capture, nothing interpreted. Runs on its own so the machine
+        // that has the hardware need not be revisited when the field map is finally decided.
+        if (args.Any(argument => string.Equals(argument, "--dump-pm-table", StringComparison.Ordinal)))
+        {
+            await streams.WriteLineAsync(PmTableDump.RunJson());
+            return 0;
+        }
+
         using var collector = new HardwareCollector();
         collector.Open();
         var session = new SidecarSession(collector);

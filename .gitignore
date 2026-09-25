@@ -45,6 +45,11 @@ TestResults/
 # Browser automation screenshots taken during verification
 .playwright-mcp/
 
+# Portable hardware-probe kit: build artefacts and the reports it brings back
+docs/spikes/tools/hardware-probe/dist/
+docs/spikes/tools/hardware-probe/*.zip
+docs/spikes/tools/hardware-probe/informe-*/
+
 # Secrets — never commit
 .env
 .env.*
