@@ -51,7 +51,7 @@ registros de una máquina real. No registrar números de serie, nombres de usuar
 | Equipo | CPU/familia | Windows/build | Alimentación | PawnIO antes | Lectura sin proveedor | PawnIO instalado una vez | Tras reinicio sin UAC | Resultado A/B/C | Evidencia |
 |---|---|---|---|---|---|---|---|---|---|
 | Desarrollo | AMD Ryzen 5 2600X / Zen+ (Pinnacle Ridge, Family 17h Model 8) | Windows 11 Pro / 26200 | CA (sin batería detectada) | no instalado | \`missing\`, sin acceso avanzado | \`available\` (elevado): SMU \`0x002B1800\`; tabla PM no fiable | \`denied\` (usuario estándar): SMU \`0x00000000\`, \`SMU_VERSION_ZERO\` → resultado **(b)** | nivel A solo elevado; sin limpieza de bits | probes 2026-09-19 |
-| Intel híbrido | Intel(R) Core(TM) Ultra 7 155H / Meteor Lake (Family 6 Model 170), 16 núcleos/22 hilos P+E+LP-E | Windows 11 Pro / 26200 | batería 76 % | ya instalado (PawnIO 2.2.0.0, servicio `Running/Manual`) | pendiente (requiere desinstalar PawnIO, no realizado) | `denied`, `MSR_READ_FAILED`, `0x64F`/`0x1A2`/`0x610` legibles pero devuelven `0x0` sin proveedor elevado | `available`: `0x1A2`=`0x0F6E0000` (TjMax 110 °C, plausible), `0x610`=`0x0042820000DD80E0` (PL1≈28 W, PL2≈64 W, ambos plausibles para este equipo), `0x64F`=`0x0` (sin razón de limitación activa en el instante de lectura); `log_clear_supported: false` (misma limitación de LHM 0.9.6 que en AMD) | nivel A de **lectura** alcanzable con sidecar elevado en Intel, con valores utilizables (mejor que AMD, que nunca superó una tabla PM no fiable); limpieza de `0x64F` sigue sin demostrarse; no probado tras reinicio | probes 2026-09-22 |
+| Intel híbrido | Intel(R) Core(TM) Ultra 7 155H / Meteor Lake (Family 6 Model 170), 16 núcleos/22 hilos P+E+LP-E | Windows 11 Pro / 26200 | batería 76 % | ya instalado (PawnIO 2.2.0.0, servicio `Running/Manual`) | pendiente (requiere desinstalar PawnIO, no realizado) | elevado: `available`, `0x1A2`=`0x0F6E0000` (TjMax 110 °C, plausible), `0x610`=`0x0042820000DD80E0` (PL1≈28 W, PL2≈64 W, plausibles), `0x64F`=`0x0`; `log_clear_supported: false` (misma limitación de LHM 0.9.6 que en AMD). Sin elevar, mismo día, servicio ya en marcha: `denied`/`MSR_READ_FAILED`, registros legibles pero en `0x0` | `denied`/`MSR_READ_FAILED`, mismo patrón de ceros; integridad media confirmada con `whoami /groups` (`S-1-16-8192`) | nivel A de **lectura** alcanzable solo con sidecar elevado en Intel, con valores utilizables (mejor que AMD, que nunca superó una tabla PM no fiable); confirmado tras reinicio que sin UAC sigue `denied` — resultado **(b)**, igual que AMD; limpieza de `0x64F` sigue sin demostrarse | probes 2026-09-22, 2026-09-25 |
 | Intel anterior | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente | salida JSON |
 | Portátil OEM | pendiente | pendiente | batería/CA | pendiente | pendiente | pendiente | pendiente | pendiente | salida JSON |
 | AMD Zen 4 | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente | salida JSON |
@@ -240,9 +240,10 @@ Para cada equipo de la tabla «Matriz de ejecución» que siga en `pendiente`, e
    (`% Processor Performance`, `Processor Frequency`, `% Processor Utility`) y catálogo LHM.
 3. Instalar PawnIO con `PawnIO_setup_2.2.0.exe -install` (una UAC), repetir con `-Phase installed`.
 4. Reiniciar, repetir sin elevar con `-Phase after-reboot`.
-5. Traer los tres JSON (no contienen identificadores) y rellenar la fila. El contraste con
-   APERF/MPERF sigue pendiente: el sidecar todavía no lee `0xE7`/`0xE8`; cuando lo haga, el
-   guion añadirá esa columna.
+5. Traer los tres JSON (no contienen identificadores) y rellenar la fila. El sidecar ya lee
+   `0xE7`/`0xE8` (contraste APERF/MPERF, ver entrada 2026-09-25 más abajo) y el objeto `probe`
+   que incrusta el guion lo incluye sin cambios adicionales; requiere proceso elevado, igual que
+   el resto de registros MSR de Intel.
 
 ### 2026-09-22 — equipo Intel híbrido, usuario estándar, PawnIO ya instalado
 
@@ -292,7 +293,7 @@ nunca leyendo `frequency_mhz` como reloj instantáneo. También confirma que
 `hypervisor_present=true` en este portátil físico (VBS activo, sin hipervisor real),
 corroborando la nota de `T-INT-005` sobre el bit de hipervisor de CPUID.
 
-El contraste con APERF/MPERF sigue pendiente: el sidecar aún no lee `0xE7`/`0xE8`.
+El contraste con APERF/MPERF se hizo el 2026-09-25 (ver la entrada de esa fecha, más abajo).
 
 ### 2026-09-22 — equipo Intel híbrido, proceso elevado (UAC), primer nivel A con valores utilizables
 
@@ -336,6 +337,101 @@ de LHM 0.9.6 que en la entrada del 19/09) y no se ha repetido tras un reinicio d
 Con esto, el resultado para Intel se acerca a **(a)** en lectura pura, aunque el ADR-0004
 (resultado (b), sidecar elevado exclusivo) sigue siendo la decisión vigente porque ya
 contempla el caso general (AMD no llega ni a lectura fiable sin elevar) y no se ha reabierto.
+
+### 2026-09-25 — equipo Intel híbrido, contraste APERF/MPERF (`0xE7`/`0xE8`)
+
+Mismo equipo (Intel Core Ultra 7 155H, Meteor Lake). El sidecar ahora lee `IA32_APERF` (`0xE7`)
+e `IA32_MPERF` (`0xE8`) dos veces con una ventana de 200 ms y expone `aperf_mperf_ratio` en el
+probe (`LowLevelAccessProbe.ComputeAperfMperfRatio`, con pruebas unitarias en
+`LowLevelAccessProbeTests.cs`). Sin proceso elevado el campo sale `null` (mismo `denied` que el
+resto de registros).
+
+**Hallazgo antes de la corrección:** las dos primeras ejecuciones elevadas con todos los
+núcleos cargados dieron `aperf_mperf_ratio: null` de forma repetida, pese a que el MSR se leía
+bien (`readable: true` en los otros registros). Causa: `APERF`/`MPERF` son contadores **por
+procesador lógico** y, sin fijar la afinidad, el planificador de Windows migra el hilo de
+lectura entre núcleo y núcleo dentro de la ventana de 200 ms bajo carga en todo el sistema; las
+dos lecturas acaban perteneciendo a contadores físicamente distintos y el `delta` de MPERF sale
+cero o negativo. En reposo (menos migraciones) una ejecución sí dio un valor (`1.30`), pero no
+de forma fiable. Corregido fijando `Process.ProcessorAffinity = 1` (núcleo lógico 0) solo
+durante la ventana de muestreo, restaurada después en un `finally`.
+
+Con la afinidad fijada:
+
+| Escenario | `aperf_mperf_ratio` | PDH `% Processor Performance` (cpu lógico 0) | `Processor Frequency` (cpu lógico 0) |
+|---|---|---|---|
+| Reposo relativo (proceso elevado, sin carga adicional) | `0.836` | — | — |
+| Los 22 procesadores lógicos cargados (bucle PowerShell en cada uno) | `0.787` | `133`–`143 %` | `1400 MHz` (fijo, nominal del grupo P) |
+
+Lectura: en el mismo intervalo de carga, `% Processor Performance` (PDH) informa un valor sobre
+el 100 % (turbo aparente) mientras el ratio APERF/MPERF, leído directamente del núcleo, muestra
+el procesador ejecutando **por debajo** de su reloj base (`< 1.0`) en la ventana de 200 ms
+concreta que capturó el sidecar. Las dos medidas no son directamente comparables (PDH agrega
+sobre ~1 s con su propio suavizado; el sidecar mide una ventana de 200 ms sin sincronizar con el
+contador de PDH), así que esto **no** se interpreta aquí como que uno de los dos esté
+equivocado; queda como el contraste que pedía `research.md` § "Riesgos abiertos" y confirma que
+`% Processor Performance` por sí solo, sin este contraste, no basta para inferir el reloj activo
+con confianza alta — coherente con el hallazgo previo (2026-09-22) de que `Processor Frequency`
+es un valor nominal por grupo, no un reloj en vivo.
+
+Comando usado (proceso elevado, `Start-Process -Verb RunAs`, mismo patrón que las entradas
+anteriores de este spike):
+
+```powershell
+& .\apps\sensor-agent\bin\Debug\net10.0-windows\SensorAgent.exe --probe-low-level
+```
+
+`docs/spikes/tools/sensor-access-matrix.ps1` ya incrusta el objeto `probe` completo (incluye
+`aperf_mperf_ratio`/`aperf_mperf_window_ms` sin cambios); se añadió además una línea de resumen
+en su salida por consola cuando el campo viene con valor.
+
+**Sigue pendiente de esta fila:** repetir la lectura tras reinicio sin UAC (ver más abajo, «tras
+reinicio»); el resto de la matriz sigue sin hardware disponible.
+
+### 2026-09-25 — equipo Intel híbrido, usuario estándar tras reiniciar
+
+Mismo equipo. Reinicio completo del equipo (la persona propietaria lo hizo y pasó la salida);
+PowerShell **sin elevar**. Integridad confirmada con `whoami /groups`: `BUILTIN\Administradores`
+aparece «Grupo usado solo para denegar» (no habilitado) y la etiqueta obligatoria es
+`Nivel obligatorio medio` (`S-1-16-8192`) — la comprobación fiable que exige la «Regla» de más
+arriba, no `IsInRole('Administrators')`.
+
+Comando: `& .\apps\sensor-agent\bin\Debug\net10.0-windows\SensorAgent.exe --probe-low-level`.
+
+```json
+{
+  "cpu_vendor": "intel",
+  "state": "denied",
+  "provider": "pawnio",
+  "provider_version": "2.2.0.0",
+  "registers": [
+    { "name": "core_perf_limit_reasons", "address": "0x64F", "readable": true, "value_hex": "0x0000000000000000", "details_code": null },
+    { "name": "temperature_target", "address": "0x1A2", "readable": true, "value_hex": "0x0000000000000000", "details_code": null },
+    { "name": "package_power_limit", "address": "0x610", "readable": true, "value_hex": "0x0000000000000000", "details_code": null }
+  ],
+  "smu_version": null,
+  "log_clear_supported": false,
+  "details_code": "MSR_READ_FAILED",
+  "error": null,
+  "aperf_mperf_ratio": null,
+  "aperf_mperf_window_ms": null
+}
+```
+
+Lectura: mismo patrón que el resto de este spike (AMD T152, Intel 2026-09-22 sin elevar): los
+registros se declaran `readable` pero vuelven `0x0`, lo que por el criterio 4 no cuenta como
+lectura válida. Con esto queda cerrada la fila Intel híbrido salvo la fase «antes de instalar
+PawnIO» (deliberadamente no hecha, ver más arriba): **confirmado el resultado (b) también en
+Intel** — nivel A de lectura solo alcanzable con el sidecar elevado, ni el reinicio ni un
+servicio ya en marcha lo cambian. Coincide con la decisión ya vigente de ADR-0004 (que ya
+contemplaba el caso general) y con la fila del 2600X; no la reabre.
+
+**Corrección de la tabla (misma fecha):** la fila «Intel híbrido» de «Matriz de ejecución»
+tenía el resultado elevado (`available`, TjMax 110 °C, PL1/PL2) en la columna «Tras reinicio sin
+UAC» y el resultado sin elevar de 2026-09-22 en «PawnIO instalado una vez» — desplazados una
+columna respecto al resto de la tabla. Corregido: «PawnIO instalado una vez» ahora resume ambas
+lecturas de 2026-09-22 (elevada y sin elevar) y «Tras reinicio sin UAC» lleva el resultado de
+esta entrada.
 
 ### Hallazgo 2026-09-19 — contadores PDH localizados
 

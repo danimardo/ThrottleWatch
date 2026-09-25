@@ -76,3 +76,6 @@ $out = Join-Path $PSScriptRoot "sensor-access-$Phase.json"
 $report | ConvertTo-Json -Depth 8 | Out-File $out -Encoding utf8
 Write-Output "written $out"
 Write-Output ("probe: state={0} provider={1} details={2}" -f $probe.state, $probe.provider_version, $probe.details_code)
+if ($probe.aperf_mperf_ratio) {
+  Write-Output ("probe: aperf_mperf_ratio={0} window_ms={1}" -f $probe.aperf_mperf_ratio, $probe.aperf_mperf_window_ms)
+}

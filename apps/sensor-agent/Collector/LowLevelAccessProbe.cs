@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Runtime.Intrinsics.X86;
 using System.Text;
+using System.Threading;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using LibreHardwareMonitor.PawnIo;
@@ -28,13 +30,21 @@ public sealed record LowLevelAccessProbeReport(
     [property: JsonPropertyName("smu_version")] string? SmuVersion,
     [property: JsonPropertyName("log_clear_supported")] bool LogClearSupported,
     [property: JsonPropertyName("details_code")] string? DetailsCode,
-    [property: JsonPropertyName("error")] ProbeError? Error = null);
+    [property: JsonPropertyName("error")] ProbeError? Error = null,
+    // T019: contrasts % Processor Performance (PDH, host side) against the CPU's own
+    // APERF/MPERF ratio, read directly in the sidecar. Null when the MSR could not be
+    // sampled twice (no access, or MPERF did not advance in the sampling window).
+    [property: JsonPropertyName("aperf_mperf_ratio")] double? AperfMperfRatio = null,
+    [property: JsonPropertyName("aperf_mperf_window_ms")] int? AperfMperfWindowMs = null);
 
 public static class LowLevelAccessProbe
 {
     private const uint CorePerfLimitReasons = 0x64F;
     private const uint TemperatureTarget = 0x1A2;
     private const uint PackagePowerLimit = 0x610;
+    private const uint Ia32Aperf = 0xE7;
+    private const uint Ia32Mperf = 0xE8;
+    private const int AperfMperfSampleWindowMs = 200;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -118,6 +128,23 @@ public static class LowLevelAccessProbe
         return tjMax is >= 50 and <= 150;
     }
 
+    /// <summary>
+    /// APERF/MPERF ratio for the sampling window, contrasted in the spike against the host's
+    /// PDH-derived <c>% Processor Performance</c> (research.md § "Riesgos abiertos"). Null when
+    /// MPERF (the fixed-rate reference clock) did not advance: no valid window to measure.
+    /// </summary>
+    public static double? ComputeAperfMperfRatio(ulong aperf0, ulong mperf0, ulong aperf1, ulong mperf1)
+    {
+        if (mperf1 <= mperf0)
+        {
+            return null;
+        }
+
+        var aperfDelta = aperf1 - aperf0;
+        var mperfDelta = mperf1 - mperf0;
+        return aperfDelta / (double)mperfDelta;
+    }
+
     private static LowLevelAccessProbeReport ProbeIntel(string? providerVersion)
     {
         try
@@ -139,6 +166,7 @@ public static class LowLevelAccessProbe
                 var detailsCode = state == "available"
                     ? "MSR_READ_OK_LOG_CLEAR_UNSUPPORTED"
                     : "MSR_READ_FAILED";
+                var aperfMperfRatio = SampleAperfMperfRatio(msr);
 
                 return new LowLevelAccessProbeReport(
                     "intel",
@@ -148,7 +176,9 @@ public static class LowLevelAccessProbe
                     registers,
                     null,
                     false,
-                    detailsCode);
+                    detailsCode,
+                    AperfMperfRatio: aperfMperfRatio,
+                    AperfMperfWindowMs: aperfMperfRatio is null ? null : AperfMperfSampleWindowMs);
             }
             finally
             {
@@ -219,6 +249,52 @@ public static class LowLevelAccessProbe
             exception.GetType().FullName ?? exception.GetType().Name,
             exception.Message,
             $"0x{exception.HResult:X8}");
+    }
+
+    // APERF/MPERF are per logical processor. Without pinning, the OS scheduler can migrate this
+    // thread between the two reads, mixing two independent counters and always yielding a
+    // meaningless (or negative) delta - observed in practice on this 22-thread hybrid CPU under
+    // load. Process affinity is restored afterward regardless of outcome.
+    private static double? SampleAperfMperfRatio(IntelMsr msr)
+    {
+        var process = Process.GetCurrentProcess();
+        var originalAffinity = process.ProcessorAffinity;
+        try
+        {
+            process.ProcessorAffinity = 1;
+
+            var before = ReadAperfMperf(msr);
+            if (before is null)
+            {
+                return null;
+            }
+
+            Thread.Sleep(AperfMperfSampleWindowMs);
+
+            var after = ReadAperfMperf(msr);
+            if (after is null)
+            {
+                return null;
+            }
+
+            var (aperf0, mperf0) = before.Value;
+            var (aperf1, mperf1) = after.Value;
+            return ComputeAperfMperfRatio(aperf0, mperf0, aperf1, mperf1);
+        }
+        finally
+        {
+            process.ProcessorAffinity = originalAffinity;
+        }
+    }
+
+    private static (ulong Aperf, ulong Mperf)? ReadAperfMperf(IntelMsr msr)
+    {
+        if (!msr.ReadMsr(Ia32Aperf, out ulong aperf) || !msr.ReadMsr(Ia32Mperf, out ulong mperf))
+        {
+            return null;
+        }
+
+        return (aperf, mperf);
     }
 
     private static RegisterProbe ReadRegister(IntelMsr msr, string name, uint address)
