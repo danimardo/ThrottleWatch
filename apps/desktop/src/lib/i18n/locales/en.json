@@ -328,7 +328,8 @@
       "upgradable": "An older version of the advanced-access driver is installed; updating it improves coverage.",
       "installable": "Advanced access can improve coverage.",
       "available": "Advanced access is available.",
-      "denied": "Advanced access is unavailable; the app will continue at a lower coverage level."
+      "denied": "Advanced access is unavailable; the app will continue at a lower coverage level.",
+      "error": "Advanced access could not be checked; the app will continue at a lower coverage level."
     },
     "back": "Back",
     "next": "Next",

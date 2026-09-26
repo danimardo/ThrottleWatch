@@ -411,7 +411,9 @@
               ? t('onboarding.access.available')
               : coverage?.advanced_access === 'denied'
                 ? t('onboarding.access.denied')
-                : undefined
+                : coverage?.advanced_access === 'error'
+                  ? t('onboarding.access.error')
+                  : undefined
     };
     return [
       {
@@ -466,6 +468,10 @@
     persist(
       resolveOnboarding(onboardingState, 'completed', new Date().toISOString())
     );
+    // Leaving the introduction lands on "Now", wherever the person was before repeating it from
+    // Settings: the last slide's button is literally "Open Now", and the sidebar that comes back
+    // should not be highlighting a screen the person is not looking at.
+    active = 'now';
   }
 
   function skipOnboarding(): void {
@@ -473,6 +479,7 @@
     persist(
       resolveOnboarding(onboardingState, 'skipped', new Date().toISOString())
     );
+    active = 'now';
   }
 
   function dismissNotice(): void {
@@ -513,8 +520,12 @@
   />
   <h1 class="visually-hidden">{t('app.title')}</h1>
 
-  <div class="body" class:has-sidebar={win.tier !== 'compact'}>
-    {#if win.tier !== 'compact'}
+  <!-- The introduction owns the whole window: no sidebar (nor the compact bar) until it is over. -->
+  <div
+    class="body"
+    class:has-sidebar={win.tier !== 'compact' && !onboardingActive}
+  >
+    {#if win.tier !== 'compact' && !onboardingActive}
       <nav class="sidebar" aria-label={t('nav.moreDestinations')}>
         {#each destinations as item (item.id)}
           <NavigationItem
@@ -676,7 +687,7 @@
     onDismiss={() => void resolveFirstClose('dismiss')}
   />
 
-  {#if win.tier === 'compact'}
+  {#if win.tier === 'compact' && !onboardingActive}
     <BottomBar
       items={compactDestinations.map((item) => ({
         id: item.id,

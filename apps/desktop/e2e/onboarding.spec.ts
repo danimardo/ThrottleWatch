@@ -85,3 +85,27 @@ test('@critical onboarding resumes at the saved slide and can be skipped by keyb
     ).toBeVisible();
   }
 });
+
+test('@critical onboarding explains an advanced-access error instead of showing an empty alert', async ({
+  page
+}) => {
+  await page.setViewportSize({ width: 1100, height: 760 });
+  await page.goto('/?onboarding=fresh&access=error');
+
+  const next = page.getByRole('button', {
+    name: /next|siguiente|start|empezar|open now|abrir ahora/i
+  });
+  for (let slide = 0; slide < 4; slide += 1) {
+    await next.focus();
+    await page.keyboard.press('Enter');
+  }
+
+  // On the last slide a critical banner shows up for this state. It used to be drawn with no text
+  // at all — the shell had no wording for `error`, so a red box with only an icon appeared and
+  // nobody could tell what it meant.
+  const banners = page.locator('main.onboarding .tw-banner');
+  await expect(banners.first()).toBeVisible();
+  for (let index = 0; index < (await banners.count()); index += 1) {
+    await expect(banners.nth(index)).toHaveText(/\S/);
+  }
+});

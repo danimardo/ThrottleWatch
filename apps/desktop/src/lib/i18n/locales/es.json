@@ -328,7 +328,8 @@
       "upgradable": "Hay una versión anterior del controlador de acceso avanzado; actualizarla mejora la cobertura.",
       "installable": "El acceso avanzado puede mejorar la cobertura.",
       "available": "El acceso avanzado está disponible.",
-      "denied": "El acceso avanzado no está disponible; la aplicación continuará con menor cobertura."
+      "denied": "El acceso avanzado no está disponible; la aplicación continuará con menor cobertura.",
+      "error": "No se ha podido comprobar el acceso avanzado; la aplicación continuará con menor cobertura."
     },
     "back": "Atrás",
     "next": "Siguiente",
