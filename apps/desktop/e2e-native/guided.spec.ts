@@ -1,5 +1,11 @@
 import type { Page } from '@playwright/test';
-import { ensureOnboardingDone, expect, openScreen, test } from './fixtures';
+import {
+  ensureOnboardingDone,
+  expect,
+  openScreen,
+  tauriInvoke,
+  test
+} from './fixtures';
 
 /**
  * T181: from `e2e/guided-analysis.spec.ts` (first two tests), against the real application: the
@@ -24,6 +30,26 @@ const START = /start|iniciar/i;
 async function openFreshGuidedScreen(page: Page): Promise<void> {
   await ensureOnboardingDone(page);
   await page.reload();
+
+  // Wait for what the application itself says it needs, not for a fixed time. The guided test's
+  // preflight asks whether the collector is delivering temperature and an active clock *right now*,
+  // and the first scenario of the suite runs the instant the application starts: on the CI runner
+  // it clicked "Start" before any telemetry had arrived and the preflight refused (6.3 s, no "skip
+  // rest"), while the very same steps passed in the next scenario a few seconds later. A fast
+  // developer machine always had the data in time, so it could never show. Polling the real
+  // `get_guided_preflight` makes the start conditional on the same fact the application checks.
+  await expect
+    .poll(
+      async () =>
+        (await tauriInvoke<{ sensors: boolean }>(page, 'get_guided_preflight'))
+          .sensors,
+      {
+        timeout: 30_000,
+        message: 'the collector never delivered temperature and an active clock'
+      }
+    )
+    .toBe(true);
+
   await openScreen(page, 'Control+5', GUIDED);
   await expect(page.getByRole('button', { name: START })).toBeVisible();
 }
