@@ -410,6 +410,7 @@ Resultados posibles: **(a)** nivel A sin UAC recurrente → se continúa con el 
 - Validar IPC, latencia y reinicio.
 - Verificar que `% Processor Performance` y `Processor Frequency` son fiables por procesador lógico en Intel híbrido y AMD (comparando con APERF/MPERF leídos por el sidecar cuando haya acceso), incluidos equipos con EcoQoS y modos de eficiencia.
 - Grabar el corpus etiquetado inicial (véase `research.md` § 15) en al menos un Intel híbrido, un Intel anterior, un portátil con gestión térmica del fabricante y un AMD Zen 4.
+  *Enmienda 2026-09-26:* «un AMD Zen 4» pasa a «un AMD de sobremesa Zen2 o Zen3». Zen 4 no tiene mapa de campos público en ninguna fuente (`docs/spikes/amd-pm-table.md`), así que esa fila no era alcanzable y se sustituye por Zen2/Zen3, que sí lo tienen en ryzen_monitor (AGPL-3.0, aceptada por la persona propietaria el 2026-09-26).
 - Validar en el hardware objetivo el presupuesto del `AnalysisChart` SVG con 4 pistas, 3.000 puntos por pista y eventos superpuestos; conservar el benchmark reproducible.
 - Medir en WebView2 el coste del material de vidrio (`backdrop-filter` en tarjetas y chrome, fondo ambiental animado) en reposo y con el gráfico actualizándose; fijar el umbral de degradación automática a `reduced` (propuesta: < 50 fps sostenidos durante 3 s o > 1 % de CPU en reposo atribuible a composición) y leer `UISettings.AdvancedEffectsEnabled` para el modo `system` (T019c; umbrales provisionales `glass.*` en `spec.md`).
 - Decidir estrategia segura de carga guiada (T053 en L03; ADR T054 al cerrar L12).

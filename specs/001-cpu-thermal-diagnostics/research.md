@@ -257,9 +257,10 @@ Los criterios SC-003 a SC-005 y SC-016 a SC-018 se miden en CI con un corpus de 
 ### Protocolo
 
 1. Grabar trazas de nivel A (acceso de bajo nivel instalado) en la matriz de hardware: Intel híbrido, Intel anterior, portátil con DTT/DPTF, sobremesa con límites abiertos, y AMD Zen 4 con tabla PM permitida. Cargas: render multihilo, compilación, juego limitado por CPU (pocos núcleos), carga AVX2 y reposo con calor residual.
+   **Enmienda 2026-09-26:** «AMD Zen 4 con tabla PM permitida» pasa a «AMD de sobremesa Zen2 o Zen3 con tabla PM permitida». Zen 4 no tiene mapa de campos público en ninguna fuente (`docs/spikes/amd-pm-table.md`), así que esa fila no era alcanzable y se sustituye por Zen2/Zen3, que sí lo tienen en ryzen_monitor (AGPL-3.0, aceptada por la persona propietaria el 2026-09-26). La fila Zen 4 se reincorpora si aparece una fuente que la cubra.
 2. Etiquetar cada ventana estable con la clase que dictan los bits (`THERMAL`, `PROCHOT`, potencia, corriente), la tendencia de PL1 y la frecuencia base (gravedad). Las trazas sintéticas se marcan como tales.
 3. Generar copias **degradadas**: B (se eliminan razones, límites y TCC offset) y C (además, potencia). Así se mide cuánto acierta la inferencia sin driver frente a la verdad de nivel A del mismo equipo y la misma carga.
-4. Casos obligatorios: fin de turbo sin calor, equipo que empieza caliente, degradación lenta, DPTF, PROCHOT externo, Zen 4 en su límite por diseño, juego con pocos núcleos, EcoQoS.
+4. Casos obligatorios: fin de turbo sin calor, equipo que empieza caliente, degradación lenta, DPTF, PROCHOT externo, Zen 4 en su límite por diseño, juego con pocos núcleos, EcoQoS. *(Enmienda 2026-09-26: mientras no haya fuente para Zen 4, el caso equivalente «AMD de sobremesa en su límite térmico por diseño, sin ser throttling» se graba con Zen2/Zen3; su límite de Tctl no es el de Zen 4 y lo dicta `thermal-limits-v1`.)*
 5. Calibrar los pesos de la confianza con este corpus y versionar el resultado con el ruleset.
 
 ### Motivo
