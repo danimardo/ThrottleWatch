@@ -32,6 +32,14 @@ jobs:
       - run: pnpm test:scripts
       - run: pnpm test
       - run: pnpm build
+      # T181: Playwright had never run in CI — neither `test:e2e` nor the nightly config. The only
+      # trace of it was the artifact upload below, for a `playwright-report/` directory nothing
+      # generated. The 108 browser-harness tests were verified by hand in local runs, so a
+      # regression stayed invisible until someone remembered to look (and one had: the ambient
+      # glow's `inset: -15%` broke all six viewport projects).
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: apps/desktop
+      - run: pnpm test:e2e
       - run: pnpm check:traceability
       - run: pnpm licenses list --json > docs/licenses/npm.json
       - uses: actions/setup-dotnet@v4
@@ -59,6 +67,12 @@ jobs:
           cargo install cargo-about --version 0.8.2 --locked
       - name: Fetch the official PawnIO installer (not versioned; hash and Authenticode verified)
         run: node scripts/fetch-pawnio.mjs
+      # T112 made `tauri.conf.json` bundle the self-contained collector, so `tauri-build` now fails
+      # with "glob pattern ... didn't match any files" unless that publish output exists — which
+      # broke every Rust step here. `--skip-signing` is what lets CI produce it: signing needs a
+      # key, and none is required to compile. The signed manifest is `release.yml`'s job.
+      - name: Publish the collector so the Tauri resource glob resolves
+        run: node scripts/prepare-collector-bundle.mjs --skip-signing
       - run: cargo fmt --all -- --check
         working-directory: apps/desktop/src-tauri
       - run: cargo check --locked
@@ -78,6 +92,15 @@ jobs:
       - run: cargo about generate -o ..\..\..\docs\licenses\rust-third-party.html ..\..\..\about.hbs
         working-directory: apps/desktop/src-tauri
       - run: pnpm licenses:sbom
+      # T181: the native suite drives the real Tauri window over CDP, with its own throwaway data
+      # directory (`TW_DEV_DATA_DIR`), so it never touches a real profile. Non-blocking for now on
+      # purpose: it needs a GUI session and a CDP handshake on a virtualized runner, and neither is
+      # proven stable here yet. Promote it to blocking once a few runs show it is.
+      - name: Native E2E against the real binary (not blocking yet)
+        continue-on-error: true
+        run: |
+          cargo build --locked --features e2e,custom-protocol --manifest-path apps/desktop/src-tauri/Cargo.toml
+          pnpm --filter @throttlewatch/desktop test:e2e:native
       - name: Upload test artifacts
         if: always()
         uses: actions/upload-artifact@v4

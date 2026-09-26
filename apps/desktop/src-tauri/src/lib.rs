@@ -114,9 +114,11 @@ pub fn run() {
                 .additional_browser_args(&format!("--remote-debugging-port={E2E_CDP_PORT}"));
             window_builder.build().map_err(|error| std::io::Error::other(error.to_string()))?;
 
-            let data_dir = app
-                .path()
-                .app_data_dir()
+            // T181: a native E2E suite drives this very binary, so it must not read or write the
+            // real `%APPDATA%\com.throttlewatch.desktop` — it would inherit the developer's
+            // onboarding, history and preferences (making the run unreproducible) and risk their
+            // data. `TW_DEV_DATA_DIR` moves the whole directory; it is compiled out of release.
+            let data_dir = dev_faults::resolve_data_dir(app.handle())
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
             std::fs::create_dir_all(&data_dir)?;
             let database = data_dir.join("throttlewatch.db");
@@ -350,7 +352,7 @@ pub(crate) fn shutdown_services(app: &tauri::AppHandle) {
             .and_then(serde_json::Value::as_str)
             .unwrap_or("7d");
         if retention == "session"
-            && let Ok(logs) = app.path().app_data_dir().map(|path| path.join("logs"))
+            && let Ok(logs) = dev_faults::resolve_data_dir(app).map(|path| path.join("logs"))
         {
             let _ = logging::clear_directory(logs);
         }

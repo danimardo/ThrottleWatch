@@ -10,6 +10,7 @@
 //! |---|---|
 //! | `TW_DEV_STORAGE_FAIL_WRITES=<n>` | las `n` primeras escrituras de sesión fallan; después vuelven a funcionar, así que una sola ejecución enseña el aviso apareciendo **y** desapareciendo |
 //! | `TW_DEV_CORRUPT_DB=1` | escribe basura en el fichero de base de datos antes de abrirlo, para que el arranque tenga que apartarlo y crear uno nuevo |
+//! | `TW_DEV_DATA_DIR=<ruta>` | usa esa carpeta como directorio de datos en vez de `%APPDATA%\com.throttlewatch.desktop`, para que una suite E2E nativa no lea ni escriba los datos reales de quien desarrolla |
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
 #[cfg(any(debug_assertions, feature = "e2e"))]
@@ -40,6 +41,16 @@ mod active {
     pub fn corrupt_database_requested() -> bool {
         std::env::var("TW_DEV_CORRUPT_DB").is_ok_and(|value| value.trim() == "1")
     }
+
+    /// Where the run must keep its data, when the caller asked for somewhere other than the real
+    /// `%APPDATA%\com.throttlewatch.desktop`. Tauri resolves that directory through
+    /// `SHGetKnownFolderPath`, which ignores the `APPDATA` variable (measured 2026-09-26: setting
+    /// it left the target folder empty), so redirecting it needs an explicit seam like this one.
+    pub fn data_dir_override() -> Option<std::path::PathBuf> {
+        let raw = std::env::var("TW_DEV_DATA_DIR").ok()?;
+        let trimmed = raw.trim();
+        if trimmed.is_empty() { None } else { Some(std::path::PathBuf::from(trimmed)) }
+    }
 }
 
 #[cfg(not(any(debug_assertions, feature = "e2e")))]
@@ -51,9 +62,31 @@ mod active {
     pub fn corrupt_database_requested() -> bool {
         false
     }
+
+    pub fn data_dir_override() -> Option<std::path::PathBuf> {
+        None
+    }
 }
 
-pub use active::{corrupt_database_requested, storage_write_should_fail};
+pub use active::{corrupt_database_requested, data_dir_override, storage_write_should_fail};
+
+/// The directory this run keeps its data in: `TW_DEV_DATA_DIR` when set (debug/`e2e` only),
+/// otherwise the real per-user one Tauri resolves.
+///
+/// Every caller must go through here rather than `app.path().app_data_dir()`. Mixing the two would
+/// be worse than not having the seam at all: `shutdown_services` deletes the `logs` subdirectory
+/// when retention is per-session, so a redirected run that resolved that path the other way would
+/// delete the developer's real logs.
+pub fn resolve_data_dir<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+) -> Result<std::path::PathBuf, tauri::Error> {
+    use tauri::Manager;
+
+    match data_dir_override() {
+        Some(overridden) => Ok(overridden),
+        None => app.path().app_data_dir(),
+    }
+}
 
 /// Damages the SQLite header of `path` so the next open has to treat the file as corrupt. Does
 /// nothing when the fault was not requested, and never touches a path that does not already hold
@@ -111,6 +144,26 @@ mod tests {
             !release_body.contains("env::var"),
             "the release half of dev_faults must never read the environment"
         );
+        // Stronger than the line above and self-maintaining: naming no variable at all means a
+        // new `TW_DEV_*` seam cannot be added to the release half without failing here.
+        assert!(
+            !release_body.contains("TW_DEV"),
+            "the release half of dev_faults must not even name a TW_DEV_* variable"
+        );
+    }
+
+    #[test]
+    fn an_absent_or_blank_data_dir_override_is_no_override() {
+        // Guards the seam's default: only a non-empty value redirects the data directory, so a
+        // stray empty `TW_DEV_DATA_DIR=` cannot send the run to the filesystem root.
+        // SAFETY: single-threaded test, and the variable is read on demand rather than cached.
+        unsafe { std::env::remove_var("TW_DEV_DATA_DIR") };
+        assert_eq!(super::data_dir_override(), None);
+        unsafe { std::env::set_var("TW_DEV_DATA_DIR", "   ") };
+        assert_eq!(super::data_dir_override(), None);
+        unsafe { std::env::set_var("TW_DEV_DATA_DIR", " C:\\tw-e2e ") };
+        assert_eq!(super::data_dir_override(), Some(std::path::PathBuf::from("C:\\tw-e2e")));
+        unsafe { std::env::remove_var("TW_DEV_DATA_DIR") };
     }
 
     #[test]

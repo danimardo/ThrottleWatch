@@ -926,7 +926,7 @@ fn ac_power_available() -> bool {
 /// cannot hold them. `None`/unreadable counts as failing the check, never as passing it.
 fn guided_disk_space_ok(app: &AppHandle, rules: &crate::diagnostics::Ruleset) -> bool {
     let Some(min_free_mb) = rules.parameter("guided.min_free_disk_mb") else { return false };
-    let Ok(data_dir) = app.path().app_data_dir() else { return false };
+    let Ok(data_dir) = crate::dev_faults::resolve_data_dir(app) else { return false };
     crate::diagnostics::disk_space::free_disk_mb(&data_dir)
         .is_some_and(|free_mb| free_mb as f64 >= min_free_mb)
 }
@@ -1520,8 +1520,9 @@ pub fn get_storage_usage(
         .map_err(|_| CommandError::operation_failed())?
         .usage()
         .map_err(|_| CommandError::operation_failed())?;
-    let logs =
-        app.path().app_data_dir().map_err(|_| CommandError::operation_failed())?.join("logs");
+    let logs = crate::dev_faults::resolve_data_dir(&app)
+        .map_err(|_| CommandError::operation_failed())?
+        .join("logs");
     let logs_bytes =
         crate::logging::directory_bytes(logs).map_err(|_| CommandError::operation_failed())?;
     let corrupt_backup = app.try_state::<CorruptBackupNotice>().and_then(|notice| {
@@ -1756,8 +1757,9 @@ pub fn delete_monitoring_data(
         Err(_) => failed.push("data".to_owned()),
     }
     forget_recorded_session(&app);
-    let logs =
-        app.path().app_data_dir().map_err(|_| CommandError::operation_failed())?.join("logs");
+    let logs = crate::dev_faults::resolve_data_dir(&app)
+        .map_err(|_| CommandError::operation_failed())?
+        .join("logs");
     match crate::logging::clear_directory(logs) {
         Ok(()) => cleared.push("logs".to_owned()),
         Err(_) => failed.push("logs".to_owned()),
@@ -1784,8 +1786,9 @@ pub fn reset_application(
         Err(_) => failed.push("data_and_preferences".to_owned()),
     }
     forget_recorded_session(&app);
-    let logs =
-        app.path().app_data_dir().map_err(|_| CommandError::operation_failed())?.join("logs");
+    let logs = crate::dev_faults::resolve_data_dir(&app)
+        .map_err(|_| CommandError::operation_failed())?
+        .join("logs");
     match crate::logging::clear_directory(logs) {
         Ok(()) => cleared.push("logs".to_owned()),
         Err(_) => failed.push("logs".to_owned()),
@@ -1800,8 +1803,9 @@ pub fn reset_application(
 
 #[tauri::command]
 pub fn open_logs_folder(app: AppHandle) -> Result<(), CommandError> {
-    let logs =
-        app.path().app_data_dir().map_err(|_| CommandError::operation_failed())?.join("logs");
+    let logs = crate::dev_faults::resolve_data_dir(&app)
+        .map_err(|_| CommandError::operation_failed())?
+        .join("logs");
     fs::create_dir_all(&logs).map_err(|_| CommandError::operation_failed())?;
     std::process::Command::new("explorer.exe")
         .arg(logs)

@@ -15,13 +15,14 @@ export default defineConfig({
     ['html', { outputFolder: 'playwright-report', open: 'never' }]
   ],
   projects: [
+    // T181: there used to be a second project here called `app`, identical to `frontend` in
+    // every way that matters — same Vite preview `baseURL`, same Chromium, same fake bridge from
+    // `e2e/fixtures.ts`. The name promised it exercised the real application and it never did, so
+    // every spec ran twice for no added coverage while nothing covered the real binary. The real
+    // application is now driven by `playwright.native.config.ts` (`e2e-native/`, over CDP, with
+    // its own isolated data directory); this config is the frontend harness and says so.
     {
       name: 'frontend',
-      use: { browserName: 'chromium' },
-      grep: /@smoke|@critical|@a11y|@visual/
-    },
-    {
-      name: 'app',
       use: {
         browserName: 'chromium',
         video: 'on-first-retry',
