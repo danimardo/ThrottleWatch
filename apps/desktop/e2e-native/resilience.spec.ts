@@ -68,7 +68,15 @@ test('@critical base danada: se aparta al arrancar y Ajustes ofrece exportarla',
   // Recovering from corruption means a fresh database, so the app starts at onboarding.
   await ensureOnboardingDone(page);
 
-  await page.getByText('Ajustes', { exact: true }).first().click();
+  // By shortcut and by a bilingual name, like the other native specs. This used to click the text
+  // 'Ajustes', which only exists in a Spanish UI: on the CI runner (English Windows) it waited the
+  // whole 30 s test timeout for a button called "Ajustes", and Playwright reported that as "Target
+  // page, context or browser has been closed". Two earlier guesses at the cause (the CDP port, then
+  // launching twice) were wrong; the failing log line said which text it was waiting for.
+  await page.keyboard.press('Control+6');
+  await expect(
+    page.getByRole('main', { name: /settings|ajustes/i })
+  ).toBeVisible();
   const corruptRow = page.locator('.row', { hasText: /dañada|corrupt/i });
   await expect(corruptRow).toBeVisible({ timeout: 20_000 });
 
