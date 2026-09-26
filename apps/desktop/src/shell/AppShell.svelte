@@ -641,12 +641,15 @@
 
   {#if guidedRunning && active !== 'guided'}
     <div class="guided-session-banner" role="status">
-      <span>{t('guided.inProgress')}</span>
-      <Button
-        variant="secondary"
-        label={t('guided.stop')}
-        onclick={() => void stopGuidedSession()}
-      />
+      <Banner tone="info" title={t('guided.inProgress')}>
+        {#snippet action()}
+          <Button
+            variant="secondary"
+            label={t('guided.stop')}
+            onclick={() => void stopGuidedSession()}
+          />
+        {/snippet}
+      </Banner>
     </div>
   {/if}
 
@@ -766,15 +769,6 @@
     right: var(--space-4);
     bottom: var(--space-4);
     z-index: 20;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-4);
-    padding: var(--space-3) var(--space-4);
-    color: var(--text-primary);
-    background: var(--surface-raised);
-    border: 1px solid var(--hairline);
-    border-radius: var(--radius-md);
     box-shadow: var(--shadow-lg);
   }
   .sidebar {

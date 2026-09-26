@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import {
     Banner,
+    Button,
     ContextStrip,
     CoverageMatrix,
     StatWidget,
@@ -342,13 +343,11 @@
           description={t('dashboard.coverageDegradedDescription')}
         >
           {#snippet action()}
-            <button
-              type="button"
-              class="repair-link"
+            <Button
+              variant="secondary"
+              label={t('dashboard.repairAdvanced')}
               onclick={() => requestAdvancedAccess('repair')}
-            >
-              {t('dashboard.repairAdvanced')}
-            </button>
+            />
           {/snippet}
         </Banner>
       {/if}
@@ -402,14 +401,5 @@
   }
   .coverage {
     padding-top: var(--space-2);
-  }
-  .repair-link {
-    border: 0;
-    padding: 0;
-    background: transparent;
-    color: var(--accent-blue);
-    font: inherit;
-    text-decoration: underline;
-    cursor: default;
   }
 </style>
