@@ -186,15 +186,35 @@ fn event_from_tracing(
     })
 }
 
+/// How long repeats of the same code are folded into one entry, and therefore how long a quiet
+/// application may hold its last entry before [`flush_aged`] writes it out anyway.
+const DEDUPLICATION_WINDOW: Duration = Duration::from_secs(60);
+
 pub struct JsonLogLayer {
     writer: NonBlocking,
-    deduplicator: Mutex<Deduplicator>,
+    deduplicator: Arc<Mutex<Deduplicator>>,
     control: LogControl,
 }
 
 impl JsonLogLayer {
-    fn new(writer: NonBlocking, control: LogControl) -> Self {
-        Self { writer, deduplicator: Mutex::new(Deduplicator::default()), control }
+    fn new(
+        writer: NonBlocking,
+        deduplicator: Arc<Mutex<Deduplicator>>,
+        control: LogControl,
+    ) -> Self {
+        Self { writer, deduplicator, control }
+    }
+}
+
+/// Writes the pending entry when it is older than the deduplication window. Without this the
+/// deduplicator only ever emits an entry when a *different* one displaces it, so a healthy, quiet
+/// application writes nothing at all and the last thing that happened — usually the interesting
+/// one — never reaches disk (T184).
+fn flush_aged(writer: &NonBlocking, deduplicator: &Mutex<Deduplicator>, now: Instant) {
+    if let Ok(mut guard) = deduplicator.lock()
+        && let Some(event) = guard.take_aged(now, DEDUPLICATION_WINDOW)
+    {
+        write_event(writer, &event);
     }
 }
 
@@ -209,12 +229,28 @@ impl Deduplicator {
             self.pending = Some((event, now, 1));
             return None;
         };
-        if pending.code == event.code && now.duration_since(at) < Duration::from_secs(60) {
+        if pending.code == event.code && now.duration_since(at) < DEDUPLICATION_WINDOW {
             self.pending = Some((pending, at, count.saturating_add(1)));
             return None;
         }
         self.pending = Some((event, now, 1));
         Some(with_repeat_count(pending, count))
+    }
+
+    /// The pending entry once it has outlived the window, so a quiet application still writes it.
+    fn take_aged(&mut self, now: Instant, window: Duration) -> Option<LogEvent> {
+        let (_, at, _) = self.pending.as_ref()?;
+        if now.duration_since(*at) < window {
+            return None;
+        }
+        let (event, _, count) = self.pending.take()?;
+        Some(with_repeat_count(event, count))
+    }
+
+    /// The pending entry whatever its age, for shutdown: otherwise it dies with the process.
+    fn take_pending(&mut self) -> Option<LogEvent> {
+        let (event, _, count) = self.pending.take()?;
+        Some(with_repeat_count(event, count))
     }
 }
 
@@ -313,8 +349,23 @@ impl Write for RotatingWriter {
 }
 
 pub struct LogGuard {
+    writer: NonBlocking,
+    deduplicator: Arc<Mutex<Deduplicator>>,
     _worker: WorkerGuard,
     control: LogControl,
+}
+
+impl Drop for LogGuard {
+    /// T184: whatever is still pending dies with the process otherwise — and that is precisely
+    /// the last thing the application said before closing. Runs before `_worker` is dropped
+    /// (fields drop after `Drop::drop`), so the entry still reaches the writer.
+    fn drop(&mut self) {
+        if let Ok(mut guard) = self.deduplicator.lock()
+            && let Some(event) = guard.take_pending()
+        {
+            write_event(&self.writer, &event);
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -358,17 +409,31 @@ pub fn init(directory: impl AsRef<Path>, detailed: bool) -> io::Result<LogGuard>
         detailed: Arc::new(AtomicBool::new(detailed)),
         detailed_until: Arc::new(Mutex::new(None)),
     };
-    let layer = JsonLogLayer::new(non_blocking, control.clone());
+    let deduplicator = Arc::new(Mutex::new(Deduplicator::default()));
+    let layer = JsonLogLayer::new(non_blocking.clone(), Arc::clone(&deduplicator), control.clone());
     tracing_subscriber::registry()
         .with(layer)
         .try_init()
         .map_err(|error| io::Error::new(io::ErrorKind::AlreadyExists, error.to_string()))?;
+    // T184: without this the deduplicator only emits an entry when a different one displaces it,
+    // so a quiet application never writes anything. The process ends when it ends; this thread
+    // does not need to be joined, it only has to keep the tail of the log moving.
+    {
+        let writer = non_blocking.clone();
+        let pending = Arc::clone(&deduplicator);
+        std::thread::Builder::new().name("log-flush".to_owned()).spawn(move || {
+            loop {
+                std::thread::sleep(DEDUPLICATION_WINDOW);
+                flush_aged(&writer, &pending, Instant::now());
+            }
+        })?;
+    }
     let previous_hook = panic::take_hook();
     panic::set_hook(Box::new(move |panic_info| {
         tracing::error!(component = "core", code = "RUST_PANIC", msg = "unhandled Rust panic");
         previous_hook(panic_info);
     }));
-    Ok(LogGuard { _worker: worker, control })
+    Ok(LogGuard { writer: non_blocking, deduplicator, _worker: worker, control })
 }
 
 impl LogGuard {
@@ -440,6 +505,68 @@ mod tests {
     use std::io::Write;
     use std::sync::{Arc, Mutex, atomic::AtomicBool};
     use std::time::{Duration, Instant};
+
+    fn sample_event(code: &str) -> LogEvent {
+        LogEvent {
+            ts: "2026-09-26T00:00:00Z".to_owned(),
+            level: "WARN".to_owned(),
+            component: "core".to_owned(),
+            target: "test".to_owned(),
+            code: code.to_owned(),
+            msg: "m".to_owned(),
+            session_id: None,
+            protocol_version: 1,
+            fields: Map::new(),
+            err: None,
+        }
+    }
+
+    /// T184: the bug that made a healthy application write an empty log. `push` only ever returns
+    /// an entry when a *different* one displaces it, so a single event stayed pending forever and
+    /// was lost when the process ended.
+    #[test]
+    fn a_lone_event_is_still_written_once_it_outlives_the_window() {
+        let mut deduplicator = Deduplicator::default();
+        let start = Instant::now();
+        assert!(
+            deduplicator.push(sample_event("ALONE"), start).is_none(),
+            "the first event is held back, waiting to fold repeats into it"
+        );
+        assert!(
+            deduplicator.take_aged(start, Duration::from_secs(60)).is_none(),
+            "not yet: inside the window it may still gather repeats"
+        );
+        let aged = deduplicator
+            .take_aged(start + Duration::from_secs(61), Duration::from_secs(60))
+            .unwrap_or_else(|| panic!("an event older than the window must be written"));
+        assert_eq!(aged.code, "ALONE");
+        assert!(deduplicator.take_aged(start + Duration::from_secs(120), Duration::ZERO).is_none());
+    }
+
+    #[test]
+    fn shutdown_writes_whatever_was_still_pending() {
+        let mut deduplicator = Deduplicator::default();
+        let start = Instant::now();
+        deduplicator.push(sample_event("LAST_WORDS"), start);
+        let pending = deduplicator
+            .take_pending()
+            .unwrap_or_else(|| panic!("closing must not swallow the last entry"));
+        assert_eq!(pending.code, "LAST_WORDS");
+        assert!(deduplicator.take_pending().is_none());
+    }
+
+    #[test]
+    fn repeats_are_still_folded_and_counted_when_flushed_by_age() {
+        let mut deduplicator = Deduplicator::default();
+        let start = Instant::now();
+        deduplicator.push(sample_event("SAME"), start);
+        deduplicator.push(sample_event("SAME"), start + Duration::from_secs(1));
+        deduplicator.push(sample_event("SAME"), start + Duration::from_secs(2));
+        let folded = deduplicator
+            .take_aged(start + Duration::from_secs(61), Duration::from_secs(60))
+            .unwrap_or_else(|| panic!("the folded entry must come out"));
+        assert_eq!(folded.fields.get("count").and_then(Value::as_u64), Some(3));
+    }
 
     #[test]
     fn redacts_fields_outside_the_allowlist() {

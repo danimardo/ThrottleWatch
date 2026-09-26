@@ -412,6 +412,30 @@ mod tests {
         manifest,
     };
 
+    /// T112: the bundled installer has to sit exactly where `installer_path` looks for it, which
+    /// is `resource_dir()` — the directory holding the executable — joined with the manifest's
+    /// `installer`. It did not: `tauri.conf.json` shipped it under `resources\pawnio\…` while
+    /// this resolves to `<exe>\pawnio\…`, so the real application could never find it and
+    /// "install advanced access" (FR-087) failed in dev and in the installed product alike. Only
+    /// the fake bridge covered that flow, so no test saw it. This keeps the two ends nailed
+    /// together: whoever changes the bundle destination has to change the manifest to match.
+    #[test]
+    fn the_bundled_installer_is_looked_for_directly_under_the_resource_directory() {
+        let value = manifest().unwrap_or_else(|error| panic!("manifest: {error}"));
+        let resolved = super::installer_path(std::path::Path::new(r"C:\app"), &value);
+        assert_eq!(
+            resolved,
+            std::path::Path::new(r"C:\app").join("pawnio/PawnIO_setup_2.2.0.exe"),
+            "the manifest's installer path is relative to the resource directory, not to a \
+             `resources` subfolder; keep tauri.conf.json's bundle destination in step"
+        );
+        assert!(
+            !value.installer.replace('\\', "/").starts_with("resources/"),
+            "prefixing the manifest with `resources/` would put the file one level below where \
+             `resource_dir()` points"
+        );
+    }
+
     #[test]
     fn manifest_pins_the_verified_release() {
         let value = match manifest() {
