@@ -10,7 +10,7 @@ body {
   min-width: 320px;
 }
 main {
-  max-width: 960px;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 3rem;
+  padding: var(--space-6);
 }
