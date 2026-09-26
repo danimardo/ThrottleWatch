@@ -1,5 +1,6 @@
 import type { Classification } from '../../design-system/lib/classification';
 import type { LiveSnapshot } from '../../lib/bridge/schemas';
+import { catalogs } from '../../lib/i18n';
 
 export type CoverageTier = 'A' | 'B' | 'C';
 export type Freshness = 'fresh' | 'stale' | 'disconnected';
@@ -11,6 +12,60 @@ export type AdvancedAccess =
   | 'denied'
   | 'error';
 export type Translate = (key: string) => string;
+
+/**
+ * The maximum-confidence line and the power line, from the same `native.live.*` texts Rust uses for
+ * the snapshot. The live events used to replace them with strings written in the component
+ * (`Maximum reachable confidence: low`, `Battery 64 %`, and the raw `ac`), so a coverage or power
+ * change turned the Spanish label Rust had produced into English.
+ */
+export function confidenceLabelFor(
+  t: Translate,
+  ceiling: 'low' | 'medium' | 'high'
+): string {
+  return t(`native.live.confidence.${ceiling}`);
+}
+
+export function powerLabelFor(
+  t: Translate,
+  source: 'ac' | 'battery' | 'unknown',
+  batteryPercent: number | null | undefined
+): string {
+  if (source === 'battery') {
+    const base = t('native.live.power.battery');
+    return batteryPercent === undefined || batteryPercent === null
+      ? base
+      : `${base} ${String(batteryPercent)} %`;
+  }
+  return t(
+    source === 'ac' ? 'native.live.power.ac' : 'native.live.power.unknown'
+  );
+}
+
+/**
+ * The reasons Rust gives a coverage row that is not available: whatever is under `coverage` in the
+ * catalogs, so there is one list and it is the texts themselves. (A test in `i18n.rs` makes sure
+ * every reason the backend can emit is in there.)
+ */
+const coverageCatalog = catalogs.en.coverage;
+export const COVERAGE_REASON_KEYS: readonly string[] =
+  typeof coverageCatalog === 'object'
+    ? Object.keys(coverageCatalog).map((name) => `coverage.${name}`)
+    : [];
+
+/**
+ * The text of a row's reason. The row carries a catalog *key*, and the matrix used to print it as
+ * it came (`coverage.temperature_missing`). A key that is not one of ours — a newer backend, say —
+ * gets the generic "not available" rather than the key itself.
+ */
+export function coverageReasonLabel(
+  t: Translate,
+  key: string | null | undefined
+): string {
+  return key !== null && key !== undefined && COVERAGE_REASON_KEYS.includes(key)
+    ? t(key)
+    : t('dashboard.unavailable');
+}
 
 /** Catalog key of every collector state the backend can report (`collector_state`). */
 export const COLLECTOR_LABEL_KEYS: Readonly<Record<string, string>> = {

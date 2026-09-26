@@ -458,6 +458,14 @@
     "filterPlaceholder": "Number or group",
     "emptyFilter": "No matching cores."
   },
+  "coverage": {
+    "access_not_installable": "Advanced access cannot be installed on this computer.",
+    "active_clock_missing": "The collector does not report the active clock.",
+    "advanced_access_required": "Requires advanced access.",
+    "power_missing": "This computer does not report power.",
+    "reading_unavailable": "The reading is not available right now.",
+    "temperature_missing": "The collector does not report temperature."
+  },
   "native": {
     "tray": {
       "status": "Current status",

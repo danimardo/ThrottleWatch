@@ -458,6 +458,14 @@
     "filterPlaceholder": "Número o grupo",
     "emptyFilter": "No hay núcleos que coincidan."
   },
+  "coverage": {
+    "access_not_installable": "El acceso avanzado no se puede instalar en este equipo.",
+    "active_clock_missing": "El colector no publica la frecuencia activa.",
+    "advanced_access_required": "Requiere acceso avanzado.",
+    "power_missing": "Este equipo no publica la potencia.",
+    "reading_unavailable": "La lectura no está disponible ahora mismo.",
+    "temperature_missing": "El colector no publica la temperatura."
+  },
   "native": {
     "tray": {
       "status": "Estado actual",

@@ -25,10 +25,13 @@
   import { toStatusHeroView } from './adapter';
   import {
     COLLECTOR_LABEL_KEYS,
+    confidenceLabelFor,
+    coverageReasonLabel,
     createDemoSnapshot,
     formatNumber,
     fromLiveSnapshot,
     marginText,
+    powerLabelFor,
     type DashboardSnapshot
   } from './model';
 
@@ -130,7 +133,7 @@
       currentSnapshot = {
         ...currentSnapshot,
         coverage: parsed.value.tier,
-        confidenceLabel: `Maximum reachable confidence: ${parsed.value.confidence_ceiling}`
+        confidenceLabel: confidenceLabelFor(t, parsed.value.confidence_ceiling)
       };
       advancedAccess = parsed.value.advanced_access;
       if (
@@ -151,10 +154,11 @@
       if (!parsed.ok) return;
       currentSnapshot = {
         ...currentSnapshot,
-        powerLabel:
-          parsed.value.source === 'battery'
-            ? `Battery${parsed.value.battery_percent === undefined || parsed.value.battery_percent === null ? '' : ` ${String(parsed.value.battery_percent)} %`}`
-            : parsed.value.source
+        powerLabel: powerLabelFor(
+          t,
+          parsed.value.source,
+          parsed.value.battery_percent
+        )
       };
     }).then((stop) => {
       if (disposed) stop();
@@ -179,9 +183,9 @@
             row.quality === 'derived' || row.quality === 'substitute'
               ? row.quality
               : 'direct',
-          qualityLabel: row.quality_label ?? 'Unknown',
-          sourceLabel: row.source_label ?? 'Unavailable',
-          reasonLabel: row.reason_key ?? 'coverage.unavailable'
+          qualityLabel: row.quality_label ?? t('dashboard.unknown'),
+          sourceLabel: row.source_label ?? t('dashboard.unavailable'),
+          reasonLabel: coverageReasonLabel(t, row.reason_key)
         }));
         advancedAccess = result.value.advanced_access;
       }
