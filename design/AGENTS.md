@@ -593,6 +593,17 @@ ArrowUp/ArrowDown move, Enter/Space choose, Escape closes and returns
 focus to the trigger. Reach for `SegmentedControl` first — this is for
 when that option range (2–5) doesn't fit.
 
+The open list is drawn in the browser's **top layer** (`popover="manual"`),
+placed by the component under the trigger — or over it when there is more
+room above — and kept attached to the trigger when the page scrolls or
+resizes beneath it (it closes only if the trigger leaves the screen). It is
+not an absolutely positioned child: inside a glass card (which has its own
+stacking context from `backdrop-filter`) a `z-index` only counts within that
+card, so the card below painted over the list and cut it off after its first
+option (fixed 2026-09-26). Do not put a `Select` inside anything that clips
+or transforms its descendants expecting the list to follow; it does not need
+to.
+
 ### Tooltip
 | prop | type | required | notes |
 |---|---|---|---|

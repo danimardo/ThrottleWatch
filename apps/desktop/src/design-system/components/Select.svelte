@@ -18,6 +18,13 @@
    *
    * `value` is bindable:
    *
+   * The open list is drawn in the browser's *top layer* (`popover="manual"`), not as an absolutely
+   * positioned child of the field. Inside a glass card — which has its own stacking context, from its
+   * `backdrop-filter` — a `z-index` only means anything *within* that card, so the card below painted
+   * over the list and cut it off after its first option. The top layer sits above every stacking
+   * context, so nothing can cover it; the component places it under (or, if there is no room, over)
+   * the trigger itself, and keeps it attached to the trigger when the page scrolls or resizes.
+   *
    *   <Select bind:value={language} label="Idioma"
    *     options={[{value:'system',label:'Usar idioma del sistema'}, ...]} />
    */
@@ -93,12 +100,72 @@
     closeList(false);
   }
 
+  const GAP = 6;
+  const EDGE = 8;
+
+  /** Puts the list under the trigger, or over it when there is more room above than below. */
+  function placeList() {
+    if (!triggerEl || !listEl) return;
+    const anchor = triggerEl.getBoundingClientRect();
+    const height = listEl.offsetHeight;
+    const width = Math.max(anchor.width, listEl.offsetWidth);
+    const below = window.innerHeight - anchor.bottom - GAP - EDGE;
+    const above = anchor.top - GAP - EDGE;
+    const up = height > below && above > below;
+    const left = Math.max(EDGE, Math.min(anchor.left, window.innerWidth - width - EDGE));
+    listEl.style.minWidth = `${anchor.width}px`;
+    listEl.style.left = `${left}px`;
+    listEl.style.top = `${up ? Math.max(EDGE, anchor.top - GAP - height) : anchor.bottom + GAP}px`;
+    listEl.style.transformOrigin = up ? 'bottom center' : 'top center';
+  }
+
+  let frame = 0;
+
+  function onViewportChange(event: Event) {
+    // The list lives in viewport coordinates, so when the page scrolls or the window resizes beneath
+    // it, it has to move with the trigger. An earlier version closed it instead, which was fragile:
+    // any scroll counted, including the ones the page makes by itself while a section expands, and
+    // the list vanished a moment after it was opened.
+    //
+    // Its own scrolling is ignored: a long list (24 hours) is taller than its `max-height` and
+    // scrolls to show the highlighted option, and that `scroll` event — caught here in the capture
+    // phase, like every other — must not re-place the list it belongs to.
+    if (event.target instanceof Node && listEl?.contains(event.target)) return;
+    if (!open || frame !== 0) return;
+    frame = requestAnimationFrame(() => {
+      frame = 0;
+      if (!triggerEl) return;
+      const anchor = triggerEl.getBoundingClientRect();
+      // Only when the trigger has left the screen altogether is there nothing left to attach to.
+      if (anchor.bottom < 0 || anchor.top > window.innerHeight) closeList(false);
+      else placeList();
+    });
+  }
+
   $effect(() => {
-    if (open) {
-      window.addEventListener('click', onWindowClick);
-      listEl?.focus();
-      return () => window.removeEventListener('click', onWindowClick);
-    }
+    if (!open || !listEl) return;
+    const list = listEl;
+    list.showPopover();
+    placeList();
+    // Without `preventScroll` focusing scrolls the *page* to reveal the list, and that scroll event
+    // then closes the list that was just opened (the 24-hour list near the bottom of Settings).
+    list.focus({ preventScroll: true });
+    window.addEventListener('click', onWindowClick);
+    window.addEventListener('resize', onViewportChange);
+    window.addEventListener('scroll', onViewportChange, true);
+    return () => {
+      window.removeEventListener('click', onWindowClick);
+      window.removeEventListener('resize', onViewportChange);
+      window.removeEventListener('scroll', onViewportChange, true);
+      cancelAnimationFrame(frame);
+      frame = 0;
+      // Already gone if the element was removed first; either way it must not stay in the top layer.
+      try {
+        list.hidePopover();
+      } catch {
+        /* not showing */
+      }
+    };
   });
 </script>
 
@@ -129,6 +196,7 @@
       bind:this={listEl}
       {id}
       role="listbox"
+      popover="manual"
       class="tw-select-list"
       tabindex="-1"
       aria-activedescendant={`${id}-opt-${activeIndex}`}
@@ -202,14 +270,16 @@
   .tw-select-list {
     animation: tw-drop var(--motion-base) var(--motion-spring) both;
     transform-origin: top center;
-    position: absolute;
-    z-index: 30;
-    top: calc(100% + 6px);
-    left: 0;
-    min-width: 100%;
+    /* In the top layer (`popover`), positioned in viewport coordinates by `placeList()`. The UA
+       stylesheet centres a popover with `inset: 0; margin: auto`, so both are reset. */
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    color: var(--text-primary);
+    /* No `min-width: 100%`: a fixed box's percentage is the *viewport's*, which made the list as wide
+       as the window. The minimum width (the trigger's) is set by `placeList()`. */
     max-height: 260px;
     overflow-y: auto;
-    margin: 0;
     padding: var(--space-1);
     list-style: none;
     background-color: var(--glass-bg-strong);
