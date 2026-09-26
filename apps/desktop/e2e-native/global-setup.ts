@@ -19,7 +19,8 @@ import path from 'node:path';
  *
  * The suite has to hold in both interface languages: the CI runner is an English Windows, a Spanish
  * developer machine is not, and a test written against one silently fails on the other. To run it in
- * English locally: `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS="--lang=en-US --accept-lang=en-US"`.
+ * English locally: `TW_DEV_SYSTEM_LANGUAGES=en-US` (the application resolves `system` from Windows'
+ * ranked language list, which this replaces; forcing the WebView's `--lang` no longer changes it).
  *
  * Build first (not done here — this is a smoke you run deliberately, not part of `pnpm test:e2e`):
  *   pnpm exec vite build
@@ -37,10 +38,7 @@ const POLL_INTERVAL_MS = 300;
 // developer's own binary with an instrumented one — and every plain `cargo build`/`cargo test`
 // replaced this one with a build that has no CDP port. Two consumers, two directories.
 const exePath = fileURLToPath(
-  new URL(
-    '../src-tauri/target-e2e/debug/throttlewatch.exe',
-    import.meta.url
-  )
+  new URL('../src-tauri/target-e2e/debug/throttlewatch.exe', import.meta.url)
 );
 const fakeCollectorPath = fileURLToPath(
   new URL('./fake-collector.mjs', import.meta.url)
@@ -62,7 +60,7 @@ async function waitForCdp(deadline: number): Promise<void> {
   throw new Error(
     `throttlewatch.exe did not open the CDP port at ${CDP_URL} within ${READY_TIMEOUT_MS}ms. ` +
       'The port is only opened by a build with the `e2e` feature (target-e2e/, kept apart from ' +
-      "target/debug so it is never overwritten by a plain build): rebuild it with `cargo build --locked " +
+      'target/debug so it is never overwritten by a plain build): rebuild it with `cargo build --locked ' +
       '--features e2e,custom-protocol --manifest-path src-tauri/Cargo.toml --target-dir src-tauri/target-e2e`.'
   );
 }
@@ -112,6 +110,15 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   const env = {
     ...process.env,
     TW_DEV_DATA_DIR: process.env.TW_DEV_DATA_DIR ?? dataDir,
+    // The WebView keeps its own profile (cookies, cache and, notably, the language it was started
+    // with) in `%LOCALAPPDATA%\com.throttlewatch.desktop\EBWebView` — *not* under the data directory
+    // above. Without this, every run of this suite wrote into the developer's real profile: forcing
+    // English for the two-language check (`--lang=en-US`) left `accept_languages = en-US` behind, and
+    // the developer's own app then reported an English browser language (2026-09-26). WebView2 honours
+    // this variable, so the suite gets a profile of its own inside the throwaway directory.
+    WEBVIEW2_USER_DATA_FOLDER:
+      process.env.WEBVIEW2_USER_DATA_FOLDER ??
+      path.join(process.env.TW_DEV_DATA_DIR ?? dataDir, 'webview'),
     // One finished session with samples and a report, imported at startup through the product's own
     // importer (`TW_DEV_SEED_BUNDLE`), so scenarios about sessions have something to open, export and
     // reference without minutes of recording or a native dialog. A caller's value wins.
