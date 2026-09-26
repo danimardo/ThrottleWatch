@@ -25,6 +25,9 @@ const POLL_INTERVAL_MS = 300;
 const exePath = fileURLToPath(
   new URL('../src-tauri/target/debug/throttlewatch.exe', import.meta.url)
 );
+const fakeCollectorPath = fileURLToPath(
+  new URL('./fake-collector.mjs', import.meta.url)
+);
 
 async function waitForCdp(deadline: number): Promise<void> {
   while (Date.now() < deadline) {
@@ -64,7 +67,8 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   // `TW_DEV_DATA_DIR` from the caller wins, so a failing run can be pointed at a kept directory.
   const env = {
     ...process.env,
-    TW_DEV_DATA_DIR: process.env.TW_DEV_DATA_DIR ?? dataDir
+    TW_DEV_DATA_DIR: process.env.TW_DEV_DATA_DIR ?? dataDir,
+    ...collectorEnvironment()
   };
 
   // `TW_DEV_CORRUPT_DB` damages an existing database; it never creates one, on purpose (see
@@ -115,6 +119,32 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     if (!process.env.TW_DEV_DATA_DIR) {
       await removeWhenReleased(dataDir);
     }
+  };
+}
+
+/**
+ * Which collector the run under test gets.
+ *
+ * By default the test double (`fake-collector.mjs`). The real collector only starts from a manifest
+ * signed by a trusted key, and the private half of the development key is kept out of the repository
+ * on purpose — so on a CI runner (or any machine that has not signed one) the app ran with no
+ * telemetry at all, and every scenario that needs samples was unreachable. It also made the suite
+ * depend on whether the developer had re-signed after their last `dotnet build`. The double is the
+ * same on every machine, which is the point of an E2E fixture; the real collector has its own tests
+ * (.NET suite, T-INT).
+ *
+ * `TW_E2E_REAL_COLLECTOR=1` opts out, for a run that wants the real one on a machine that has it. A
+ * `TW_DEV_COLLECTOR_CMD` from the caller always wins.
+ */
+function collectorEnvironment(): NodeJS.ProcessEnv {
+  if (
+    process.env.TW_DEV_COLLECTOR_CMD !== undefined ||
+    process.env.TW_E2E_REAL_COLLECTOR === '1'
+  ) {
+    return {};
+  }
+  return {
+    TW_DEV_COLLECTOR_CMD: JSON.stringify([process.execPath, fakeCollectorPath])
   };
 }
 

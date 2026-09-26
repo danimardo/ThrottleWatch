@@ -31,15 +31,10 @@ test('@critical disco lleno: aviso persistente, modo memoria y recuperacion sola
     'necesita TW_DEV_STORAGE_FAIL_WRITES; ver la cabecera de este fichero'
   );
   // This scenario needs live telemetry: the warning comes from a failed *write of a recorded
-  // sample*, and with no collector there are none. The collector only starts with a manifest signed
-  // by a trusted key; a debug build trusts the development key, whose private half lives outside
-  // the repository on purpose, so a CI runner cannot sign one. Reproduced locally by moving the
-  // manifests away: same failure, same 30 s timeout. Not worth weakening the trust boundary for a
-  // test. The real fix is a test collector or trace replay (T181, tasks.md).
-  test.skip(
-    process.env.CI !== undefined,
-    'necesita un colector vivo, y el runner de CI no puede firmar su manifiesto'
-  );
+  // sample*, and with no collector there are none. The harness gives the app a test double for the
+  // collector (`fake-collector.mjs`, via `TW_DEV_COLLECTOR_CMD`), so it runs the same on a CI runner
+  // — which cannot sign the real collector's manifest — as on a developer machine. Before that it
+  // could only run where a signed collector happened to be installed, and skipped itself under CI.
   test.setTimeout(RETRY_BUDGET_MS + 60_000);
 
   // T181: the run starts from an empty database now (`TW_DEV_DATA_DIR`), so onboarding is what

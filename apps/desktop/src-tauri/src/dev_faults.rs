@@ -10,6 +10,7 @@
 //! |---|---|
 //! | `TW_DEV_STORAGE_FAIL_WRITES=<n>` | las `n` primeras escrituras de sesión fallan; después vuelven a funcionar, así que una sola ejecución enseña el aviso apareciendo **y** desapareciendo |
 //! | `TW_DEV_CORRUPT_DB=1` | escribe basura en el fichero de base de datos antes de abrirlo, para que el arranque tenga que apartarlo y crear uno nuevo |
+//! | `TW_DEV_COLLECTOR_CMD=<json>` | arranca este programa en lugar del colector real, como un array JSON `["programa","arg",…]`; el programa habla el protocolo IPC por stdin/stdout. Sirve para que una suite E2E tenga telemetría sin un colector firmado |
 //! | `TW_DEV_DATA_DIR=<ruta>` | usa esa carpeta como directorio de datos en vez de `%APPDATA%\com.throttlewatch.desktop`, para que una suite E2E nativa no lea ni escriba los datos reales de quien desarrolla |
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
@@ -42,6 +43,29 @@ mod active {
         std::env::var("TW_DEV_CORRUPT_DB").is_ok_and(|value| value.trim() == "1")
     }
 
+    /// The program (and arguments) to run in place of the collector, from `TW_DEV_COLLECTOR_CMD`.
+    ///
+    /// The collector only starts from a manifest signed by a trusted key, and the development
+    /// key's private half lives outside the repository on purpose, so a CI runner can never launch
+    /// the real one: every scenario that needs live telemetry was unreachable there (the full-disk
+    /// scenario failed identically with the manifests hidden locally, 2026-09-26). This replaces the
+    /// *launcher*, not the check: the trust boundary is untouched and simply not consulted, in the
+    /// only builds where this exists.
+    pub fn fake_collector_command() -> Option<(std::path::PathBuf, Vec<String>)> {
+        parse_command(&std::env::var("TW_DEV_COLLECTOR_CMD").ok()?)
+    }
+
+    /// `["program","arg",…]` as JSON. Anything else — not JSON, not an array of strings, empty, or a
+    /// blank program — is no command at all, so a stray value cannot start a half-specified process.
+    pub fn parse_command(raw: &str) -> Option<(std::path::PathBuf, Vec<String>)> {
+        let parts: Vec<String> = serde_json::from_str(raw).ok()?;
+        let (program, args) = parts.split_first()?;
+        if program.trim().is_empty() {
+            return None;
+        }
+        Some((std::path::PathBuf::from(program), args.to_vec()))
+    }
+
     /// Where the run must keep its data, when the caller asked for somewhere other than the real
     /// `%APPDATA%\com.throttlewatch.desktop`. Tauri resolves that directory through
     /// `SHGetKnownFolderPath`, which ignores the `APPDATA` variable (measured 2026-09-26: setting
@@ -66,9 +90,16 @@ mod active {
     pub fn data_dir_override() -> Option<std::path::PathBuf> {
         None
     }
+
+    pub fn fake_collector_command() -> Option<(std::path::PathBuf, Vec<String>)> {
+        None
+    }
 }
 
-pub use active::{corrupt_database_requested, data_dir_override, storage_write_should_fail};
+pub use active::{
+    corrupt_database_requested, data_dir_override, fake_collector_command,
+    storage_write_should_fail,
+};
 
 /// The directory this run keeps its data in: `TW_DEV_DATA_DIR` when set (debug/`e2e` only),
 /// otherwise the real per-user one Tauri resolves.
@@ -152,6 +183,54 @@ mod tests {
         );
     }
 
+    #[cfg(any(debug_assertions, feature = "e2e"))]
+    #[test]
+    fn a_json_array_is_a_program_and_its_arguments() {
+        let (program, args) = super::active::parse_command(r#"["node","fake.mjs","--fast"]"#)
+            .unwrap_or_else(|| panic!("a well-formed command must parse"));
+        assert_eq!(program, std::path::PathBuf::from("node"));
+        assert_eq!(args, vec!["fake.mjs".to_owned(), "--fast".to_owned()]);
+    }
+
+    #[cfg(any(debug_assertions, feature = "e2e"))]
+    #[test]
+    fn a_command_with_no_arguments_is_still_a_command() {
+        let (program, args) = super::active::parse_command(r#"["fake-collector.exe"]"#)
+            .unwrap_or_else(|| panic!("a bare program must parse"));
+        assert_eq!(program, std::path::PathBuf::from("fake-collector.exe"));
+        assert!(args.is_empty());
+    }
+
+    #[cfg(any(debug_assertions, feature = "e2e"))]
+    #[test]
+    fn anything_that_is_not_a_usable_command_is_no_command() {
+        for raw in
+            ["", "node fake.mjs", "[]", r#"[""]"#, r#"["  "]"#, r#"{"a":1}"#, "[1,2]", "null"]
+        {
+            assert_eq!(super::active::parse_command(raw), None, "{raw:?}");
+        }
+    }
+
+    /// The runtime counterpart of `a_release_build_can_never_be_faulted`: that one reads the source,
+    /// this one sets every variable and checks the release half really answers "nothing". It only
+    /// exists in a build without `debug_assertions`/`e2e`, so `cargo test --release` is what runs it.
+    #[cfg(not(any(debug_assertions, feature = "e2e")))]
+    #[test]
+    fn a_release_build_ignores_every_seam_even_when_the_variables_are_set() {
+        // SAFETY: single-threaded test; nothing in the release half caches these.
+        unsafe {
+            std::env::set_var("TW_DEV_DATA_DIR", "somewhere-else");
+            std::env::set_var("TW_DEV_COLLECTOR_CMD", r#"["evil.exe"]"#);
+            std::env::set_var("TW_DEV_CORRUPT_DB", "1");
+            std::env::set_var("TW_DEV_STORAGE_FAIL_WRITES", "5");
+        }
+        assert_eq!(super::data_dir_override(), None);
+        assert_eq!(super::fake_collector_command(), None);
+        assert!(!super::corrupt_database_requested());
+        assert!(!super::storage_write_should_fail());
+    }
+
+    #[cfg(any(debug_assertions, feature = "e2e"))]
     #[test]
     fn an_absent_or_blank_data_dir_override_is_no_override() {
         // Guards the seam's default: only a non-empty value redirects the data directory, so a

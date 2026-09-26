@@ -6,7 +6,7 @@
 //! until the updater key exists; debug builds trust the development key.
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
-use super::runtime::{CollectorLauncher, CollectorLink, SidecarLauncher};
+use super::runtime::{CollectorLauncher, CollectorLink, CommandLauncher, SidecarLauncher};
 use crate::release_manifest::{ManifestError, ReleaseManifest, trusted_public_key};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -95,6 +95,18 @@ impl CollectorLauncher for Unavailable {
 }
 
 pub fn collector_launcher() -> Box<dyn CollectorLauncher> {
+    // T181: a debug/`e2e` build may be told to run a stand-in collector (`TW_DEV_COLLECTOR_CMD`), so
+    // an E2E run has live telemetry without a signed manifest. It replaces the launcher and skips
+    // the check below rather than weakening it; `dev_faults` answers `None` in a release build, so
+    // this branch cannot be taken there. The warning keeps such a run from passing for a real one.
+    if let Some((program, args)) = crate::dev_faults::fake_collector_command() {
+        tracing::warn!(
+            component = "core",
+            code = "COLLECTOR_TEST_DOUBLE_IN_USE",
+            msg = "TW_DEV_COLLECTOR_CMD replaces the collector with a test double"
+        );
+        return Box::new(CommandLauncher { program, args });
+    }
     let mut last = LaunchError::SidecarNotFound;
     for directory in candidate_directories() {
         match locate_in(&directory, trusted_public_key()) {

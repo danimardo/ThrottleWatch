@@ -13,7 +13,7 @@
     "check:contracts": "pnpm --filter @throttlewatch/contracts check",
     "check:catalogs": "node scripts/check-catalogs.mjs",
     "check:command-surface": "node scripts/check-command-surface.mjs",
-    "test:scripts": "node --test scripts/generate-update-manifest.test.mjs",
+    "test:scripts": "node --test scripts/generate-update-manifest.test.mjs apps/desktop/e2e-native/fake-collector.test.mjs",
     "test": "pnpm --filter @throttlewatch/desktop test",
     "test:e2e": "pnpm --filter @throttlewatch/desktop test:e2e",
     "test:e2e:nightly": "pnpm --filter @throttlewatch/desktop exec playwright test --config playwright.nightly.config.ts",
