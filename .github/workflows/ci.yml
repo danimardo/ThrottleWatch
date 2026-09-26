@@ -101,6 +101,19 @@ jobs:
         run: |
           cargo build --locked --features e2e,custom-protocol --manifest-path apps/desktop/src-tauri/Cargo.toml
           pnpm --filter @throttlewatch/desktop test:e2e:native
+      # E2E-13 needs the app launched with its own fault variable, one instance per scenario, so
+      # a plain run skips both (first CI run: "3 skipped"). Each is reproducible from an empty
+      # profile now, which is what makes them worth running here at all. Same non-blocking policy.
+      - name: Native E2E - corrupt database is set aside and offered for export (not blocking yet)
+        continue-on-error: true
+        env:
+          TW_DEV_CORRUPT_DB: '1'
+        run: pnpm --filter @throttlewatch/desktop test:e2e:native resilience
+      - name: Native E2E - full disk warns, then recovers on its own (not blocking yet)
+        continue-on-error: true
+        env:
+          TW_DEV_STORAGE_FAIL_WRITES: '1'
+        run: pnpm --filter @throttlewatch/desktop test:e2e:native resilience
       - name: Upload test artifacts
         if: always()
         uses: actions/upload-artifact@v4
