@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, type Snippet } from 'svelte';
   import Button from '../../design-system/components/Button.svelte';
   import ExportDialog, {
     type ExportFormat
@@ -25,6 +25,8 @@
   import { getTranslator } from '../../lib/i18n/runtime';
   import { classificationLabelFor, classificationOf } from './classification';
   import { takeRequestedSessionReport } from './handoff';
+  import { narrativeFor, type ChainKind } from './report-narrative';
+  import { createWidthTracker } from '../../design-system/lib/responsive.svelte';
   import { evidenceLines, impactText, noImpactReason } from './report-view';
 
   const { t, locale } = getTranslator();
@@ -169,6 +171,28 @@
             headline: t('sessions.reevaluatedUnavailable')
           }
         : undefined
+  );
+  const win = createWidthTracker();
+  const chainIcons: Record<ChainKind, Snippet> = {
+    load: loadIcon,
+    temperature: flameIcon,
+    power: powerIcon,
+    platform: platformIcon,
+    clock: clockIcon
+  };
+  let narrative = $derived(narrativeFor(t, selectedReport));
+  // The rail needs horizontal room and has no stacked fallback: below the expanded tier it is
+  // not mounted at all.
+  let causalChain = $derived(
+    win.tier === 'expanded' && narrative.causalChain !== undefined
+      ? narrative.causalChain.map((node) => ({
+          id: node.id,
+          label: node.label,
+          value: node.value,
+          tone: node.tone,
+          icon: chainIcons[node.kind]
+        }))
+      : undefined
   );
   let reportEvidence = $derived(evidenceLines(t, selectedReport));
   let reportImpact = $derived(impactText(t, selectedReport));
@@ -387,6 +411,57 @@
   });
 </script>
 
+{#snippet loadIcon()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+    <path d="M4 17l5-6 4 3 5-8 4 5" />
+  </svg>
+{/snippet}
+{#snippet flameIcon()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+    <path
+      d="M8 3c0 4-4 5-4 10a6 6 0 0 0 12 0c0-2-1-3-2-4.5 0 2-1 3-2 3-1.5 0-2-1.5-1-3.5C10 6 9 4.5 8 3Z"
+    />
+  </svg>
+{/snippet}
+{#snippet powerIcon()}
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2.2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />
+  </svg>
+{/snippet}
+{#snippet platformIcon()}
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2.2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <rect x="3" y="5" width="18" height="12" rx="2" /><path
+      d="M8 21h8M12 17v4"
+    />
+  </svg>
+{/snippet}
+{#snippet clockIcon()}
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2.2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+  </svg>
+{/snippet}
+
 {#if view === 'list'}
   <div class="session-list-shell">
     <div class="session-actions">
@@ -453,13 +528,17 @@
       reducedConfidence={selectedSession?.coverage_tier !== 'A'}
       reducedConfidenceNoticeTitle={t('sessions.reportReducedConfidence')}
       observedTitle={t('sessions.reportObservedTitle')}
-      observedText={t('sessions.reportObserved')}
+      observedText={narrative.observed}
+      {causalChain}
       impactTitle={t('sessions.reportImpactTitle')}
       impactValue={reportImpact}
       impactUnavailableTitle={t('sessions.reportNoImpact')}
       impactUnavailableReason={noImpactReason(t, selectedReport)}
       evidenceTitle={t('sessions.reportEvidenceTitle')}
       evidence={reportEvidence}
+      alternativeCauses={narrative.alternativeCauses}
+      cannotConclude={narrative.cannotConclude}
+      recommendations={narrative.recommendations}
       alternativeCausesTitle={t('sessions.reportAlternativesTitle')}
       cannotConcludeTitle={t('sessions.reportCannotConcludeTitle')}
       recommendationsTitle={t('sessions.reportRecommendationsTitle')}

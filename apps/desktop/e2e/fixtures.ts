@@ -552,7 +552,7 @@ export const test = base.extend({
                 classification: 'thermal_confirmed',
                 severity: 'below_base',
                 confidence: 'medium',
-                coverage_tier: 'B',
+                coverage_tier: 'A',
                 analyzed_start_ms: 0,
                 analyzed_end_ms: 360_000,
                 events: [{ kind: 'thermal', start_ms: 60_000, end_ms: 72_000 }],

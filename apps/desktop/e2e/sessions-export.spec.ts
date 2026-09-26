@@ -99,6 +99,18 @@ test('@critical sesiones previsualiza, anonimiza, exporta e importa', async ({
   ).toBeVisible();
   await expect(page.getByText(/low_percent|"method"/)).toHaveCount(0);
 
+  // What the class means, in words: what was observed, what cannot be concluded and what to do
+  // (never "improve cooling" for a power limit), and the causal chain when the reasons are direct.
+  await expect(
+    page.getByText(
+      /reported its thermal limit|indicó límite térmico durante buena parte/i
+    )
+  ).toBeVisible();
+  await expect(
+    page.getByText(/check the cooling|revisa la refrigeración/i)
+  ).toBeVisible();
+  await expect(page.getByText(/^(temperature|temperatura)$/i)).toBeVisible();
+
   const calls = await page.evaluate(
     () =>
       (
