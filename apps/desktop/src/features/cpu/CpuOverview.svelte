@@ -8,16 +8,13 @@
     CoreTableRow
   } from '../../design-system/components/CpuAdvancedTable.svelte';
   import { invokeValidated } from '../../lib/bridge';
-  import { createTranslator } from '../../lib/i18n';
+  import { getTranslator } from '../../lib/i18n/runtime';
   import {
     commandResponseSchemas,
     type CpuTopology
   } from '../../lib/bridge/schemas';
 
-  const { t } = createTranslator(
-    'system',
-    typeof navigator === 'undefined' ? 'en-US' : navigator.language
-  );
+  const { t } = getTranslator();
 
   let topology = $state<CpuTopology['cores']>([]);
   let selectedCoreId = $state<string | undefined>();

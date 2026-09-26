@@ -301,6 +301,7 @@ pub fn run() {
             commands::get_onboarding_state,
             commands::set_onboarding_state,
             commands::get_window_state,
+            commands::get_effective_locale,
             commands::set_window_state,
             commands::request_low_level_access,
             commands::disable_advanced_access,

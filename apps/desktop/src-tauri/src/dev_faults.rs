@@ -11,6 +11,7 @@
 //! | `TW_DEV_STORAGE_FAIL_WRITES=<n>` | las `n` primeras escrituras de sesión fallan; después vuelven a funcionar, así que una sola ejecución enseña el aviso apareciendo **y** desapareciendo |
 //! | `TW_DEV_CORRUPT_DB=1` | escribe basura en el fichero de base de datos antes de abrirlo, para que el arranque tenga que apartarlo y crear uno nuevo |
 //! | `TW_DEV_COLLECTOR_CMD=<json>` | arranca este programa en lugar del colector real, como un array JSON `["programa","arg",…]`; el programa habla el protocolo IPC por stdin/stdout. Sirve para que una suite E2E tenga telemetría sin un colector firmado |
+//! | `TW_DEV_SYSTEM_LANGUAGES=<lista>` | sustituye la lista de idiomas de pantalla de Windows con la que se resuelve `system` (p. ej. `en-US` o `es-ES,en-US`), para probar las dos lenguas en una misma máquina: el runner de CI está en inglés y quien desarrolla puede no estarlo |
 //! | `TW_DEV_SEED_BUNDLE=<ruta>` | importa ese paquete de exportación (JSON) al abrir la base, con el mismo importador que «Importar sesión»: deja una sesión con historial sin depender de minutos de grabación ni de un diálogo nativo |
 //! | `TW_DEV_DATA_DIR=<ruta>` | usa esa carpeta como directorio de datos en vez de `%APPDATA%\com.throttlewatch.desktop`, para que una suite E2E nativa no lea ni escriba los datos reales de quien desarrolla |
 #![deny(clippy::unwrap_used, clippy::expect_used)]
@@ -67,6 +68,19 @@ mod active {
         Some((std::path::PathBuf::from(program), args.to_vec()))
     }
 
+    /// The languages `system` resolves against, in place of Windows' own list, from
+    /// `TW_DEV_SYSTEM_LANGUAGES` (comma-separated, ranked: `es-ES,en-US`).
+    pub fn system_languages_override() -> Option<Vec<String>> {
+        parse_language_list(&std::env::var("TW_DEV_SYSTEM_LANGUAGES").ok()?)
+    }
+
+    /// `"es-ES, en-US"` as a ranked list. Empty entries are dropped, and nothing at all is no list.
+    pub fn parse_language_list(raw: &str) -> Option<Vec<String>> {
+        let list: Vec<String> =
+            raw.split(',').map(|tag| tag.trim().to_owned()).filter(|tag| !tag.is_empty()).collect();
+        if list.is_empty() { None } else { Some(list) }
+    }
+
     /// The export bundle to import at startup, from `TW_DEV_SEED_BUNDLE`.
     pub fn seed_bundle_path() -> Option<std::path::PathBuf> {
         let raw = std::env::var("TW_DEV_SEED_BUNDLE").ok()?;
@@ -106,11 +120,15 @@ mod active {
     pub fn seed_bundle_path() -> Option<std::path::PathBuf> {
         None
     }
+
+    pub fn system_languages_override() -> Option<Vec<String>> {
+        None
+    }
 }
 
 pub use active::{
     corrupt_database_requested, data_dir_override, fake_collector_command, seed_bundle_path,
-    storage_write_should_fail,
+    storage_write_should_fail, system_languages_override,
 };
 
 /// Why a requested seed did not land. Never silent: a scenario that needs the seed and quietly runs
@@ -277,10 +295,12 @@ mod tests {
             std::env::set_var("TW_DEV_CORRUPT_DB", "1");
             std::env::set_var("TW_DEV_STORAGE_FAIL_WRITES", "5");
             std::env::set_var("TW_DEV_SEED_BUNDLE", "somewhere-else.json");
+            std::env::set_var("TW_DEV_SYSTEM_LANGUAGES", "en-US");
         }
         assert_eq!(super::data_dir_override(), None);
         assert_eq!(super::fake_collector_command(), None);
         assert_eq!(super::seed_bundle_path(), None);
+        assert_eq!(super::system_languages_override(), None);
         assert!(!super::corrupt_database_requested());
         assert!(!super::storage_write_should_fail());
     }
@@ -342,6 +362,18 @@ mod tests {
             "a failed seed adds nothing"
         );
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(any(debug_assertions, feature = "e2e"))]
+    #[test]
+    fn a_language_list_is_ranked_trimmed_and_never_empty() {
+        let parse = super::active::parse_language_list;
+        assert_eq!(parse("es-ES, en-US"), Some(vec!["es-ES".to_owned(), "en-US".to_owned()]));
+        assert_eq!(parse("en-US"), Some(vec!["en-US".to_owned()]));
+        assert_eq!(parse(" ,, es "), Some(vec!["es".to_owned()]));
+        for nothing in ["", "   ", ",", " , , "] {
+            assert_eq!(parse(nothing), None, "{nothing:?}");
+        }
     }
 
     #[cfg(any(debug_assertions, feature = "e2e"))]

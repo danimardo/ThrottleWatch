@@ -558,6 +558,7 @@ export const commandResponseSchemas = {
   set_onboarding_state: onboardingStateSchema,
   get_window_state: windowStateSchema,
   set_window_state: windowStateSchema,
+  get_effective_locale: z.enum(['es', 'en']),
   get_preferences: preferencesSnapshotSchema,
   get_storage_usage: z
     .object({
@@ -640,6 +641,7 @@ export const commandArgsSchemas = {
   // `invoke` args by parameter name, so the payload must be nested under that key, not flattened.
   set_onboarding_state: z.object({ request: onboardingStateSchema }).strict(),
   get_window_state: noCommandArgs,
+  get_effective_locale: noCommandArgs,
   get_preferences: noCommandArgs,
   get_storage_usage: noCommandArgs,
   export_corrupt_backup: noCommandArgs,

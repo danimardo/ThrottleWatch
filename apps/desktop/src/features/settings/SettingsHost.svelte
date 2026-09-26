@@ -18,7 +18,7 @@
   import { invokeValidated, listenValidated } from '../../lib/bridge';
   import { blockedReasonKey, toUpdatesSection } from './updates';
   import { accessRequestAction } from '../../lib/access-action';
-  import { createTranslator } from '../../lib/i18n';
+  import { getTranslator, refreshLocale } from '../../lib/i18n/runtime';
   import {
     isDetailedLoggingActive,
     setApplicationDetailedLogging
@@ -29,10 +29,7 @@
   }
 
   let { onRepeatIntroduction }: Props = $props();
-  const { t } = createTranslator(
-    'system',
-    typeof navigator === 'undefined' ? 'en-US' : navigator.language
-  );
+  const { t, locale } = getTranslator();
 
   let preferences = $state<PreferencesSnapshot | null>(null);
   let coverage = $state<CoverageMatrix | null>(null);
@@ -82,6 +79,11 @@
         setApplicationDetailedLogging(
           isDetailedLoggingActive(result.value.values['logging.detailed_until'])
         );
+      }
+      if (key === 'locale.mode') {
+        // The screens are built with the language in force when they were created, so ask Rust
+        // for it again: a change rebuilds the whole interface in the new language, no restart.
+        void refreshLocale();
       }
       if (key.startsWith('appearance.')) {
         window.dispatchEvent(
@@ -586,9 +588,7 @@
         },
         t,
         formatDate: (value) =>
-          new Date(value).toLocaleString(
-            typeof navigator === 'undefined' ? 'en-US' : navigator.language
-          ),
+          new Date(value).toLocaleString(locale === 'es' ? 'es-ES' : 'en-US'),
         blockedReasonKey: installBlockedKey,
         onAutoCheckChange: (checked) =>
           void setPreference('updates.enabled', checked),

@@ -7,6 +7,7 @@ Frontera tipada entre la interfaz Svelte y el backend Tauri/Rust. No forma parte
 - `get_preferences() -> PreferencesSnapshot`
 - `set_preference({ key, value, expected_schema_version }) -> PreferencesSnapshot`
 - `reset_preferences() -> void`: solo como parte del restablecimiento total confirmado.
+- `get_effective_locale() -> "es" | "en"`: el idioma de la interfaz en vigor. **Lo resuelve Rust** —`locale.mode` guardado y, si es `system`, el primer idioma de la lista de idiomas de pantalla preferidos de Windows que la aplicación tenga— y la interfaz lo pregunta en lugar de decidirlo por su cuenta, de modo que ella y los textos de Rust (bandeja, notificaciones, etiquetas del `snapshot`) no puedan discrepar. Enmienda 2026-09-26: antes la interfaz ignoraba el modo guardado y usaba `navigator.language`.
 
 El backend valida claves, tipos y dependencias. En particular, `startup.mode=tray` se rechaza si `tray.monitoring_enabled=false`; desactivar bandeja cambia un inicio oculto incompatible a `window` y una acción de cierre `tray` a `exit` de forma atómica y lo comunica en la respuesta (`PreferencesSnapshot.adjusted[]`). `guided.notify_on_finish=true` se rechaza si `notifications.enabled=false`.
 

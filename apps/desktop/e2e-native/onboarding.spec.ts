@@ -34,7 +34,7 @@ test('@native onboarding resumes at the saved slide and can be skipped by keyboa
 }) => {
   await resetOnboarding(page, 3);
   await expect(
-    page.getByText(/continuing where you left off|continúa donde lo dejaste/i)
+    page.getByText(/continuing where you left off|continuando donde lo dejaste/i)
   ).toBeVisible();
 
   const skip = page.getByRole('button', { name: SKIP });

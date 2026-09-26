@@ -10,7 +10,7 @@
     listenValidated,
     parseEvent
   } from '../../lib/bridge';
-  import { createTranslator } from '../../lib/i18n';
+  import { getTranslator } from '../../lib/i18n/runtime';
   import {
     percentRemaining,
     preflightChecks,
@@ -25,10 +25,7 @@
   let guidedState = $state<GuidedPhase | null>(null);
   let checks = $state<ReturnType<typeof preflightChecks>>([]);
   let error = $state<string | undefined>();
-  const { t } = createTranslator(
-    'system',
-    typeof navigator === 'undefined' ? 'en-US' : navigator.language
-  );
+  const { t } = getTranslator();
 
   async function loadPreflight(): Promise<void> {
     const result = await invokeValidated(

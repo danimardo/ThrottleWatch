@@ -9,13 +9,10 @@
     type ExportPreview
   } from '../../lib/bridge/schemas';
   import { invokeValidated } from '../../lib/bridge';
-  import { createTranslator } from '../../lib/i18n';
+  import { getTranslator } from '../../lib/i18n/runtime';
   import { toAnalysisView } from './model';
 
-  const { t } = createTranslator(
-    'system',
-    typeof navigator === 'undefined' ? 'en-US' : navigator.language
-  );
+  const { t } = getTranslator();
 
   let status = $state<'noHistory' | 'loading' | 'ready'>('loading');
   let window = $state<AnalysisWindow | null>(null);

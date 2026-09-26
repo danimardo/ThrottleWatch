@@ -22,12 +22,9 @@
     type ExportPreview,
     type SessionSummary
   } from '../../lib/bridge/schemas';
-  import { createTranslator } from '../../lib/i18n';
+  import { getTranslator } from '../../lib/i18n/runtime';
 
-  const { t, locale } = createTranslator(
-    'system',
-    typeof navigator === 'undefined' ? 'en-US' : navigator.language
-  );
+  const { t, locale } = getTranslator();
 
   const classifications: readonly Classification[] = [
     'normal',

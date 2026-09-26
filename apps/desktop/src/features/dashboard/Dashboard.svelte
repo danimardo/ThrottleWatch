@@ -21,7 +21,7 @@
     accessRequestAction,
     type AccessRequestAction
   } from '../../lib/access-action';
-  import { createTranslator } from '../../lib/i18n';
+  import { getTranslator } from '../../lib/i18n/runtime';
   import { toStatusHeroView } from './adapter';
   import {
     COLLECTOR_LABEL_KEYS,
@@ -32,10 +32,7 @@
     type DashboardSnapshot
   } from './model';
 
-  const { t, locale } = createTranslator(
-    'system',
-    typeof navigator === 'undefined' ? 'en-US' : navigator.language
-  );
+  const { t, locale } = getTranslator();
   const numberLocale = locale === 'es' ? 'es-ES' : 'en-US';
 
   function localizedCollectorLabel(value: string): string {

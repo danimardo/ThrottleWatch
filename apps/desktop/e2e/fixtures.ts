@@ -67,7 +67,8 @@ export const test = base.extend({
         'get_update_state',
         'download_update',
         'install_update',
-        'get_effective_glass_level'
+        'get_effective_glass_level',
+        'get_effective_locale'
       ]);
       const requestCommands = new Set([
         'set_onboarding_state',
@@ -382,6 +383,20 @@ export const test = base.extend({
             };
             if (request?.key) values[request.key] = request.value;
             return { schema_version: 1, values, adjusted: [] };
+          }
+          if (command === 'get_effective_locale') {
+            // What Rust does: the first language of the ranked list that the application has. Here the
+            // list is the browser context's, so the `es-ES`/`en-US` projects keep meaning what they say.
+            const languages = navigator.languages?.length
+              ? navigator.languages
+              : [navigator.language];
+            for (const tag of languages) {
+              const language = tag.toLowerCase().split(/[-_]/)[0] ?? '';
+              if (['es', 'ca', 'gl', 'eu', 'ast', 'an'].includes(language))
+                return 'es';
+              if (language === 'en') return 'en';
+            }
+            return 'en';
           }
           if (command === 'get_effective_glass_level') {
             const level = glassFixture ?? 'full';

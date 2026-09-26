@@ -82,6 +82,8 @@ function argsSchemaFor(command: string): z.ZodType | undefined {
       return commandArgsSchemas.set_onboarding_state;
     case 'get_window_state':
       return commandArgsSchemas.get_window_state;
+    case 'get_effective_locale':
+      return commandArgsSchemas.get_effective_locale;
     case 'get_preferences':
       return commandArgsSchemas.get_preferences;
     case 'get_storage_usage':

@@ -1,3 +1,15 @@
+<script module lang="ts">
+  type DestinationId =
+    'now' | 'analysis' | 'cpu' | 'sessions' | 'guided' | 'settings';
+
+  /**
+   * Which screen the person is on. It lives at module level so it survives the interface being
+   * rebuilt for a language change (`App.svelte` re-creates this component); without it, choosing a
+   * language in Settings would drop the person back on "Now". A page reload resets it, as it should.
+   */
+  let rememberedDestination: DestinationId = 'now';
+</script>
+
 <script lang="ts">
   import { onMount } from 'svelte';
   import {
@@ -30,7 +42,7 @@
   } from '../lib/bridge/schemas';
   import { invokeValidated, listenValidated } from '../lib/bridge';
   import { stopOperationFor } from '../lib/lifecycle/close';
-  import { createTranslator } from '../lib/i18n';
+  import { getTranslator } from '../lib/i18n/runtime';
   import {
     isDetailedLoggingActive,
     setApplicationDetailedLogging
@@ -74,10 +86,7 @@
   };
 
   const win = createWidthTracker();
-  const { t, locale } = createTranslator(
-    'system',
-    typeof navigator === 'undefined' ? 'en-US' : navigator.language
-  );
+  const { t, locale } = getTranslator();
   const destinations: Destination[] = [
     { id: 'now', icon: 'now', label: t('nav.now') },
     { id: 'analysis', icon: 'analysis', label: t('nav.analysis') },
@@ -92,7 +101,10 @@
     motion: MotionLevel;
     glass: GlassLevel | 'system';
   }>({ theme: 'system', motion: 'system', glass: 'system' });
-  let active = $state<Destination['id']>('now');
+  let active = $state<Destination['id']>(rememberedDestination);
+  $effect(() => {
+    rememberedDestination = active;
+  });
   let maximized = $state(false);
   let windowAdapter: WindowAdapter = createWindowAdapter();
   let onboardingState = $state<OnboardingState | null>(null);

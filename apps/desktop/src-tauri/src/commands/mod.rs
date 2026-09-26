@@ -1917,6 +1917,21 @@ pub fn set_onboarding_state(
     Ok(onboarding_state_dto(value))
 }
 
+/// The interface language in force, `es` or `en`: Rust resolves the stored `locale.mode` against
+/// Windows' preferred languages (`i18n::current`, the same call the tray, the notifications and the
+/// live snapshot's texts use) and the interface asks instead of deciding on its own. It used to
+/// decide alone, from the WebView's `navigator.language` and ignoring the stored choice, so a
+/// Spanish selection was saved and never applied, and Rust's texts came out in Spanish next to an
+/// English interface.
+#[tauri::command]
+pub fn get_effective_locale(app: AppHandle) -> String {
+    match crate::tray::current_locale(&app) {
+        crate::i18n::Locale::Es => "es",
+        crate::i18n::Locale::En => "en",
+    }
+    .to_owned()
+}
+
 #[tauri::command]
 pub fn get_window_state(state: State<'_, AppState>) -> Result<WindowStateDto, CommandError> {
     let guard = state.storage.lock().map_err(|_| CommandError::operation_failed())?;

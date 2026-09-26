@@ -26,6 +26,29 @@ describe('catalogs', () => {
     expect(resolveLocale('system', windowsLocale)).toBe(expected);
   });
 
+  it.each([
+    // The person's own ranking decides: the first language the application has.
+    [['es-ES', 'en-US'], 'es'],
+    [['en-US', 'es-ES'], 'en'],
+    // An unsupported language is skipped, not taken as the answer.
+    [['fr-FR', 'es-ES'], 'es'],
+    [['de-DE', 'en-GB'], 'en'],
+    // Nothing we have: English.
+    [['fr-FR'], 'en'],
+    [['pt-PT', 'de'], 'en'],
+    [[], 'en']
+  ] as const)(
+    'resolves the list %j to %s in system mode',
+    (languages, expected) => {
+      expect(resolveLocale('system', languages)).toBe(expected);
+    }
+  );
+
+  it('never lets the list override an explicit choice', () => {
+    expect(resolveLocale('es', ['en-US'])).toBe('es');
+    expect(resolveLocale('en', ['es-ES'])).toBe('en');
+  });
+
   it('lets an explicit language override Windows', () => {
     expect(createTranslator('en', 'es-ES').t('nav.settings')).toBe('Settings');
     expect(createTranslator('es', 'en-US').t('nav.settings')).toBe('Ajustes');
