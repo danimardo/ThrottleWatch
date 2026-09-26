@@ -232,3 +232,44 @@ test('@critical guided result shows the verdict, sets the reference and opens th
     page.getByRole('button', { name: /^(start|iniciar)$/i })
   ).toBeVisible();
 });
+
+test('@critical guided start uses the duration and AC choices from Settings', async ({
+  page
+}) => {
+  await page.goto('/');
+  await page.keyboard.press('Control+6');
+  await page.evaluate(async () => {
+    const invoke = (
+      window as unknown as {
+        __THROTTLEWATCH_FAKE_BRIDGE__: {
+          invoke: (command: string, args: unknown) => Promise<unknown>;
+        };
+      }
+    ).__THROTTLEWATCH_FAKE_BRIDGE__;
+    await invoke.invoke('set_preference', {
+      request: { key: 'guided.duration', value: 'long' }
+    });
+    await invoke.invoke('set_preference', {
+      request: { key: 'guided.require_ac', value: true }
+    });
+  });
+
+  await page
+    .getByRole('button', { name: /guided diagnostic|diagnóstico guiado/i })
+    .click();
+  await page.getByRole('button', { name: /^(start|iniciar)$/i }).click();
+
+  const start = await page.evaluate(
+    () =>
+      (
+        window as unknown as {
+          __THROTTLEWATCH_CALLS__: Array<{
+            command: string;
+            args?: { request?: Record<string, unknown> };
+          }>;
+        }
+      ).__THROTTLEWATCH_CALLS__.find((call) => call.command === 'start_guided')
+        ?.args?.request
+  );
+  expect(start).toMatchObject({ profile: 'long', require_ac: true });
+});

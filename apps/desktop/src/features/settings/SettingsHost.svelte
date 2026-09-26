@@ -447,12 +447,14 @@
         options: themeOptions,
         onThemeChange: (value) => void setPreference('appearance.theme', value),
         motionRowLabel: t('settings.motion'),
+        motionRowDescription: t('settings.motionDescription'),
         motionLabel: t('settings.motion'),
         motion: preferenceValue('appearance.motion', 'system'),
         motionOptions,
         onMotionChange: (value) =>
           void setPreference('appearance.motion', value),
         glassRowLabel: t('settings.glass'),
+        glassRowDescription: t('settings.glassDescription'),
         glassLabel: t('settings.glass'),
         glass: preferenceValue('appearance.glass', 'system'),
         glassOptions,
@@ -461,11 +463,13 @@
       monitoring={{
         title: t('settings.monitoringTitle'),
         modeRowLabel: t('settings.profile'),
+        modeRowDescription: t('settings.profileDescription'),
         modeLabel: t('settings.profile'),
         mode: preferenceValue('sampling.profile', 'normal'),
         modeOptions: samplingOptions,
         onModeChange: (value) => void setPreference('sampling.profile', value),
         onBatteryRowLabel: t('settings.onBattery'),
+        onBatteryRowDescription: t('settings.onBatteryDescription'),
         onBatteryLabel: t('settings.onBattery'),
         onBattery: preferenceValue('sampling.on_battery', 'keep'),
         onBatteryOptions: batteryOptions,
@@ -479,6 +483,7 @@
         onSamplingIntervalChange: (value) =>
           void setPreference('sampling.profile', value),
         perCoreHistoryLabel: t('settings.perCoreHistory'),
+        perCoreHistoryDescription: t('settings.perCoreHistoryDescription'),
         perCoreHistory: preferenceValue('sampling.per_core_history', false),
         onPerCoreHistoryChange: (checked) =>
           void setPreference('sampling.per_core_history', checked)
@@ -486,15 +491,18 @@
       tray={{
         title: t('settings.trayTitle'),
         backgroundLabel: t('settings.backgroundMonitoring'),
+        backgroundDescription: t('settings.backgroundDescription'),
         backgroundMonitoring: preferenceValue('tray.monitoring_enabled', false),
         onBackgroundMonitoringChange: (checked) =>
           void setPreference('tray.monitoring_enabled', checked),
         notificationsLabel: t('settings.notifications'),
+        notificationsDescription: t('settings.notificationsDescription'),
         notifications: preferenceValue('notifications.enabled', false),
         onNotificationsChange: (checked) =>
           void setPreference('notifications.enabled', checked),
         advancedLabel: t('settings.advanced'),
         quietPeriodLabel: t('settings.quietPeriod'),
+        quietPeriodDescription: t('settings.quietPeriodDescription'),
         quietPeriodEnabled: quietPeriod !== null,
         onQuietPeriodEnabledChange: setQuietPeriodEnabled,
         quietPeriodStartLabel: t('settings.quietStart'),
@@ -502,15 +510,18 @@
         quietPeriodStart: quietPeriod?.start ?? '22',
         quietPeriodEnd: quietPeriod?.end ?? '07',
         quietPeriodOptions: quietPeriodHourOptions,
-        onQuietPeriodChange: setQuietPeriod
+        onQuietPeriodChange: setQuietPeriod,
+        alertRulesNote: t('settings.alertRulesNote')
       }}
       privacy={{
         title: t('settings.privacyTitle'),
         anonymizeExportsLabel: t('settings.anonymizeExports'),
+        anonymizeExportsDescription: t('settings.anonymizeExportsDescription'),
         anonymizeExports: preferenceValue('privacy.anonymize_exports', true),
         onAnonymizeExportsChange: (checked) =>
           void setPreference('privacy.anonymize_exports', checked),
         retentionRowLabel: t('settings.retention'),
+        retentionRowDescription: t('settings.retentionDescription'),
         retentionSelectLabel: t('settings.retention'),
         dataRetention: preferenceValue('history.retention', '7d'),
         dataRetentionOptions: retentionOptions,
@@ -521,7 +532,7 @@
           ? formatBytes(storageUsage.total_bytes)
           : t('settings.notAvailable'),
         storageDescription: storageUsage
-          ? `${formatBytes(storageUsage.database_bytes)} + ${formatBytes(storageUsage.logs_bytes)} · ${storageUsage.session_count}`
+          ? `${t('settings.storageDatabase')} ${formatBytes(storageUsage.database_bytes)} · ${t('settings.storageLogs')} ${formatBytes(storageUsage.logs_bytes)} · ${String(storageUsage.session_count)} ${t('settings.storageSessions')}`
           : undefined,
         corruptBackupRowLabel: t('settings.corruptBackup'),
         corruptBackupNotice: storageUsage?.corrupt_backup
@@ -533,16 +544,18 @@
         corruptBackupExportLabel: t('settings.corruptBackupExport'),
         onExportCorruptBackup: () => void exportCorruptBackup(),
         exportRowLabel: t('settings.export'),
+        exportRowDescription: t('settings.exportDescription'),
         exportButtonLabel: t('settings.export'),
         onExport: () =>
           window.dispatchEvent(new CustomEvent('throttlewatch:request-export')),
         deleteRowLabel: t('settings.deleteData'),
+        deleteRowDescription: t('settings.deleteDescription'),
         deleteButtonLabel: t('settings.deleteData'),
         deleteStatus,
         deleteErrorMessage,
         onDeleteAllData: () => void deleteAllData(),
         deleteDialogTitle: t('settings.deleteData'),
-        deleteDialogDescription: t('settings.notAvailable'),
+        deleteDialogDescription: t('settings.deleteDialogDescription'),
         deleteDialogCancelLabel: t('settings.cancel'),
         deleteDialogConfirmLabel: t('settings.deleteData')
       }}
@@ -572,23 +585,44 @@
       diagnostics={{
         title: t('settings.diagnosticsTitle'),
         durationRowLabel: t('settings.duration'),
+        durationRowDescription: t('settings.durationDescription'),
         durationLabel: t('settings.duration'),
         duration: preferenceValue('guided.duration', 'standard'),
         durationOptions,
         onDurationChange: (value) =>
           void setPreference('guided.duration', value),
         requireAcLabel: t('settings.requireAc'),
+        requireAcDescription: t('settings.requireAcDescription'),
         requireAc: preferenceValue('guided.require_ac', false),
         onRequireAcChange: (checked) =>
           void setPreference('guided.require_ac', checked),
         notifyLabel: t('settings.notifyOnFinish'),
+        notifyDescription: t('settings.notifyDescription'),
         notifyOnFinish: preferenceValue('guided.notify_on_finish', false),
         onNotifyOnFinishChange: (checked) =>
           void setPreference('guided.notify_on_finish', checked),
         notifyDisabled: !preferenceValue('notifications.enabled', false),
         notifyDisabledReason: t('settings.notificationsRequired'),
         safetyLimitsTitle: t('settings.safetyLimits'),
-        safetyLimits: []
+        safetyLimits: [
+          {
+            label: t('settings.safetyOverTemp'),
+            value: t('settings.safetyOverTempValue')
+          },
+          {
+            label: t('settings.safetyCooling'),
+            value: t('settings.safetyCoolingValue')
+          },
+          {
+            label: t('settings.safetySensor'),
+            value: t('settings.safetySensorValue')
+          },
+          {
+            label: t('settings.safetyGenerator'),
+            value: t('settings.safetyGeneratorValue')
+          }
+        ],
+        safetyLimitsNote: t('settings.safetyLimitsNote')
       }}
       updates={toUpdatesSection({
         state: updateState ?? {
@@ -619,6 +653,7 @@
         versionRowLabel: t('settings.version'),
         version: updateState?.current_version ?? '0.1.0',
         repeatIntroLabel: t('settings.repeatIntroduction'),
+        repeatIntroDescription: t('settings.repeatIntroDescription'),
         onRepeatIntro: onRepeatIntroduction,
         links: [
           {
@@ -655,12 +690,13 @@
       riskZone={{
         title: t('settings.riskZone'),
         resetRowLabel: t('settings.reset'),
+        resetRowDescription: t('settings.resetDescription'),
         resetButtonLabel: t('settings.reset'),
         resetStatus,
         resetErrorMessage,
         onReset: () => void resetApplication(),
         resetDialogTitle: t('settings.reset'),
-        resetDialogDescription: t('settings.notAvailable'),
+        resetDialogDescription: t('settings.resetDialogDescription'),
         resetDialogCancelLabel: t('settings.cancel'),
         resetDialogConfirmLabel: t('settings.reset')
       }}

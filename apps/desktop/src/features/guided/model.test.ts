@@ -22,7 +22,8 @@ describe('guided model', () => {
         generator: true,
         require_ac: true
       },
-      (key) => `«${key}»`
+      (key) => `«${key}»`,
+      true
     );
     expect(
       checks.find((check) => check.label === '«guided.checks.power»')?.status
@@ -32,23 +33,35 @@ describe('guided model', () => {
     ).toBe(true);
   });
 
-  it('blocks starting on battery only when the test requires AC', () => {
+  it('blocks starting on battery only when the person asked for AC, and warns otherwise', () => {
     const base = {
       sensors: true,
       profile: true,
       disk_space: true,
-      generator: true
+      generator: true,
+      require_ac: true
     };
-    expect(batteryStateOf({ ...base, ac_power: false, require_ac: true })).toBe(
-      'blocked'
-    );
-    expect(
-      batteryStateOf({ ...base, ac_power: false, require_ac: false })
-    ).toBe('ok');
-    expect(batteryStateOf({ ...base, ac_power: true, require_ac: true })).toBe(
-      'ok'
-    );
-    expect(batteryStateOf(null)).toBe('ok');
+    expect(batteryStateOf({ ...base, ac_power: false }, true)).toBe('blocked');
+    expect(batteryStateOf({ ...base, ac_power: false }, false)).toBe('warning');
+    expect(batteryStateOf({ ...base, ac_power: true }, true)).toBe('ok');
+    expect(batteryStateOf(null, true)).toBe('ok');
+  });
+
+  it('does not fail the power check on battery when AC is not required', () => {
+    const value = {
+      sensors: true,
+      ac_power: false,
+      profile: true,
+      disk_space: true,
+      generator: true,
+      require_ac: true
+    };
+    const power = (requireAc: boolean) =>
+      preflightChecks(value, (key) => key, requireAc).find(
+        (check) => check.label === 'guided.checks.power'
+      )?.status;
+    expect(power(true)).toBe('failed');
+    expect(power(false)).toBe('ok');
   });
 
   it('calculates progress without inventing a duration', () => {

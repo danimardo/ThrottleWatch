@@ -46,7 +46,8 @@ export function toDiagnosticPhase(
 
 export function preflightChecks(
   value: GuidedPreflight,
-  t: (key: string) => string
+  t: (key: string) => string,
+  requireAc: boolean
 ): GuidedCheck[] {
   return [
     {
@@ -55,7 +56,7 @@ export function preflightChecks(
     },
     {
       label: t('guided.checks.power'),
-      status: value.ac_power || !value.require_ac ? 'ok' : 'failed'
+      status: value.ac_power || !requireAc ? 'ok' : 'failed'
     },
     {
       label: t('guided.checks.profile'),
@@ -72,13 +73,16 @@ export function preflightChecks(
   ];
 }
 
-/** A person on battery when the test requires AC cannot start it: say so above the checks. */
+/**
+ * On battery the test cannot start when the person asked for AC (`guided.require_ac`), and is only
+ * warned about possible power limits when they did not.
+ */
 export function batteryStateOf(
-  value: GuidedPreflight | null
-): 'ok' | 'blocked' {
-  return value !== null && value.require_ac && !value.ac_power
-    ? 'blocked'
-    : 'ok';
+  value: GuidedPreflight | null,
+  requireAc: boolean
+): 'ok' | 'warning' | 'blocked' {
+  if (value === null || value.ac_power) return 'ok';
+  return requireAc ? 'blocked' : 'warning';
 }
 
 export function percentRemaining(

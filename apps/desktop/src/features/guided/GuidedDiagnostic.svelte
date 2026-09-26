@@ -33,22 +33,45 @@
 
   let guidedState = $state<GuidedPhase | null>(null);
   let preflight = $state<GuidedPreflight | null>(null);
+  // `guided.duration` and `guided.require_ac` from Ajustes. Both used to be ignored: the screen
+  // always started the standard profile and always demanded AC, whatever was chosen there.
+  let profile = $state<'short' | 'standard' | 'long'>('standard');
+  let requireAc = $state(false);
   let failed = $state(false);
   let finished = $state<SessionSummary | null>(null);
   let finishedSessionId = $state<string | null>(null);
   const { t } = getTranslator();
 
   let checks = $derived(
-    preflight === null ? [] : preflightChecks(preflight, t)
+    preflight === null ? [] : preflightChecks(preflight, t, requireAc)
   );
-  let batteryState = $derived(batteryStateOf(preflight));
+  let batteryState = $derived(batteryStateOf(preflight, requireAc));
 
   function reportFailure(action: string, messageKey: string): void {
     failed = true;
     getApplicationLogger().warn(`guided ${action} failed: ${messageKey}`);
   }
 
+  async function loadPreferences(): Promise<void> {
+    const result = await invokeValidated(
+      'get_preferences',
+      undefined,
+      commandResponseSchemas.get_preferences
+    );
+    if (!result.ok) return;
+    const duration = result.value.values['guided.duration'];
+    if (
+      duration === 'short' ||
+      duration === 'standard' ||
+      duration === 'long'
+    ) {
+      profile = duration;
+    }
+    requireAc = result.value.values['guided.require_ac'] === true;
+  }
+
   async function loadPreflight(): Promise<void> {
+    await loadPreferences();
     const result = await invokeValidated(
       'get_guided_preflight',
       undefined,
@@ -62,7 +85,7 @@
     const result = await invokeValidated(
       'start_guided',
       {
-        request: { profile: 'standard', skip_rest: skipRest, require_ac: true }
+        request: { profile, skip_rest: skipRest, require_ac: requireAc }
       },
       commandResponseSchemas.start_guided
     );
@@ -241,7 +264,9 @@
   preflightChecks={checks}
   preflightFailedTitle={t('guided.reviewConditions')}
   {batteryState}
-  batteryMessage={t('guided.needsAc')}
+  batteryMessage={requireAc
+    ? t('guided.needsAc')
+    : t('guided.onBatteryWarning')}
   preflightCheckingLabel={t('guided.checkingSensors')}
   readyTitle={t('guided.readyTitle')}
   readyBody={t('guided.readyBody')}
@@ -250,7 +275,7 @@
   whatWillHappenTitle={t('guided.whatWillHappen')}
   whatWillHappen={[
     { label: t('guided.load'), value: t('guided.fixedLoop') },
-    { label: t('guided.duration'), value: t('guided.standardProfile') }
+    { label: t('guided.duration'), value: t(`guided.${profile}Profile`) }
   ]}
   introDisclaimer={t('guided.disclaimer')}
   startLabel={t('guided.start')}

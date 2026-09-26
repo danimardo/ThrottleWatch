@@ -46,6 +46,8 @@ export const test = base.extend({
       };
       const calls: Array<{ command: string; args?: Record<string, unknown> }> =
         [];
+      // What `set_preference` stored, so a later `get_preferences` sees it like the real store does.
+      const storedPreferences: Record<string, unknown> = {};
       const noArgumentCommands = new Set([
         'get_live_snapshot',
         'get_coverage',
@@ -381,7 +383,8 @@ export const test = base.extend({
               'updates.enabled': false,
               'logging.detailed_until': null
             };
-            if (request?.key) values[request.key] = request.value;
+            if (request?.key) storedPreferences[request.key] = request.value;
+            Object.assign(values, storedPreferences);
             return { schema_version: 1, values, adjusted: [] };
           }
           if (command === 'get_effective_locale') {
