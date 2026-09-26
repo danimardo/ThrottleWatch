@@ -55,3 +55,73 @@ export async function ensureOnboardingDone(page: Page): Promise<void> {
   }
   await expect(app).toBeVisible({ timeout: 30_000 });
 }
+
+/**
+ * A real IPC round trip from the page: `window.__TAURI_INTERNALS__.invoke`, the same channel the
+ * application's own bridge uses. This is what the fake bridge of `e2e/` could not give — it answers
+ * every command without checking the arguments, which is how T171 (arguments not nested under
+ * `request`) stayed invisible. Here a wrong shape is rejected by the real backend.
+ */
+export async function tauriInvoke<T = unknown>(
+  page: Page,
+  command: string,
+  args?: Record<string, unknown>
+): Promise<T> {
+  return (await page.evaluate(
+    ([name, payload]) =>
+      (
+        window as unknown as {
+          __TAURI_INTERNALS__: {
+            invoke: (
+              command: string,
+              args?: Record<string, unknown>
+            ) => Promise<unknown>;
+          };
+        }
+      ).__TAURI_INTERNALS__.invoke(name as string, payload as never),
+    [command, args] as const
+  )) as T;
+}
+
+interface OnboardingState {
+  flow_version: number;
+  last_slide: number;
+  status: 'pending' | 'completed' | 'skipped';
+  completed_at: string | null;
+  last_seen_notice_version: number;
+}
+
+/**
+ * Puts onboarding back to `pending` at `lastSlide` through the real backend and reloads, so the
+ * next thing on screen is onboarding at that slide. The application under test is one instance
+ * shared by every spec, and onboarding is state it keeps: the other specs dismiss it, so one that
+ * is *about* onboarding has to bring it back rather than assume it is still there.
+ */
+export async function resetOnboarding(
+  page: Page,
+  lastSlide = 1
+): Promise<void> {
+  const current = await tauriInvoke<OnboardingState>(
+    page,
+    'get_onboarding_state'
+  );
+  await tauriInvoke(page, 'set_onboarding_state', {
+    request: {
+      ...current,
+      status: 'pending',
+      last_slide: lastSlide,
+      completed_at: null
+    }
+  });
+  await page.reload();
+}
+
+/** Goes to a screen by its shortcut and waits for its `main` landmark. */
+export async function openScreen(
+  page: Page,
+  shortcut: string,
+  name: RegExp
+): Promise<void> {
+  await page.keyboard.press(shortcut);
+  await expect(page.getByRole('main', { name })).toBeVisible();
+}
