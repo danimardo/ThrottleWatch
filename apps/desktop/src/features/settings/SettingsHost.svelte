@@ -417,6 +417,23 @@
       language={{
         title: t('settings.languageTitle'),
         rowLabel: t('settings.language'),
+        // What "System" means and what is in force, which the design offers (`rowDescription`,
+        // `effectiveLabel`) and the application was not filling in: with the choice saved but not
+        // visibly applied, there was no way to tell which language the app thought it was in.
+        rowDescription: t('settings.languageDescription'),
+        effectiveLabel: t('settings.languageEffective')
+          .replace(
+            '{language}',
+            locale === 'es'
+              ? t('settings.languageSpanish')
+              : t('settings.languageEnglish')
+          )
+          .replace(
+            '{source}',
+            preferenceValue('locale.mode', 'system') === 'system'
+              ? t('settings.languageSourceSystem')
+              : t('settings.languageSourceChosen')
+          ),
         selectLabel: t('settings.language'),
         value: preferenceValue('locale.mode', 'system'),
         options: languageOptions,

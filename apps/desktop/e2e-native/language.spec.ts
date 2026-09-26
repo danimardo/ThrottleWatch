@@ -42,6 +42,15 @@ test('@native the interface follows the language Rust resolves, not the WebView'
   ).toBeVisible();
 
   // ...and the WebView is free to disagree. Nothing here asserts on `navigator.language`, on purpose.
+
+  // Settings says which language is in force and why, so the person is never left guessing: with
+  // the choice on "Sistema" it names the language and that it comes from Windows.
+  await openScreen(page, 'Control+6', SETTINGS);
+  const effective = page.getByText(/idioma efectivo|effective language/i);
+  await expect(effective).toContainText(
+    locale === 'es' ? 'Español' : 'English'
+  );
+  await expect(effective).toContainText(/según windows|from windows/i);
 });
 
 test('@native choosing a language applies at once, keeps the screen and can be undone', async ({
@@ -72,8 +81,14 @@ test('@native choosing a language applies at once, keeps the screen and can be u
     ).toBeVisible();
     // ...Rust agrees, so its own texts (tray, notifications, the Now screen's labels) follow too...
     expect(await effectiveLocale(page)).toBe(other);
-    // ...and the person is still on Settings, not dropped back on "Now".
+    // ...and the person is still on Settings, not dropped back on "Now"...
     await expect(page.getByRole('main', { name: SETTINGS })).toBeVisible();
+    // ...where the effective-language line now says it is the person's own choice.
+    const effective = page.getByText(/idioma efectivo|effective language/i);
+    await expect(effective).toContainText(
+      other === 'es' ? 'Español' : 'English'
+    );
+    await expect(effective).toContainText(/elegido por ti|your choice/i);
   } finally {
     // Leave the shared application as it was found: back to "Sistema".
     await tauriInvoke(page, 'set_preference', {
