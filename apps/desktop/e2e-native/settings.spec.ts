@@ -56,11 +56,20 @@ test('@native an active session does not expose the delete action', async ({
   await ensureOnboardingDone(page);
   await openScreen(page, 'Control+4', /sessions|sesiones/i);
 
+  const inProgress = page
+    .getByRole('listitem')
+    .filter({
+      has: page
+        .locator('.status-tag')
+        .filter({ hasText: /in progress|en curso/i })
+    });
+  await expect(inProgress).toHaveCount(1, { timeout: 30_000 });
+
+  // Scoped to *that* card. The original asserted no delete button anywhere on the screen, which
+  // held only because its fake profile had a single session. Here the application is shared: an
+  // earlier spec leaves finished guided sessions on the list, and those rightly offer deletion.
   await expect(
-    page.locator('.status-tag').filter({ hasText: /in progress|en curso/i })
-  ).toBeVisible({ timeout: 30_000 });
-  await expect(
-    page.getByRole('button', { name: /delete session|eliminar sesión/i })
+    inProgress.getByRole('button', { name: /delete session|eliminar sesión/i })
   ).toHaveCount(0);
 });
 
