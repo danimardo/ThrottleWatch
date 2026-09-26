@@ -58,7 +58,10 @@ impl GlassLevel {
 }
 
 /// `preference` is the raw `appearance.glass` value (`"system"`, `"full"`, `"reduced"`, `"off"`,
-/// or anything else, treated like `"system"`). `system_advanced_effects` is `None` when the OS
+/// or anything else, treated like `"system"`). With Windows' transparency off, `system` gives
+/// `Reduced` (no blur, nearly opaque cards, the ambient gradient kept) rather than `Off`: the
+/// setting is respected (constitution, accessibility) and the look stays close to the design mockup;
+/// the person can still ask for `off` explicitly. `system_advanced_effects` is `None` when the OS
 /// read failed — resolved to `Full`, the same "unknown treated as the unrestricted case" choice
 /// `sampling_control::on_ac_power` makes for an unknown power source: a failed read must never by
 /// itself force a degraded look.
@@ -66,7 +69,7 @@ pub fn resolve_base_level(preference: &str, system_advanced_effects: Option<bool
     match GlassLevel::from_preference(preference) {
         Some(level) => level,
         None => match system_advanced_effects {
-            Some(false) => GlassLevel::Off,
+            Some(false) => GlassLevel::Reduced,
             Some(true) | None => GlassLevel::Full,
         },
     }
@@ -535,7 +538,7 @@ mod tests {
     #[test]
     fn system_maps_the_os_transparency_setting_and_fails_open() {
         assert_eq!(resolve_base_level("system", Some(true)), GlassLevel::Full);
-        assert_eq!(resolve_base_level("system", Some(false)), GlassLevel::Off);
+        assert_eq!(resolve_base_level("system", Some(false)), GlassLevel::Reduced);
         assert_eq!(resolve_base_level("system", None), GlassLevel::Full);
     }
 
