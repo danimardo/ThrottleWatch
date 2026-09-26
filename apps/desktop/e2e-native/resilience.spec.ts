@@ -33,8 +33,7 @@ test('@critical disco lleno: aviso persistente, modo memoria y recuperacion sola
   test.setTimeout(RETRY_BUDGET_MS + 60_000);
 
   // T181: the run starts from an empty database now (`TW_DEV_DATA_DIR`), so onboarding is what
-  // comes up. Getting past it is what makes the application record, and recording is what produces
-  // the writes this scenario is about.
+  // comes up first. Getting past it is what lets the application record.
   const skip = page.getByRole('button', { name: /omitir|skip/i }).first();
   if (await skip.isVisible().catch(() => false)) {
     await skip.click();
@@ -42,25 +41,15 @@ test('@critical disco lleno: aviso persistente, modo memoria y recuperacion sola
 
   // The warning is global: it must be there whatever screen the app happens to be on.
   await expect(page.getByText(WARNING)).toBeVisible({ timeout: 30_000 });
-});
 
-/**
- * T181, 2026-09-26. The draining half of the scenario used to be asserted in the test above and
- * passed — but only because the run reused the developer's own data directory, where a session was
- * already recording and producing writes tick after tick. From the empty directory the suite now
- * starts from, the log shows exactly **one** `STORAGE_WRITE_FAULT_INJECTED` in 90 s: the
- * application attempts a single write. `write_actions` is what retries the backlog (oldest action
- * first, paced by `storage.retry_s`), and it only runs when there are recorder actions, so with no
- * second write the backlog can never drain and the warning can never clear.
- *
- * So this is left visibly pending rather than deleted or left failing, and it is not a test bug to
- * paper over: either passive monitoring should be recording continuously on a fresh profile — in
- * which case FR-075's recovery has never been exercised — or the scenario has to start a session
- * first. Deciding which is a product question, noted in `tasks.md` under T181.
- */
-test.fixme('@critical disco lleno: el backlog drena solo y el aviso desaparece', async ({
-  page
-}) => {
+  // Nobody asks for the retry: Rust drains the backlog on its own and the warning goes away. The
+  // retry is paced by `storage.retry_s` (60 s), so with `TW_DEV_STORAGE_FAIL_WRITES=1` the first
+  // retry succeeds and the warning clears within one period.
+  //
+  // Note the variable's value matters here: `=N` makes the first N writes fail, and each failed
+  // retry costs another 60 s, so recovery takes about N minutes. Measured 2026-09-26 with `=3`:
+  // failures at 0, 60 and 120 s. That is well past `RETRY_BUDGET_MS`, which is why this is
+  // documented with `=1`.
   await expect(page.getByText(WARNING)).toHaveCount(0, {
     timeout: RETRY_BUDGET_MS
   });
