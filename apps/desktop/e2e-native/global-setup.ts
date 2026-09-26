@@ -83,6 +83,11 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     await waitUntilExists(database);
     seed.kill();
     await once(seed, 'exit').catch(() => undefined);
+    // The seed's WebView2 child processes can outlive it and keep answering on the CDP port for a
+    // moment. Launching straight away made `waitForCdp` see that dying browser as the new app, and
+    // Playwright then attached to it ("Target page, context or browser has been closed", seen on
+    // the CI runner, never locally). Wait until nothing answers before starting the run under test.
+    await waitUntilCdpClosed();
 
     // Windows keeps the SQLite files locked for a moment after the process is gone. The run under
     // test opens the database immediately, and `overwrite_header` reports failure by returning
@@ -111,6 +116,22 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
       await removeWhenReleased(dataDir);
     }
   };
+}
+
+/** Waits until nothing answers on the CDP port any more. */
+async function waitUntilCdpClosed(): Promise<void> {
+  const deadline = Date.now() + READY_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    try {
+      await fetch(CDP_URL);
+    } catch {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+  }
+  throw new Error(
+    `something still answers on ${CDP_URL} ${READY_TIMEOUT_MS}ms after the seeding launch was killed`
+  );
 }
 
 /** Waits for `file` to show up, for as long as the CDP handshake is given. */

@@ -109,11 +109,11 @@ jobs:
         env:
           TW_DEV_CORRUPT_DB: '1'
         run: pnpm --filter @throttlewatch/desktop test:e2e:native resilience
-      - name: Native E2E - full disk warns, then recovers on its own (not blocking yet)
-        continue-on-error: true
-        env:
-          TW_DEV_STORAGE_FAIL_WRITES: '1'
-        run: pnpm --filter @throttlewatch/desktop test:e2e:native resilience
+      # Not run here: the full-disk scenario needs a live collector, and the collector only starts
+      # with a manifest signed by a trusted key. The development key's private half is kept out of
+      # the repository on purpose, so the runner cannot produce one (the scenario skips itself
+      # under CI and stays a local check). Confirmed by hiding the manifests locally: identical
+      # failure. It needs a test collector or trace replay, not a weaker trust boundary.
       - name: Upload test artifacts
         if: always()
         uses: actions/upload-artifact@v4
