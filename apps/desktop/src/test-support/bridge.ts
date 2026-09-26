@@ -183,7 +183,7 @@ export function preferences(
 ): z.infer<typeof preferencesSchema> {
   return preferencesSchema.parse({
     language: 'system',
-    theme: 'system',
+    theme: 'dark',
     motion: 'system',
     glass: 'system',
     ...overrides
@@ -202,7 +202,7 @@ export class FakeBridge implements BridgeTransport {
     schema_version: 1,
     values: {
       'locale.mode': 'system',
-      'appearance.theme': 'system',
+      'appearance.theme': 'dark',
       'appearance.motion': 'system',
       'appearance.glass': 'system',
       'sampling.profile': 'normal',

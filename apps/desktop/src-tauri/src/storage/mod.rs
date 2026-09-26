@@ -1769,7 +1769,9 @@ mod tests {
     fn reset_restores_factory_preferences_in_the_same_database() -> rusqlite::Result<()> {
         let storage = Storage::in_memory()?;
         let mut values = storage.user_preferences()?;
-        values.insert("appearance.theme".to_owned(), serde_json::json!("dark"));
+        // A value that is not the default (`dark`), so that getting the default back after the reset
+        // shows the reset did something.
+        values.insert("appearance.theme".to_owned(), serde_json::json!("light"));
         storage.set_user_preferences(&values)?;
         storage.set_advanced_access_enabled(false)?;
         storage.set_onboarding_state(super::OnboardingState {
@@ -1780,7 +1782,7 @@ mod tests {
             last_seen_notice_version: 3,
         })?;
         storage.reset_all()?;
-        assert_eq!(storage.user_preferences()?["appearance.theme"], serde_json::json!("system"));
+        assert_eq!(storage.user_preferences()?["appearance.theme"], serde_json::json!("dark"));
         assert!(storage.advanced_access_enabled()?);
         assert_eq!(storage.usage()?.session_count, 0);
         // FR-051: "provocar un primer inicio limpio" — a factory reset must leave onboarding and

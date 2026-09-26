@@ -443,7 +443,7 @@
         title: t('settings.appearanceTitle'),
         rowLabel: t('settings.theme'),
         segmentedLabel: t('settings.theme'),
-        theme: preferenceValue('appearance.theme', 'system'),
+        theme: preferenceValue('appearance.theme', 'dark'),
         options: themeOptions,
         onThemeChange: (value) => void setPreference('appearance.theme', value),
         motionRowLabel: t('settings.motion'),

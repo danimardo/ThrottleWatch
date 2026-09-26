@@ -47,3 +47,17 @@ test('@native the "What is new" notice lines up with the cards under it', async 
     )
   ).toBeLessThan(1);
 });
+
+/**
+ * FR-042 (amended 2026-09-26): a profile that never chose a theme starts dark, whatever Windows is
+ * set to. The harness gives every run a fresh data directory, so nothing has chosen one here.
+ */
+test('@native a fresh profile starts in the dark theme', async ({ page }) => {
+  await ensureOnboardingDone(page);
+  const snapshot = await tauriInvoke<{ values: Record<string, unknown> }>(
+    page,
+    'get_preferences'
+  );
+  expect(snapshot.values['appearance.theme']).toBe('dark');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+});

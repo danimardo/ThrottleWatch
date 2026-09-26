@@ -100,7 +100,7 @@
     theme: ThemePreference;
     motion: MotionLevel;
     glass: GlassLevel | 'system';
-  }>({ theme: 'system', motion: 'system', glass: 'system' });
+  }>({ theme: 'dark', motion: 'system', glass: 'system' });
   let active = $state<Destination['id']>(rememberedDestination);
   $effect(() => {
     rememberedDestination = active;
@@ -311,7 +311,7 @@
     const values = result.value.values;
     appearance = {
       theme:
-        (values['appearance.theme'] as ThemePreference | undefined) ?? 'system',
+        (values['appearance.theme'] as ThemePreference | undefined) ?? 'dark',
       motion:
         (values['appearance.motion'] as MotionLevel | undefined) ?? 'system',
       glass:

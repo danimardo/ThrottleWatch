@@ -18,7 +18,10 @@ pub enum PreferenceError {
 pub fn default_values() -> PreferenceMap {
     BTreeMap::from([
         ("locale.mode".to_owned(), json!("system")),
-        ("appearance.theme".to_owned(), json!("system")),
+        // Dark, like the designer's mockup (owner's decision, 2026-09-26; FR-042 amended). It used
+        // to be `system`, which follows Windows' light/dark setting. The choice is still offered, and
+        // a person who picks `system` still gets Windows' theme; only the starting point changed.
+        ("appearance.theme".to_owned(), json!("dark")),
         ("appearance.motion".to_owned(), json!("system")),
         ("appearance.glass".to_owned(), json!("system")),
         ("sampling.profile".to_owned(), json!("normal")),
@@ -166,6 +169,18 @@ mod tests {
     fn defaults_cover_every_known_preference() {
         assert_eq!(default_values().len(), 20);
         assert_eq!(default_values()["privacy.anonymize_exports"], json!(true));
+    }
+
+    #[test]
+    fn a_fresh_profile_starts_in_the_dark_theme_and_still_offers_the_others() {
+        // FR-042 as amended 2026-09-26: the starting point is dark, like the designer's mockup.
+        assert_eq!(default_values()["appearance.theme"], json!("dark"));
+        // Nothing was taken away: `system` and `light` remain valid choices.
+        for choice in ["system", "light", "dark"] {
+            let result = update(&default_values(), "appearance.theme", json!(choice), "now");
+            assert!(result.is_ok(), "{choice} must stay a valid theme");
+        }
+        assert!(update(&default_values(), "appearance.theme", json!("sepia"), "now").is_err());
     }
 
     #[test]
