@@ -10,6 +10,9 @@ pnpm-debug.log*
 # Rust (apps/desktop/src-tauri, once the app exists)
 # Cargo.lock is intentionally tracked for a binary crate (reproducible builds).
 target/
+# The native E2E suite builds its own binary here so it never overwrites the one
+# `arrancar.ps1` launches from target/debug (see apps/desktop/e2e-native/global-setup.ts).
+target-e2e/
 mutants.out/
 .tools/
 

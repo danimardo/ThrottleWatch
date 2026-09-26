@@ -23,7 +23,7 @@ import path from 'node:path';
  *
  * Build first (not done here — this is a smoke you run deliberately, not part of `pnpm test:e2e`):
  *   pnpm exec vite build
- *   cargo build --locked --features e2e,custom-protocol --manifest-path src-tauri/Cargo.toml
+ *   cargo build --locked --features e2e,custom-protocol --manifest-path src-tauri/Cargo.toml --target-dir src-tauri/target-e2e
  */
 
 const CDP_PORT = 9222;
@@ -31,8 +31,16 @@ const CDP_URL = `http://127.0.0.1:${CDP_PORT}/json/version`;
 const READY_TIMEOUT_MS = 20_000;
 const POLL_INTERVAL_MS = 300;
 
+// A target directory of its own, not `target/debug`. `arrancar.ps1` launches whatever is in
+// `target/debug`, and this suite needs a build with the `e2e` feature (it opens a CDP debugging
+// port and reads the `TW_DEV_*` seams). Sharing the directory meant every suite build replaced the
+// developer's own binary with an instrumented one — and every plain `cargo build`/`cargo test`
+// replaced this one with a build that has no CDP port. Two consumers, two directories.
 const exePath = fileURLToPath(
-  new URL('../src-tauri/target/debug/throttlewatch.exe', import.meta.url)
+  new URL(
+    '../src-tauri/target-e2e/debug/throttlewatch.exe',
+    import.meta.url
+  )
 );
 const fakeCollectorPath = fileURLToPath(
   new URL('./fake-collector.mjs', import.meta.url)
@@ -53,9 +61,9 @@ async function waitForCdp(deadline: number): Promise<void> {
   }
   throw new Error(
     `throttlewatch.exe did not open the CDP port at ${CDP_URL} within ${READY_TIMEOUT_MS}ms. ` +
-      'The port is only opened by a build with the `e2e` feature, and any later plain `cargo test ' +
-      '--all-targets` / `cargo build` overwrites target/debug/throttlewatch.exe with one without it: ' +
-      'rebuild with `cargo build --locked --features e2e,custom-protocol --manifest-path src-tauri/Cargo.toml`.'
+      'The port is only opened by a build with the `e2e` feature (target-e2e/, kept apart from ' +
+      "target/debug so it is never overwritten by a plain build): rebuild it with `cargo build --locked " +
+      '--features e2e,custom-protocol --manifest-path src-tauri/Cargo.toml --target-dir src-tauri/target-e2e`.'
   );
 }
 
@@ -83,7 +91,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   }
   if (!existsSync(exePath)) {
     throw new Error(
-      `${exePath} does not exist. Build it first: cargo build --locked --features e2e,custom-protocol --manifest-path src-tauri/Cargo.toml (and pnpm exec vite build for the embedded frontend).`
+      `${exePath} does not exist. Build it first: cargo build --locked --features e2e,custom-protocol --manifest-path src-tauri/Cargo.toml --target-dir src-tauri/target-e2e (and pnpm exec vite build for the embedded frontend).`
     );
   }
   // T181: this drives the real binary, which without help would use the real
@@ -181,7 +189,7 @@ function collectorEnvironment(): NodeJS.ProcessEnv {
  */
 function placeholderDatabase(): Buffer {
   const file = Buffer.alloc(8192);
-  file.write('SQLite format 3 ', 0, 'latin1');
+  file.write('SQLite format 3\0', 0, 'latin1');
   return file;
 }
 

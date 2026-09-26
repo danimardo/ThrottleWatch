@@ -99,7 +99,7 @@ jobs:
       - name: Native E2E against the real binary (not blocking yet)
         continue-on-error: true
         run: |
-          cargo build --locked --features e2e,custom-protocol --manifest-path apps/desktop/src-tauri/Cargo.toml
+          cargo build --locked --features e2e,custom-protocol --manifest-path apps/desktop/src-tauri/Cargo.toml --target-dir apps/desktop/src-tauri/target-e2e
           pnpm --filter @throttlewatch/desktop test:e2e:native
       # E2E-13 needs the app launched with its own fault variable, one instance per scenario, so
       # a plain run skips both (first CI run: "3 skipped"). Each is reproducible from an empty

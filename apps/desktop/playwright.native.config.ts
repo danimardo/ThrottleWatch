@@ -7,7 +7,7 @@ import { defineConfig } from '@playwright/test';
  * `e2e-native/global-setup.ts`) and is not part of `pnpm test:e2e` or CI yet — run it explicitly:
  *
  *   pnpm exec vite build
- *   cargo build --locked --features e2e,custom-protocol --manifest-path src-tauri/Cargo.toml
+ *   cargo build --locked --features e2e,custom-protocol --manifest-path src-tauri/Cargo.toml --target-dir src-tauri/target-e2e
  *   pnpm exec playwright test --config playwright.native.config.ts
  */
 export default defineConfig({

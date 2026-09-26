@@ -54,6 +54,33 @@ function Stop-Zombie([string]$processName) {
 Stop-Zombie 'throttlewatch'
 Stop-Zombie 'SensorAgent'
 
+# El colector solo arranca si SensorAgent.exe coincide con el manifiesto firmado que lo acompana
+# (ADR-0004). Si se recompila o se republica sin volver a firmar, la aplicacion arranca pero sin
+# datos ("Collector unavailable") y sin decir por que. Se avisa aqui, con el comando exacto.
+# Solo compara el hash con el manifiesto; la firma la verifica la propia aplicacion al arrancar.
+function Test-Colector([string]$directorioExe) {
+    $carpeta = @((Join-Path $directorioExe 'collector'), $directorioExe) |
+        Where-Object { Test-Path (Join-Path $_ 'SensorAgent.exe') } |
+        Select-Object -First 1
+    if (-not $carpeta) { return 'no se encuentra SensorAgent.exe junto al ejecutable' }
+    $manifiesto = Join-Path $carpeta 'release-manifest.json'
+    if (-not (Test-Path $manifiesto)) { return "falta release-manifest.json en $carpeta" }
+    $listado = (Get-Content $manifiesto -Raw | ConvertFrom-Json).files |
+        Where-Object { $_.path -eq 'SensorAgent.exe' } |
+        Select-Object -First 1
+    if (-not $listado) { return 'el manifiesto no lista SensorAgent.exe' }
+    $real = (Get-FileHash (Join-Path $carpeta 'SensorAgent.exe') -Algorithm SHA256).Hash
+    if ($real -ne $listado.sha256) { return 'SensorAgent.exe no coincide con el manifiesto firmado' }
+    return $null
+}
+
+$motivoColector = Test-Colector (Split-Path $exePath)
+if ($motivoColector) {
+    Write-Warning "El colector no va a arrancar: $motivoColector. La aplicacion se abrira, pero sin datos ('Collector unavailable')."
+    Write-Warning 'Para repararlo, desde la raiz del repositorio:  node scripts/prepare-collector-bundle.mjs'
+    Write-Warning 'y despues, en apps\desktop:  cargo build --locked --features custom-protocol --manifest-path src-tauri\Cargo.toml'
+}
+
 Write-Output "Arrancando ThrottleWatch ($exePath)..."
 $proceso = Start-Process -FilePath $exePath -PassThru
 Start-Sleep -Seconds 2
