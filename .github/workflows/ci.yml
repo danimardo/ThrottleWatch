@@ -108,7 +108,24 @@ jobs:
         continue-on-error: true
         env:
           TW_DEV_CORRUPT_DB: '1'
+          # A fixed directory (which the harness leaves alone) so the next step can read the log.
+          TW_DEV_DATA_DIR: ${{ runner.temp }}/tw-e2e-corrupt
         run: pnpm --filter @throttlewatch/desktop test:e2e:native resilience
+      # This scenario passes locally and fails on the runner with "Target page, context or browser
+      # has been closed" right after onboarding, and two guesses at the cause (the CDP port of the
+      # seeding launch, then WebView2 leftovers) were wrong. Rather than guess again, show what the
+      # application itself logged, and the harness now reports when the app exits on its own.
+      - name: Native E2E - what the app logged in the corrupt-database run
+        if: always()
+        continue-on-error: true
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'tw-e2e-corrupt'
+          if (-not (Test-Path $dir)) { Write-Host "no data directory at $dir"; exit 0 }
+          Get-ChildItem $dir -Recurse -File | Select-Object FullName, Length | Format-Table -AutoSize | Out-String -Width 200
+          Get-ChildItem (Join-Path $dir 'logs') -File -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "--- $($_.Name)"
+            Get-Content $_.FullName -Tail 60
+          }
       # The full-disk scenario needs live telemetry, and the real collector only starts from a manifest
       # signed by a trusted key whose private half is kept out of the repository on purpose, so a
       # runner can never launch it. The harness hands the app a test double instead

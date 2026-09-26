@@ -40,7 +40,10 @@ async function waitForCdp(deadline: number): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
   }
   throw new Error(
-    `throttlewatch.exe did not open the CDP port at ${CDP_URL} within ${READY_TIMEOUT_MS}ms`
+    `throttlewatch.exe did not open the CDP port at ${CDP_URL} within ${READY_TIMEOUT_MS}ms. ` +
+      'The port is only opened by a build with the `e2e` feature, and any later plain `cargo test ' +
+      '--all-targets` / `cargo build` overwrites target/debug/throttlewatch.exe with one without it: ' +
+      'rebuild with `cargo build --locked --features e2e,custom-protocol --manifest-path src-tauri/Cargo.toml`.'
   );
 }
 
@@ -85,6 +88,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     // it resolves the data directory and opens the database. Killing on CDP alone therefore
     // usually killed the seed before the file existed (measured 2026-09-26).
     await waitUntilExists(database);
+    expectExit(seed);
     seed.kill();
     await once(seed, 'exit').catch(() => undefined);
     // The seed's WebView2 child processes can outlive it and keep answering on the CDP port for a
@@ -110,6 +114,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   });
 
   return async () => {
+    expectExit(child);
     child.kill();
     // `kill()` returns before Windows has released the SQLite files, so removing the directory
     // straight away fails with EPERM. Wait for the process to actually be gone first.
@@ -186,6 +191,13 @@ async function waitUntilWritable(file: string): Promise<boolean> {
   return false;
 }
 
+const expectedExits = new WeakSet<object>();
+
+/** Marks a child this setup is about to kill itself, so its exit is not reported as a crash. */
+function expectExit(child: object): void {
+  expectedExits.add(child);
+}
+
 /** Starts the binary and resolves once its CDP port answers, or rejects if it exits first. */
 async function launch(
   env: NodeJS.ProcessEnv
@@ -214,6 +226,16 @@ async function launch(
   // The rejection above is no longer anyone's to handle once the window is up, and an unhandled
   // one would crash the runner when the app is later killed in teardown.
   startupError.catch(() => undefined);
+  // Once the window is up, an exit nobody asked for is the app dying under the test. Playwright then
+  // only reports "Target page, context or browser has been closed", which says nothing about why
+  // (seen on the CI runner for the corrupt-database scenario, never locally) — so say it here.
+  child.once('exit', (code, signal) => {
+    if (!expectedExits.has(child)) {
+      console.error(
+        `[e2e-native] throttlewatch.exe (pid ${child.pid}) exited on its own: code=${code} signal=${signal}`
+      );
+    }
+  });
   return child;
 }
 
