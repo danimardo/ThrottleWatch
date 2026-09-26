@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { ensureOnboardingDone, expect, test } from './fixtures';
 
 test('@native the real Tauri window serves the app and responds to a real IPC round trip', async ({
   page
@@ -14,7 +14,10 @@ test('@native the real Tauri window serves the app and responds to a real IPC ro
   expect(isRealTauriWindow).toBe(true);
 
   // A real navigation exercises a real IPC round trip (`set_window_state`/`get_preferences` and
-  // friends), not the fake bridge `e2e/fixtures.ts` injects for `frontend`/`app`.
+  // friends), not the fake bridge `e2e/fixtures.ts` injects for `frontend`/`app`. It has to get
+  // past onboarding first: from an empty profile that is what is on screen, and it swallows the
+  // shortcut (this test used to pass only because another spec had dismissed it beforehand).
+  await ensureOnboardingDone(page);
   await page.keyboard.press('Control+6');
   await expect(
     page.getByRole('main', { name: /settings|ajustes/i })

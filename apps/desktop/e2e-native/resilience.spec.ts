@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { ensureOnboardingDone, expect, test } from './fixtures';
 
 /**
  * E2E-13 (HU-19, FR-075): the two storage failures, forced on the real binary through the
@@ -34,10 +34,7 @@ test('@critical disco lleno: aviso persistente, modo memoria y recuperacion sola
 
   // T181: the run starts from an empty database now (`TW_DEV_DATA_DIR`), so onboarding is what
   // comes up first. Getting past it is what lets the application record.
-  const skip = page.getByRole('button', { name: /omitir|skip/i }).first();
-  if (await skip.isVisible().catch(() => false)) {
-    await skip.click();
-  }
+  await ensureOnboardingDone(page);
 
   // The warning is global: it must be there whatever screen the app happens to be on.
   await expect(page.getByText(WARNING)).toBeVisible({ timeout: 30_000 });
@@ -64,10 +61,7 @@ test('@critical base danada: se aparta al arrancar y Ajustes ofrece exportarla',
   );
 
   // Recovering from corruption means a fresh database, so the app starts at onboarding.
-  const skip = page.getByRole('button', { name: /omitir|skip/i });
-  if (await skip.count()) {
-    await skip.first().click();
-  }
+  await ensureOnboardingDone(page);
 
   await page.getByText('Ajustes', { exact: true }).first().click();
   const corruptRow = page.locator('.row', { hasText: /dañada|corrupt/i });

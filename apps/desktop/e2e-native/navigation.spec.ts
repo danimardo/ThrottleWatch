@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { ensureOnboardingDone, expect, test } from './fixtures';
 
 /**
  * T181: `e2e/navigation.spec.ts` drives the same six destinations against the fake bridge, which
@@ -29,10 +29,7 @@ test('@native every destination mounts against the real command surface', async 
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
   // A fresh `TW_DEV_DATA_DIR` means an empty database, so onboarding is what comes up first.
-  const skip = page.getByRole('button', { name: /omitir|skip/i }).first();
-  if (await skip.isVisible().catch(() => false)) {
-    await skip.click();
-  }
+  await ensureOnboardingDone(page);
 
   for (const destination of DESTINATIONS) {
     await page.keyboard.press(destination.shortcut);
@@ -57,6 +54,7 @@ test('@native every destination mounts against the real command surface', async 
 test('@native a preference written through the real backend survives a reload', async ({
   page
 }) => {
+  await ensureOnboardingDone(page);
   await page.keyboard.press('Control+6');
   const settings = page.getByRole('main', { name: /settings|ajustes/i });
   await expect(settings).toBeVisible();
