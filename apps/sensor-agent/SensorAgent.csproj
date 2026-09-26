@@ -7,6 +7,13 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!-- Declared so the lock file is identical whether restore runs plain (CI) or targets
+         win-x64 (the self-contained publish `scripts/prepare-collector-bundle.mjs` does for
+         the installer). Without it, that publish rewrote packages.lock.json with a
+         `net10.0-windows7.0/win-x64` section and CI's locked-mode restore then failed with
+         NU1004 ("project's runtime identifiers: , lock file's: win-x64"). The collector only
+         ever ships as Windows x64, so naming it here costs nothing. -->
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0" PrivateAssets="all" />

@@ -350,10 +350,21 @@
    threshold unmeasurable while it ran. `isolation: isolate` keeps the
    pseudo-element's z-index scoped to this element, never affecting
    stacking elsewhere; `inset: -15%` gives the drift room without ever
-   revealing an edge. */
+   revealing an edge.
+
+   `overflow: clip` is what makes that "without ever revealing an edge"
+   true (2026-09-26). Without it the pseudo-element's 15% bleed past the
+   right edge counts towards the document's scrollable area, so
+   `documentElement.scrollWidth` came out at exactly 1.15x the viewport at
+   every width (480 -> 552, 840 -> 966, 1100 -> 1265) and
+   `e2e/environment-matrix.spec.ts` failed in all six viewport projects.
+   `clip` rather than `hidden` on purpose: it clips without turning this
+   element into a scroll container, which would capture the inner panes'
+   own scrolling. */
 .tw-ambient {
   position: relative;
   isolation: isolate;
+  overflow: clip;
   background-color: var(--bg);
 }
 .tw-ambient::before {
