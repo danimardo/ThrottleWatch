@@ -540,11 +540,13 @@
 
     <div class="content">
       {#if storageDegraded}
-        <Banner
-          tone="warning"
-          title={t('app.storageDegradedTitle')}
-          description={t('app.storageDegradedDescription')}
-        />
+        <div class="notice-slot">
+          <Banner
+            tone="warning"
+            title={t('app.storageDegradedTitle')}
+            description={t('app.storageDegradedDescription')}
+          />
+        </div>
       {/if}
       {#if onboardingActive}
         <main class="onboarding" aria-label={t('onboarding.ariaLabel')}>
@@ -569,16 +571,18 @@
         </main>
       {:else if active === 'now'}
         {#if noticesVisible}
-          <WhatsNewCards
-            title={t('notices.title')}
-            cards={pendingNotices.map((notice) => ({
-              id: notice.id,
-              title: t(notice.titleKey),
-              body: t(notice.bodyKey)
-            }))}
-            dismissLabel={t('notices.dismiss')}
-            onDismiss={dismissNotice}
-          />
+          <div class="notice-slot">
+            <WhatsNewCards
+              title={t('notices.title')}
+              cards={pendingNotices.map((notice) => ({
+                id: notice.id,
+                title: t(notice.titleKey),
+                body: t(notice.bodyKey)
+              }))}
+              dismissLabel={t('notices.dismiss')}
+              onDismiss={dismissNotice}
+            />
+          </div>
         {/if}
         <Dashboard />
       {:else if active === 'guided'}
@@ -769,6 +773,16 @@
   .content {
     min-width: 0;
     flex: 1;
+  }
+  /* The notices sit above the screen, outside its own padding, so they need the same column and
+     the same inset as the screens (`.dashboard`: 1100px centred, `--space-6`). Without it the
+     "What's new" card ran edge to edge against the window while the cards under it had margin. The
+     bottom is left open: the screen's own top padding is the gap between the two. */
+  .notice-slot {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: var(--space-6) var(--space-6) 0;
+    box-sizing: border-box;
   }
   .onboarding {
     min-height: 100%;
