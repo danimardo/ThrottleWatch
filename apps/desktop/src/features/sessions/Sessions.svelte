@@ -23,26 +23,10 @@
     type SessionSummary
   } from '../../lib/bridge/schemas';
   import { getTranslator } from '../../lib/i18n/runtime';
+  import { classificationLabelFor, classificationOf } from './classification';
+  import { takeRequestedSessionReport } from './handoff';
 
   const { t, locale } = getTranslator();
-
-  const classifications: readonly Classification[] = [
-    'normal',
-    'hot_unproven',
-    'thermal_probable',
-    'thermal_confirmed',
-    'power_limited',
-    'platform_limited',
-    'mixed_limit',
-    'indeterminate'
-  ];
-
-  function isClassification(value: unknown): value is Classification {
-    return (
-      typeof value === 'string' &&
-      classifications.some((item) => item === value)
-    );
-  }
 
   let listStatus = $state<'loading' | 'error' | 'loaded'>('loading');
   let sessions = $state<SessionSummary[]>([]);
@@ -76,23 +60,8 @@
     }
   );
 
-  function classificationOf(value: unknown): Classification {
-    return isClassification(value) ? value : 'indeterminate';
-  }
-
   function classificationLabel(value: unknown): string {
-    const classification = classificationOf(value);
-    const labels: Record<Classification, string> = {
-      normal: t('sessions.classificationNormal'),
-      hot_unproven: t('sessions.classificationHotUnproven'),
-      thermal_probable: t('sessions.classificationThermalProbable'),
-      thermal_confirmed: t('sessions.classificationThermalConfirmed'),
-      power_limited: t('sessions.classificationPowerLimited'),
-      platform_limited: t('sessions.classificationPlatformLimited'),
-      mixed_limit: t('sessions.classificationMixedLimit'),
-      indeterminate: t('sessions.classificationIndeterminate')
-    };
-    return labels[classification];
+    return classificationLabelFor(t, value);
   }
 
   function typeLabel(kind: SessionSummary['kind']): string {
@@ -405,6 +374,8 @@
 
   onMount(() => {
     void loadSessions();
+    const requestedReport = takeRequestedSessionReport();
+    if (requestedReport !== null) void openSession(requestedReport);
     const onOpenExport = (): void => {
       const candidate =
         selectedSession ??

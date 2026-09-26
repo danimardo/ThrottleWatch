@@ -249,7 +249,7 @@ export function parseEvent(
   value: unknown
 ): BridgeResult<import('./schemas').SessionChangedEvent>;
 export function parseEvent(
-  event: 'report:frozen',
+  event: 'report:frozen' | 'guided:finished',
   value: unknown
 ): BridgeResult<{ session_id: string }>;
 export function parseEvent(

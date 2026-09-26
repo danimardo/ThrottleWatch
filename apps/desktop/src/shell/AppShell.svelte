@@ -186,7 +186,15 @@
         }
       }
     };
+    const onNavigate = (event: Event): void => {
+      const destination = (event as CustomEvent<{ destination?: string }>)
+        .detail?.destination;
+      if (destinations.some((item) => item.id === destination)) {
+        active = destination as Destination['id'];
+      }
+    };
     window.addEventListener('keydown', onShortcut);
+    window.addEventListener('throttlewatch:navigate', onNavigate);
     window.addEventListener('throttlewatch:request-export', onExportRequest);
     windowAdapter = createWindowAdapter();
     void windowAdapter.isMaximized().then((value) => (maximized = value));
@@ -277,6 +285,7 @@
       stopGlassEffectiveListener();
       stopGlassPerformanceReporting();
       window.removeEventListener('keydown', onShortcut);
+      window.removeEventListener('throttlewatch:navigate', onNavigate);
       window.removeEventListener(
         'throttlewatch:request-export',
         onExportRequest

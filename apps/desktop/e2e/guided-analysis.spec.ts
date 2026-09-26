@@ -166,3 +166,69 @@ test('@critical CPU topology keeps core selection while changing metric', async 
   await expect(firstCore).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByText('3900 MHz', { exact: true })).toBeVisible();
 });
+
+test('@critical guided result shows the verdict, sets the reference and opens the report', async ({
+  page
+}) => {
+  await page.goto('/');
+  await page
+    .getByRole('button', { name: /guided diagnostic|diagnóstico guiado/i })
+    .click();
+  await page.getByRole('button', { name: /start|iniciar/i }).click();
+
+  // What Rust emits when the run ends: the session it saved, then the final phase.
+  await page.evaluate(() => {
+    const emit = (
+      window as unknown as {
+        __THROTTLEWATCH_EMIT__: (event: string, payload: unknown) => void;
+      }
+    ).__THROTTLEWATCH_EMIT__;
+    emit('guided:finished', { session_id: 'history-session' });
+    emit('guided:phase', {
+      phase: 'result',
+      elapsed_ms: 300_000,
+      remaining_ms: 0,
+      reason_key: null,
+      temperature_c: 70,
+      thermal_limit_c: 95,
+      active_clock_mhz: 3900,
+      base_clock_mhz: 3600,
+      throughput_ops_s: 1000,
+      progress_percent: 100
+    });
+  });
+
+  await expect(
+    page.getByText(/no limitation detected|sin limitación detectada/i)
+  ).toBeVisible();
+  await page
+    .getByRole('button', { name: /use as reference|usar como referencia/i })
+    .click();
+  const calls = await page.evaluate(
+    () =>
+      (
+        window as unknown as {
+          __THROTTLEWATCH_CALLS__: Array<{ command: string }>;
+        }
+      ).__THROTTLEWATCH_CALLS__
+  );
+  expect(calls.map(({ command }) => command)).toContain(
+    'set_session_reference'
+  );
+
+  await page.getByRole('button', { name: /view report|ver informe/i }).click();
+  await expect(
+    page.getByRole('main', { name: /sessions|sesiones/i })
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: /back to sessions|volver a sesiones/i })
+  ).toBeVisible();
+
+  // Coming back to the guided screen starts over instead of showing the finished run again.
+  await page
+    .getByRole('button', { name: /guided diagnostic|diagnóstico guiado/i })
+    .click();
+  await expect(
+    page.getByRole('button', { name: /^(start|iniciar)$/i })
+  ).toBeVisible();
+});

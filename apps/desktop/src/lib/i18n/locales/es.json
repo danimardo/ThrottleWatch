@@ -403,7 +403,19 @@
     "inProgress": "Diagnóstico guiado en curso",
     "closeDescription": "La prueba debe detenerse antes de cerrar la ventana.",
     "closeAndStop": "Detener y salir",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "checks": {
+      "sensors": "Sensores",
+      "power": "Alimentación",
+      "profile": "Perfil",
+      "disk": "Espacio de disco",
+      "generator": "Generador de carga"
+    },
+    "needsAc": "Conecta el equipo a la corriente para empezar el diagnóstico.",
+    "errorDescription": "No se pudo completar la operación. Vuelve a intentarlo; si sigue fallando, consulta el registro.",
+    "resultSaved": "El resultado queda guardado como informe de la sesión.",
+    "viewReport": "Ver informe",
+    "referenceSet": "Esta sesión es ahora tu referencia para comparar."
   },
   "analysis": {
     "selectedEvent": "Evento seleccionado",

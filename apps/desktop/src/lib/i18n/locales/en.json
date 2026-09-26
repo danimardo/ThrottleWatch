@@ -403,7 +403,19 @@
     "inProgress": "Guided diagnostic in progress",
     "closeDescription": "The test must stop before the window can close.",
     "closeAndStop": "Stop and exit",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "checks": {
+      "sensors": "Sensors",
+      "power": "Power",
+      "profile": "Profile",
+      "disk": "Disk space",
+      "generator": "Load generator"
+    },
+    "needsAc": "Plug the computer in to start the diagnostic.",
+    "errorDescription": "The operation could not be completed. Try again; if it keeps failing, check the log.",
+    "resultSaved": "The result is saved as the session report.",
+    "viewReport": "View report",
+    "referenceSet": "This session is now your reference for comparisons."
   },
   "analysis": {
     "selectedEvent": "Selected event",

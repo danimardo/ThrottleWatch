@@ -3,15 +3,24 @@
   import GuidedDiagnosticScreen from '../../design-system/components/GuidedDiagnosticScreen.svelte';
   import {
     commandResponseSchemas,
-    type GuidedPhase
+    type GuidedPhase,
+    type GuidedPreflight,
+    type SessionSummary
   } from '../../lib/bridge/schemas';
   import {
     invokeValidated,
     listenValidated,
     parseEvent
   } from '../../lib/bridge';
+  import { getApplicationLogger } from '../../lib/logging';
   import { getTranslator } from '../../lib/i18n/runtime';
   import {
+    classificationLabelFor,
+    classificationOf
+  } from '../sessions/classification';
+  import { requestSessionReport } from '../sessions/handoff';
+  import {
+    batteryStateOf,
     percentRemaining,
     preflightChecks,
     toDiagnosticPhase
@@ -23,9 +32,21 @@
   } from './session';
 
   let guidedState = $state<GuidedPhase | null>(null);
-  let checks = $state<ReturnType<typeof preflightChecks>>([]);
-  let error = $state<string | undefined>();
+  let preflight = $state<GuidedPreflight | null>(null);
+  let failed = $state(false);
+  let finished = $state<SessionSummary | null>(null);
+  let finishedSessionId = $state<string | null>(null);
   const { t } = getTranslator();
+
+  let checks = $derived(
+    preflight === null ? [] : preflightChecks(preflight, t)
+  );
+  let batteryState = $derived(batteryStateOf(preflight));
+
+  function reportFailure(action: string, messageKey: string): void {
+    failed = true;
+    getApplicationLogger().warn(`guided ${action} failed: ${messageKey}`);
+  }
 
   async function loadPreflight(): Promise<void> {
     const result = await invokeValidated(
@@ -33,9 +54,8 @@
       undefined,
       commandResponseSchemas.get_guided_preflight
     );
-    if (result.ok) checks = preflightChecks(result.value);
-    else
-      error = `${result.error.message_key}: ${JSON.stringify(result.error.details)}`;
+    if (result.ok) preflight = result.value;
+    else reportFailure('preflight', result.error.message_key);
   }
 
   async function start(skipRest = false): Promise<void> {
@@ -47,14 +67,59 @@
       commandResponseSchemas.start_guided
     );
     if (result.ok) {
+      failed = false;
+      finished = null;
+      finishedSessionId = null;
       guidedState = result.value;
       publishGuidedPhase(result.value);
-    } else
-      error = `${result.error.message_key}: ${JSON.stringify(result.error.details)}`;
+    } else reportFailure('start', result.error.message_key);
+  }
+
+  async function loadFinished(sessionId: string): Promise<void> {
+    const result = await invokeValidated(
+      'get_session',
+      { request: { session_id: sessionId } },
+      commandResponseSchemas.get_session
+    );
+    if (result.ok && finishedSessionId === sessionId) {
+      finished = result.value.summary;
+    }
+  }
+
+  async function markAsReference(): Promise<void> {
+    if (finished === null) return;
+    const result = await invokeValidated(
+      'set_session_reference',
+      { request: { session_id: finished.session_id, is_reference: true } },
+      commandResponseSchemas.set_session_reference
+    );
+    if (result.ok) await loadFinished(finished.session_id);
+    else reportFailure('reference', result.error.message_key);
+  }
+
+  function leave(): void {
+    const sessionId = finishedSessionId;
+    const showReport = sessionId !== null && currentPhase === 'result';
+    guidedState = null;
+    finished = null;
+    finishedSessionId = null;
+    failed = false;
+    publishGuidedPhase(null);
+    void loadPreflight();
+    if (showReport) requestSessionReport(sessionId);
+    window.dispatchEvent(
+      new CustomEvent('throttlewatch:navigate', {
+        detail: { destination: showReport ? 'sessions' : 'now' }
+      })
+    );
   }
 
   async function stop(): Promise<void> {
     await stopGuidedSession();
+  }
+
+  function onFocus(): void {
+    if (guidedState === null) void loadPreflight();
   }
 
   function onShortcut(event: KeyboardEvent): void {
@@ -70,17 +135,35 @@
       guidedState = phase;
     });
     window.addEventListener('keydown', onShortcut);
+    window.addEventListener('focus', onFocus);
     let unlisten: (() => void) | undefined;
+    let unlistenFinished: (() => void) | undefined;
+    let unlistenFrozen: (() => void) | undefined;
     void listenValidated('guided:phase', (value) => {
       const parsed = parseEvent('guided:phase', value);
       if (!parsed.ok) return;
       guidedState = parsed.value;
       publishGuidedPhase(parsed.value);
     }).then((stopListening) => (unlisten = stopListening));
+    void listenValidated('guided:finished', (value) => {
+      const parsed = parseEvent('guided:finished', value);
+      if (!parsed.ok) return;
+      finishedSessionId = parsed.value.session_id;
+      void loadFinished(parsed.value.session_id);
+    }).then((stopListening) => (unlistenFinished = stopListening));
+    void listenValidated('report:frozen', (value) => {
+      const parsed = parseEvent('report:frozen', value);
+      if (parsed.ok && parsed.value.session_id === finishedSessionId) {
+        void loadFinished(parsed.value.session_id);
+      }
+    }).then((stopListening) => (unlistenFrozen = stopListening));
     return () => {
       unsubscribeSession();
       window.removeEventListener('keydown', onShortcut);
+      window.removeEventListener('focus', onFocus);
       unlisten?.();
+      unlistenFinished?.();
+      unlistenFrozen?.();
     };
   });
 
@@ -112,6 +195,24 @@
       ? `${(guidedState.thermal_limit_c - guidedState.temperature_c).toFixed(0)} ${t('dashboard.celsius')}`
       : undefined
   );
+  let result = $derived(
+    currentPhase === 'result' &&
+      finished !== null &&
+      finished.report_classification !== null
+      ? {
+          classification: classificationOf(finished.report_classification),
+          classificationLabel: classificationLabelFor(
+            t,
+            finished.report_classification
+          ),
+          summarySentence: t('guided.resultSaved'),
+          evidenceLine:
+            finished.duration_ms === null
+              ? undefined
+              : `${t('guided.duration')}: ${String(Math.round(finished.duration_ms / 1000))} ${t('common.seconds')}`
+        }
+      : undefined
+  );
   let reading = $derived({
     temperatureLabel,
     limitLabel,
@@ -138,12 +239,14 @@
   ]}
   stepperLabel={t('guided.phasesLabel')}
   preflightChecks={checks}
-  preflightFailedTitle={error ?? t('guided.reviewConditions')}
+  preflightFailedTitle={t('guided.reviewConditions')}
+  {batteryState}
+  batteryMessage={t('guided.needsAc')}
   preflightCheckingLabel={t('guided.checkingSensors')}
   readyTitle={t('guided.readyTitle')}
   readyBody={t('guided.readyBody')}
   introTitle={t('guided.title')}
-  introBody={error ?? t('guided.introBody')}
+  introBody={failed ? t('guided.errorDescription') : t('guided.introBody')}
   whatWillHappenTitle={t('guided.whatWillHappen')}
   whatWillHappen={[
     { label: t('guided.load'), value: t('guided.fixedLoop') },
@@ -172,9 +275,17 @@
   sensorLostTitle={t('guided.sensorLostTitle')}
   sensorLostDescription={t('guided.sensorLostDescription')}
   errorTitle={t('guided.errorTitle')}
-  errorDescription={error}
-  closeLabel={t('guided.close')}
+  errorDescription={t('guided.errorDescription')}
+  {result}
+  useAsReferenceLabel={finished !== null && !finished.is_reference
+    ? t('sessions.useReference')
+    : undefined}
+  onUseAsReference={() => void markAsReference()}
+  referenceNote={finished?.is_reference ? t('guided.referenceSet') : undefined}
+  closeLabel={currentPhase === 'result' && finishedSessionId !== null
+    ? t('guided.viewReport')
+    : t('guided.close')}
   restartLabel={t('guided.restart')}
   onRestart={() => void start()}
-  onClose={() => undefined}
+  onClose={leave}
 />

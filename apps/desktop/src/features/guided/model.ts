@@ -44,17 +44,41 @@ export function toDiagnosticPhase(
   return phaseMap[phase];
 }
 
-export function preflightChecks(value: GuidedPreflight): GuidedCheck[] {
+export function preflightChecks(
+  value: GuidedPreflight,
+  t: (key: string) => string
+): GuidedCheck[] {
   return [
-    { label: 'Sensores', status: value.sensors ? 'ok' : 'failed' },
     {
-      label: 'Alimentación',
+      label: t('guided.checks.sensors'),
+      status: value.sensors ? 'ok' : 'failed'
+    },
+    {
+      label: t('guided.checks.power'),
       status: value.ac_power || !value.require_ac ? 'ok' : 'failed'
     },
-    { label: 'Perfil', status: value.profile ? 'ok' : 'failed' },
-    { label: 'Espacio de disco', status: value.disk_space ? 'ok' : 'failed' },
-    { label: 'Generador', status: value.generator ? 'ok' : 'failed' }
+    {
+      label: t('guided.checks.profile'),
+      status: value.profile ? 'ok' : 'failed'
+    },
+    {
+      label: t('guided.checks.disk'),
+      status: value.disk_space ? 'ok' : 'failed'
+    },
+    {
+      label: t('guided.checks.generator'),
+      status: value.generator ? 'ok' : 'failed'
+    }
   ];
+}
+
+/** A person on battery when the test requires AC cannot start it: say so above the checks. */
+export function batteryStateOf(
+  value: GuidedPreflight | null
+): 'ok' | 'blocked' {
+  return value !== null && value.require_ac && !value.ac_power
+    ? 'blocked'
+    : 'ok';
 }
 
 export function percentRemaining(
