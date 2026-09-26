@@ -10,7 +10,7 @@
   } from '../../lib/bridge/schemas';
   import { invokeValidated } from '../../lib/bridge';
   import { getTranslator } from '../../lib/i18n/runtime';
-  import { toAnalysisView } from './model';
+  import { toAnalysisView, type AnalysisTrackKind } from './model';
 
   const { t } = getTranslator();
 
@@ -48,6 +48,16 @@
   }
 
   onMount(() => void loadWindow());
+
+  // The model names a track by its sensor kind (`temperature`, `clock`…), which is an identifier, not
+  // a label; the legend printed it as it was, untranslated in both languages. The wording is the one
+  // the Now screen already uses for the same four quantities.
+  const TRACK_LABEL: Record<AnalysisTrackKind, string> = {
+    temperature: 'dashboard.temperature',
+    clock: 'dashboard.activeClock',
+    load: 'dashboard.load',
+    power: 'dashboard.packagePower'
+  };
 
   let view = $derived(
     window ? toAnalysisView(window) : { tracks: [], events: [] }
@@ -155,7 +165,10 @@
   loadingLabel={t('analysis.loading')}
   noHistoryTitle={t('analysis.noHistory')}
   noHistoryDescription={t('analysis.noHistoryDescription')}
-  tracks={view.tracks}
+  tracks={view.tracks.map((track) => ({
+    ...track,
+    label: t(TRACK_LABEL[track.kind])
+  }))}
   events={view.events}
   {selectedEventId}
   onSelectEvent={(id) => (selectedEventId = id)}
