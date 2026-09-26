@@ -329,7 +329,22 @@
     "importStoring": "Guardando la sesión…",
     "importSuccess": "Sesión importada correctamente.",
     "importClose": "Cerrar",
-    "importOpen": "Abrir sesión"
+    "importOpen": "Abrir sesión",
+    "eventThermal": "Limitación térmica",
+    "eventPower": "Límite de potencia",
+    "eventPlatform": "Límite del equipo",
+    "eventMixed": "Limitación mixta",
+    "eventTurboEnd": "Fin del turbo",
+    "eventOemModeChange": "Cambio de modo del fabricante",
+    "confidenceLow": "baja",
+    "confidenceMedium": "media",
+    "confidenceHigh": "alta",
+    "reportConfidenceLine": "Confianza en el resultado: {level}",
+    "reportCoverageLine": "Cobertura de sensores: nivel {tier}",
+    "reportIntervalLine": "Intervalo analizado: {seconds} s",
+    "reportCoolingImpact": "Con mejor refrigeración el rendimiento podría subir entre +{low} % y +{high} %. Es una estimación por techo de potencia, no una medición.",
+    "reportGuidedImpact": "Rendimiento de la carga de prueba: {percent} % de la carga inicial.",
+    "reportNoImpactPower": "La refrigeración apenas influye: el límite es de potencia. No se cuantifica."
   },
   "onboarding": {
     "ariaLabel": "Introducción inicial",

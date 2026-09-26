@@ -551,8 +551,17 @@ export const test = base.extend({
               const report = {
                 classification: 'thermal_confirmed',
                 severity: 'below_base',
-                events: [],
-                cooling_potential: null
+                confidence: 'medium',
+                coverage_tier: 'B',
+                analyzed_start_ms: 0,
+                analyzed_end_ms: 360_000,
+                events: [{ kind: 'thermal', start_ms: 60_000, end_ms: 72_000 }],
+                cooling_potential: {
+                  low_percent: 5,
+                  high_percent: 15,
+                  method: 'power_headroom',
+                  inputs: { package_power_w: 41 }
+                }
               };
               return command === 'get_session'
                 ? {

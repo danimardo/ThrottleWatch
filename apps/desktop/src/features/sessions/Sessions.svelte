@@ -25,6 +25,7 @@
   import { getTranslator } from '../../lib/i18n/runtime';
   import { classificationLabelFor, classificationOf } from './classification';
   import { takeRequestedSessionReport } from './handoff';
+  import { evidenceLines, impactText, noImpactReason } from './report-view';
 
   const { t, locale } = getTranslator();
 
@@ -169,37 +170,8 @@
           }
         : undefined
   );
-  let reportEvidence = $derived(
-    Array.isArray(selectedReport?.events)
-      ? selectedReport.events
-          .map((event) => {
-            if (typeof event !== 'object' || event === null) return null;
-            const kind =
-              'kind' in event && typeof event.kind === 'string'
-                ? event.kind
-                : null;
-            const start =
-              'start_ms' in event && typeof event.start_ms === 'number'
-                ? event.start_ms
-                : null;
-            const end =
-              'end_ms' in event && typeof event.end_ms === 'number'
-                ? event.end_ms
-                : null;
-            if (kind === null) return null;
-            return end === null || start === null
-              ? kind
-              : `${kind} · ${Math.max(0, end - start)} ms`;
-          })
-          .filter((event): event is string => event !== null)
-      : []
-  );
-  let reportImpact = $derived(
-    typeof selectedReport?.cooling_potential === 'object' &&
-      selectedReport.cooling_potential !== null
-      ? JSON.stringify(selectedReport.cooling_potential)
-      : undefined
-  );
+  let reportEvidence = $derived(evidenceLines(t, selectedReport));
+  let reportImpact = $derived(impactText(t, selectedReport));
 
   async function loadSessions(): Promise<void> {
     listStatus = 'loading';
@@ -485,7 +457,7 @@
       impactTitle={t('sessions.reportImpactTitle')}
       impactValue={reportImpact}
       impactUnavailableTitle={t('sessions.reportNoImpact')}
-      impactUnavailableReason={t('sessions.reportNoImpactReason')}
+      impactUnavailableReason={noImpactReason(t, selectedReport)}
       evidenceTitle={t('sessions.reportEvidenceTitle')}
       evidence={reportEvidence}
       alternativeCausesTitle={t('sessions.reportAlternativesTitle')}

@@ -329,7 +329,22 @@
     "importStoring": "Storing session…",
     "importSuccess": "Session imported successfully.",
     "importClose": "Close",
-    "importOpen": "Open session"
+    "importOpen": "Open session",
+    "eventThermal": "Thermal limit",
+    "eventPower": "Power limit",
+    "eventPlatform": "Platform limit",
+    "eventMixed": "Mixed limit",
+    "eventTurboEnd": "End of turbo",
+    "eventOemModeChange": "Vendor mode change",
+    "confidenceLow": "low",
+    "confidenceMedium": "medium",
+    "confidenceHigh": "high",
+    "reportConfidenceLine": "Confidence in the result: {level}",
+    "reportCoverageLine": "Sensor coverage: tier {tier}",
+    "reportIntervalLine": "Analysed interval: {seconds} s",
+    "reportCoolingImpact": "With better cooling, performance could rise by +{low} % to +{high} %. This is a power-ceiling estimate, not a measurement.",
+    "reportGuidedImpact": "Test load performance: {percent} % of the initial load.",
+    "reportNoImpactPower": "Cooling barely matters: the limit is power. It is not quantified."
   },
   "onboarding": {
     "ariaLabel": "First-run introduction",

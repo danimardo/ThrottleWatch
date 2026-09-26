@@ -87,6 +87,18 @@ test('@critical sesiones previsualiza, anonimiza, exporta e importa', async ({
     )
   ).toBeVisible();
 
+  // The report says what it found in words: the cooling estimate as a range, the limit event by
+  // name and how long it lasted, and how much to trust it. It used to print the raw JSON of the
+  // cooling potential and the internal event code.
+  await expect(page.getByText(/\+5 % (to|y) \+15 %/)).toBeVisible();
+  await expect(
+    page.getByText(/(thermal limit|limitación térmica) · 12 s/i)
+  ).toBeVisible();
+  await expect(
+    page.getByText(/(confidence in the result|confianza en el resultado)/i)
+  ).toBeVisible();
+  await expect(page.getByText(/low_percent|"method"/)).toHaveCount(0);
+
   const calls = await page.evaluate(
     () =>
       (
