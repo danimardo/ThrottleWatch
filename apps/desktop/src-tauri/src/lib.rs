@@ -148,6 +148,23 @@ pub fn run() {
                 );
             }
             app.manage(commands::CorruptBackupNotice(std::sync::Mutex::new(recovered)));
+            // T181: `TW_DEV_SEED_BUNDLE` leaves a session with history without minutes of recording
+            // or a native dialog, through the same importer the person's own "Import session" uses.
+            // Always logged either way: a seed that silently did not land would make a scenario pass
+            // or fail for reasons that have nothing to do with what it tests. No-op outside debug/`e2e`.
+            match dev_faults::import_seed_if_requested(&storage) {
+                Some(Ok(_)) => tracing::warn!(
+                    component = "core",
+                    code = "STORAGE_TEST_SEED_IMPORTED",
+                    msg = "TW_DEV_SEED_BUNDLE imported a session into the database"
+                ),
+                Some(Err(error)) => tracing::warn!(
+                    component = "core",
+                    code = error.code(),
+                    msg = "TW_DEV_SEED_BUNDLE could not be imported"
+                ),
+                None => {}
+            }
             let mut preferences = storage
                 .user_preferences()
                 .map_err(|error| std::io::Error::other(error.to_string()))?;

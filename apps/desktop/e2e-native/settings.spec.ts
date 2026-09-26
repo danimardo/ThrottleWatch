@@ -56,13 +56,11 @@ test('@native an active session does not expose the delete action', async ({
   await ensureOnboardingDone(page);
   await openScreen(page, 'Control+4', /sessions|sesiones/i);
 
-  const inProgress = page
-    .getByRole('listitem')
-    .filter({
-      has: page
-        .locator('.status-tag')
-        .filter({ hasText: /in progress|en curso/i })
-    });
+  const inProgress = page.getByRole('listitem').filter({
+    has: page
+      .locator('.status-tag')
+      .filter({ hasText: /in progress|en curso/i })
+  });
   await expect(inProgress).toHaveCount(1, { timeout: 30_000 });
 
   // Scoped to *that* card. The original asserted no delete button anywhere on the screen, which

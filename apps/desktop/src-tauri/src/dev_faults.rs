@@ -11,6 +11,7 @@
 //! | `TW_DEV_STORAGE_FAIL_WRITES=<n>` | las `n` primeras escrituras de sesión fallan; después vuelven a funcionar, así que una sola ejecución enseña el aviso apareciendo **y** desapareciendo |
 //! | `TW_DEV_CORRUPT_DB=1` | escribe basura en el fichero de base de datos antes de abrirlo, para que el arranque tenga que apartarlo y crear uno nuevo |
 //! | `TW_DEV_COLLECTOR_CMD=<json>` | arranca este programa en lugar del colector real, como un array JSON `["programa","arg",…]`; el programa habla el protocolo IPC por stdin/stdout. Sirve para que una suite E2E tenga telemetría sin un colector firmado |
+//! | `TW_DEV_SEED_BUNDLE=<ruta>` | importa ese paquete de exportación (JSON) al abrir la base, con el mismo importador que «Importar sesión»: deja una sesión con historial sin depender de minutos de grabación ni de un diálogo nativo |
 //! | `TW_DEV_DATA_DIR=<ruta>` | usa esa carpeta como directorio de datos en vez de `%APPDATA%\com.throttlewatch.desktop`, para que una suite E2E nativa no lea ni escriba los datos reales de quien desarrolla |
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
@@ -66,6 +67,13 @@ mod active {
         Some((std::path::PathBuf::from(program), args.to_vec()))
     }
 
+    /// The export bundle to import at startup, from `TW_DEV_SEED_BUNDLE`.
+    pub fn seed_bundle_path() -> Option<std::path::PathBuf> {
+        let raw = std::env::var("TW_DEV_SEED_BUNDLE").ok()?;
+        let trimmed = raw.trim();
+        if trimmed.is_empty() { None } else { Some(std::path::PathBuf::from(trimmed)) }
+    }
+
     /// Where the run must keep its data, when the caller asked for somewhere other than the real
     /// `%APPDATA%\com.throttlewatch.desktop`. Tauri resolves that directory through
     /// `SHGetKnownFolderPath`, which ignores the `APPDATA` variable (measured 2026-09-26: setting
@@ -94,12 +102,57 @@ mod active {
     pub fn fake_collector_command() -> Option<(std::path::PathBuf, Vec<String>)> {
         None
     }
+
+    pub fn seed_bundle_path() -> Option<std::path::PathBuf> {
+        None
+    }
 }
 
 pub use active::{
-    corrupt_database_requested, data_dir_override, fake_collector_command,
+    corrupt_database_requested, data_dir_override, fake_collector_command, seed_bundle_path,
     storage_write_should_fail,
 };
+
+/// Why a requested seed did not land. Never silent: a scenario that needs the seed and quietly runs
+/// without it would pass or fail for reasons that have nothing to do with what it tests.
+#[derive(Debug, PartialEq, Eq)]
+pub enum SeedError {
+    Unreadable,
+    NotABundle,
+    Rejected,
+}
+
+impl SeedError {
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::Unreadable => "STORAGE_TEST_SEED_UNREADABLE",
+            Self::NotABundle => "STORAGE_TEST_SEED_NOT_A_BUNDLE",
+            Self::Rejected => "STORAGE_TEST_SEED_REJECTED",
+        }
+    }
+}
+
+/// Imports the bundle in `path` through the same importer the person's own "Import session" uses
+/// (`import_bundle` then `Storage::import_export_bundle`), and returns the id it was stored under.
+///
+/// Going through the product's importer rather than writing rows is the point: it exercises a real
+/// path and does not copy the schema (ten migrations) into a test helper that would drift from it.
+pub fn import_seed(
+    path: &std::path::Path,
+    storage: &crate::storage::Storage,
+) -> Result<String, SeedError> {
+    let bytes = std::fs::read(path).map_err(|_| SeedError::Unreadable)?;
+    let bundle = crate::export::import_bundle(&bytes).map_err(|_| SeedError::NotABundle)?;
+    storage.import_export_bundle(&bundle).map_err(|_| SeedError::Rejected)
+}
+
+/// Startup hook: seeds when `TW_DEV_SEED_BUNDLE` names a bundle. `None` when nothing was asked.
+pub fn import_seed_if_requested(
+    storage: &crate::storage::Storage,
+) -> Option<Result<String, SeedError>> {
+    let path = seed_bundle_path()?;
+    Some(import_seed(&path, storage))
+}
 
 /// The directory this run keeps its data in: `TW_DEV_DATA_DIR` when set (debug/`e2e` only),
 /// otherwise the real per-user one Tauri resolves.
@@ -223,11 +276,72 @@ mod tests {
             std::env::set_var("TW_DEV_COLLECTOR_CMD", r#"["evil.exe"]"#);
             std::env::set_var("TW_DEV_CORRUPT_DB", "1");
             std::env::set_var("TW_DEV_STORAGE_FAIL_WRITES", "5");
+            std::env::set_var("TW_DEV_SEED_BUNDLE", "somewhere-else.json");
         }
         assert_eq!(super::data_dir_override(), None);
         assert_eq!(super::fake_collector_command(), None);
+        assert_eq!(super::seed_bundle_path(), None);
         assert!(!super::corrupt_database_requested());
         assert!(!super::storage_write_should_fail());
+    }
+
+    fn scratch_dir(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("tw-seed-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap_or_else(|error| panic!("scratch: {error}"));
+        dir
+    }
+
+    fn bundle_json(session_id: &str) -> String {
+        format!(
+            r#"{{"schema_version":1,"kind":"session","session":{{"session_id":"{session_id}","status":"completed","started_at":"2026-09-20T12:00:00Z","ended_at":"2026-09-20T12:01:00Z","duration_ms":60000,"coverage_tier":"B","cpu_vendor":"intel","cpu_model":"Seed CPU","topology":"8t/4c","ruleset_version":"ruleset-v1"}},"samples":[],"events":[],"report":null}}"#
+        )
+    }
+
+    #[test]
+    fn a_seed_bundle_lands_as_a_session_through_the_products_importer() {
+        let dir = scratch_dir("ok");
+        let path = dir.join("bundle.json");
+        std::fs::write(&path, bundle_json("seed-1")).unwrap_or_else(|error| panic!("{error}"));
+        let storage = crate::storage::Storage::open(dir.join("t.db"))
+            .unwrap_or_else(|error| panic!("open: {error}"));
+
+        let id = super::import_seed(&path, &storage).unwrap_or_else(|error| panic!("{error:?}"));
+
+        assert_eq!(id, "imported-seed-1");
+        let sessions = storage.list_sessions(10).unwrap_or_else(|error| panic!("{error}"));
+        assert_eq!(sessions.len(), 1, "exactly the seeded session");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_seed_that_cannot_land_says_why_instead_of_doing_nothing() {
+        let dir = scratch_dir("bad");
+        let storage = crate::storage::Storage::open(dir.join("t.db"))
+            .unwrap_or_else(|error| panic!("open: {error}"));
+
+        let missing = super::import_seed(&dir.join("nope.json"), &storage);
+        assert_eq!(missing, Err(super::SeedError::Unreadable));
+
+        let junk = dir.join("junk.json");
+        std::fs::write(&junk, "not json").unwrap_or_else(|error| panic!("{error}"));
+        assert_eq!(super::import_seed(&junk, &storage), Err(super::SeedError::NotABundle));
+
+        let wrong_kind = dir.join("kind.json");
+        std::fs::write(
+            &wrong_kind,
+            bundle_json("x").replace("\"kind\":\"session\"", "\"kind\":\"nope\""),
+        )
+        .unwrap_or_else(|error| panic!("{error}"));
+        // The product's importer already refuses a document that is not a `session` bundle, before it
+        // gets near the database; `Rejected` is for the database itself failing to take it.
+        assert_eq!(super::import_seed(&wrong_kind, &storage), Err(super::SeedError::NotABundle));
+
+        assert!(
+            storage.list_sessions(10).unwrap_or_default().is_empty(),
+            "a failed seed adds nothing"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[cfg(any(debug_assertions, feature = "e2e"))]
