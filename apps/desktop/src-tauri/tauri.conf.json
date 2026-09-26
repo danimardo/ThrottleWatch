@@ -30,6 +30,7 @@
     "active": true,
     "targets": ["nsis"],
     "resources": {
+      "../../sensor-agent/bin/Release/net10.0-windows/win-x64/publish/*": "collector/",
       "resources/pawnio/PawnIO_setup_2.2.0.exe": "resources/pawnio/PawnIO_setup_2.2.0.exe",
       "resources/pawnio-manifest.json": "resources/pawnio-manifest.json",
       "../../../docs/help/es.md": "help/es.md",

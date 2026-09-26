@@ -43,6 +43,11 @@ pub fn candidate_directories() -> Vec<PathBuf> {
     if let Some(directory) =
         std::env::current_exe().ok().and_then(|exe| exe.parent().map(Path::to_path_buf))
     {
+        // T112: the installer bundles the self-contained sidecar under `collector\` rather than
+        // beside the executable, because a self-contained .NET publish is a couple of hundred
+        // files. Security is unchanged: whichever directory wins, `locate_in` still demands a
+        // manifest signed by a trusted key and a matching SHA-256 before anything is started.
+        directories.push(directory.join("collector"));
         directories.push(directory);
     }
     #[cfg(debug_assertions)]

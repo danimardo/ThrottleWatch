@@ -16,6 +16,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "tauri:dev": "tauri dev",
+    "collector:prepare": "node ../../scripts/prepare-collector-bundle.mjs",
     "tauri:build": "tauri build"
   },
   "dependencies": {

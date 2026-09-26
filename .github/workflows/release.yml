@@ -50,7 +50,27 @@ jobs:
           toolchain: 1.98.1
       - run: pnpm install --frozen-lockfile
       - run: node scripts/fetch-pawnio.mjs
-      - run: dotnet build apps/sensor-agent/SensorAgent.csproj -c Release
+      # T112: the collector must be published self-contained and its release manifest signed
+      # BEFORE bundling, because `tauri build` picks the whole published folder up as the
+      # `collector/` resource and the application refuses to start a sidecar whose manifest is
+      # missing or unsigned (ADR-0004 R2). The production key is the one a release build trusts.
+      - name: Publish and sign the collector (the key never leaves this step)
+        shell: pwsh
+        env:
+          KEY: ${{ secrets.UPDATER_SIGNING_KEY }}
+          KEY_PASSWORD: ${{ secrets.UPDATER_SIGNING_KEY_PASSWORD }}
+        run: |
+          cargo install rsign2 --version 0.6.6 --locked
+          $keyFile = Join-Path $env:RUNNER_TEMP 'collector.key'
+          Set-Content -Path $keyFile -Value $env:KEY -NoNewline
+          try {
+            $env:RSIGN_PASSWORD = $env:KEY_PASSWORD
+            node scripts/prepare-collector-bundle.mjs --key $keyFile
+            if ($LASTEXITCODE -ne 0) { throw 'collector publish/sign failed' }
+          } finally {
+            Remove-Item $keyFile -Force -ErrorAction SilentlyContinue
+          }
+      # No `--features dev-signing` here, on purpose: a release must trust the production key only.
       - run: pnpm --filter @throttlewatch/desktop tauri:build
       - name: Sign the installer (the key never leaves this step)
         shell: pwsh
