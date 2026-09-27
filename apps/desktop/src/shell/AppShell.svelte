@@ -511,6 +511,21 @@
 {#snippet sessionsIcon()}<NavIcon kind="sessions" />{/snippet}
 {#snippet guidedIcon()}<NavIcon kind="guided" />{/snippet}
 {#snippet settingsIcon()}<NavIcon kind="settings" />{/snippet}
+{#snippet moreIcon()}
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    ><circle cx="5" cy="12" r="1.4" fill="currentColor" /><circle
+      cx="12"
+      cy="12"
+      r="1.4"
+      fill="currentColor"
+    /><circle cx="19" cy="12" r="1.4" fill="currentColor" /></svg
+  >
+{/snippet}
 
 <div class="tw-ds app-shell tw-ambient">
   <TitleBar
@@ -717,7 +732,7 @@
         id: 'more',
         label: t('nav.more'),
         menuLabel: t('nav.moreDestinations'),
-        icon: settingsIcon,
+        icon: moreIcon,
         items: overflowDestinations.map((item) => ({
           id: item.id,
           label: item.label,

@@ -464,17 +464,13 @@
 
 {#if view === 'list'}
   <div class="session-list-shell">
-    <div class="session-actions">
-      <Button
-        variant="secondary"
-        label={t('sessions.importSession')}
-        onclick={() => void importSession()}
-      />
-    </div>
     <SessionsScreen
       status={listStatus}
       sessions={screenSessions}
       title={t('sessions.title')}
+      importLabel={t('sessions.importSession')}
+      importDisabled={importOpen}
+      onImport={() => void importSession()}
       onDeleteSession={(sessionId) => void deleteSession(sessionId)}
       loadingLabel={t('sessions.loading')}
       emptyTitle={t('sessions.emptyTitle')}
@@ -623,16 +619,12 @@
   .session-list-shell {
     min-height: 100%;
   }
-  .session-actions,
   .report-actions {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
     max-width: 1100px;
     margin: 0 auto;
-    padding: var(--space-4) var(--space-6) 0;
-  }
-  .report-actions {
-    padding-top: var(--space-6);
+    padding: var(--space-6) var(--space-6) 0;
   }
 </style>
