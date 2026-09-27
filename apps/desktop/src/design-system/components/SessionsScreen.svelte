@@ -188,7 +188,7 @@
   .tw-sessions-screen {
     background: transparent;
     padding: var(--space-6);
-    max-width: 860px;
+    max-width: 1100px;
     margin: 0 auto;
     font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif);
     container-type: inline-size;

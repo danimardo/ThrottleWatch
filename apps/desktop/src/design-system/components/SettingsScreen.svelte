@@ -364,6 +364,8 @@
   }
 
   interface Props {
+    /** Optional page header, same slot every other screen in this system exposes. */
+    title?: string;
     general: SettingsGeneralSection;
     language: SettingsLanguageSection;
     appearance: SettingsAppearanceSection;
@@ -380,6 +382,7 @@
   }
 
   let {
+    title,
     general,
     language,
     appearance,
@@ -510,6 +513,9 @@
 {/snippet}
 
 <div class="tw-ds tw-settings-screen">
+  {#if title}
+    <h2 class="value-md" style:color="var(--text-primary)" style:margin="0">{title}</h2>
+  {/if}
   <!-- 1. General -->
   <section>
     <h3 class="label section-title">{general.title}</h3>
@@ -1344,7 +1350,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-6);
-    max-width: 720px;
+    max-width: 1100px;
     margin: 0 auto;
     padding: var(--space-6);
     font-family: var(

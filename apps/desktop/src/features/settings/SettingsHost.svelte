@@ -390,6 +390,7 @@
 {:else}
   <div class="settings-host">
     <SettingsScreen
+      title={t('nav.settings')}
       general={{
         title: t('settings.generalTitle'),
         closeActionRowLabel: t('settings.closeAction'),

@@ -53,6 +53,8 @@
   }
 
   interface Props {
+    /** Optional page header, same slot every other screen in this system exposes. */
+    title?: string;
     status: AnalysisStatus;
     loadingLabel: string;
     noHistoryTitle: string;
@@ -79,6 +81,7 @@
   }
 
   let {
+    title,
     status,
     loadingLabel,
     noHistoryTitle,
@@ -108,6 +111,11 @@
 </script>
 
 <div class="tw-ds tw-analysis-screen">
+  {#if title}
+    <div class="screen-head">
+      <h2 class="value-md" style:color="var(--text-primary)">{title}</h2>
+    </div>
+  {/if}
   {#if status === 'loading'}
     <div class="status-block">
       <ProgressBar indeterminate tone="accent" label={loadingLabel} />
@@ -165,6 +173,16 @@
 </div>
 
 <style>
+  .screen-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+  }
+  .screen-head h2 {
+    margin: 0;
+  }
   .tw-analysis-screen {
     background: transparent;
     padding: var(--space-6);

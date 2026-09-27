@@ -92,7 +92,7 @@
   .tw-cpu-screen {
     background: transparent;
     padding: var(--space-6);
-    max-width: 860px;
+    max-width: 1100px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;

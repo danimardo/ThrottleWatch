@@ -161,6 +161,7 @@
 </div>
 
 <AnalysisScreen
+  title={t('nav.analysis')}
   {status}
   loadingLabel={t('analysis.loading')}
   noHistoryTitle={t('analysis.noHistory')}

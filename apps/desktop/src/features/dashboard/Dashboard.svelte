@@ -255,6 +255,9 @@
 </script>
 
 <main class="dashboard" aria-label={t('nav.now')}>
+  <h2 class="value-md" style:color="var(--text-primary)" style:margin="0">
+    {t('nav.now')}
+  </h2>
   <ContextStrip
     cpuLabel={currentSnapshot.cpuLabel}
     topologyLabel={currentSnapshot.topologyLabel}

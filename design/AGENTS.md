@@ -745,6 +745,7 @@ optional snippets — `sensors.coverage` (a `CoverageMatrix`) and
 | `about` | `SettingsAboutSection` | version row, Repetir introducción, `links[]` (`external: true` draws the external-link glyph + `externalHint`), optional `technicalSummary` Snippet, optional folded Avanzado with `detailedLogging`, its `detailedLoggingUntilLabel` and `onDetailedLoggingChange` |
 | `riskZone` | `SettingsRiskZoneSection` | "restablecer ThrottleWatch" (opens an internal confirm `Dialog`, `resetStatus` drives the same in-progress/error rendering as `privacy`'s delete action) |
 | `footer` | `Snippet?` | optional extra content after "Zona de riesgo" (e.g. a build id) |
+| `title` | `string` | no | optional page header (`<h2 class="value-md">`), same slot every other screen in this system exposes |
 
 `SettingsScreen` reflows at its own container width via a CSS
 `@container` query keyed to the same 700px breakpoint as
@@ -1016,6 +1017,7 @@ against it with confidence:
 | `selectedEventEvidence` / `rangeEvidence` | `AnalysisEvidence` (`{ title, description?, items?: { label, value }[] }`) | no | priority: `selectedEventEvidence` > `rangeEvidence` > `idleHint` — the host computes both by looking up `events`/the range, `AnalysisScreen` never does that lookup itself |
 | `idleHint` | `string` | yes | shown when neither evidence prop is set |
 | `evidenceTitle` | `string` | yes | the evidence panel's heading |
+| `title` | `string` | no | optional page header (`<h2 class="value-md">`), same slot every other screen in this system exposes |
 
 Reflows at its own container width (`@container tw-analysis`, 699px) —
 the evidence panel moves below the chart instead of beside it.
