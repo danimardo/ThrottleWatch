@@ -6,7 +6,10 @@
 //! until the updater key exists; debug builds trust the development key.
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
-use super::runtime::{CollectorLauncher, CollectorLink, CommandLauncher, SidecarLauncher};
+use super::runtime::{
+    CollectorLauncher, CollectorLink, CommandLauncher, PipeLink, SidecarLauncher,
+};
+use crate::ipc::supervisor::spawn_verified;
 use crate::release_manifest::{ManifestError, ReleaseManifest, trusted_public_key};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -94,11 +97,60 @@ impl CollectorLauncher for Unavailable {
     }
 }
 
-pub fn collector_launcher() -> Box<dyn CollectorLauncher> {
+/// A sidecar started elevated on demand (FR-088), so a person on an account without an elevated
+/// session still reaches coverage tier A once advanced access is installed — installing it is the
+/// only UAC prompt SC-019 allows. Falls back to a plain, unelevated [`SidecarLauncher`] for this one
+/// attempt when the elevated path itself fails (the scheduled task missing, Task Scheduler blocked
+/// by policy, …): the collector still runs, only at a lower tier, and Ajustes already shows a
+/// repair action for that (`advanced_access` reads `denied`/`error`, same as an unelevated sidecar
+/// PawnIO itself refuses). The next restart tries elevated again, so a transient failure heals
+/// itself instead of leaving the person degraded forever.
+pub struct ElevatedSidecarLauncher {
+    pub executable: PathBuf,
+    pub expected_sha256: String,
+}
+
+impl CollectorLauncher for ElevatedSidecarLauncher {
+    fn launch(&mut self) -> io::Result<Box<dyn CollectorLink>> {
+        match crate::ipc::elevated::start_registered_sidecar(
+            &self.executable,
+            &self.expected_sha256,
+        ) {
+            Ok((to_launcher, from_launcher)) => {
+                Ok(Box::new(PipeLink::connect(to_launcher, from_launcher)?))
+            }
+            Err(error) => {
+                tracing::warn!(
+                    component = "core",
+                    code = "COLLECTOR_ELEVATED_LAUNCH_FAILED",
+                    msg = %format!("the elevated sidecar could not be started, falling back to an unelevated one this time: {error}")
+                );
+                let child = spawn_verified(&self.executable, &self.expected_sha256)?;
+                Ok(Box::new(super::runtime::ProcessLink::from_child(child)?))
+            }
+        }
+    }
+}
+
+/// Whether the collector should try the elevated launch path this run: advanced access is turned
+/// on (the person has not disabled it in Ajustes) and PawnIO is installed at a version this build
+/// trusts. `Upgradable` stays unelevated — an old client library reading the wrong register
+/// offsets is worse than the coverage gap it would close.
+pub fn should_launch_elevated(advanced_access_enabled: bool) -> bool {
+    advanced_access_enabled
+        && crate::access::manifest()
+            .and_then(|manifest| crate::access::detect_installation(&manifest.minimum_version))
+            .is_ok_and(|installation| {
+                matches!(installation, crate::access::PawnIoInstallation::Current { .. })
+            })
+}
+
+pub fn collector_launcher(advanced_access_enabled: bool) -> Box<dyn CollectorLauncher> {
     // T181: a debug/`e2e` build may be told to run a stand-in collector (`TW_DEV_COLLECTOR_CMD`), so
     // an E2E run has live telemetry without a signed manifest. It replaces the launcher and skips
     // the check below rather than weakening it; `dev_faults` answers `None` in a release build, so
     // this branch cannot be taken there. The warning keeps such a run from passing for a real one.
+    // It is never elevated: the harness runs unattended and must not depend on a scheduled task.
     if let Some((program, args)) = crate::dev_faults::fake_collector_command() {
         tracing::warn!(
             component = "core",
@@ -107,9 +159,16 @@ pub fn collector_launcher() -> Box<dyn CollectorLauncher> {
         );
         return Box::new(CommandLauncher { program, args });
     }
+    let elevate = should_launch_elevated(advanced_access_enabled);
     let mut last = LaunchError::SidecarNotFound;
     for directory in candidate_directories() {
         match locate_in(&directory, trusted_public_key()) {
+            Ok(launcher) if elevate => {
+                return Box::new(ElevatedSidecarLauncher {
+                    executable: launcher.executable,
+                    expected_sha256: launcher.expected_sha256,
+                });
+            }
             Ok(launcher) => return Box::new(launcher),
             // Keep the most informative reason: "not found" is the least.
             Err(error) if !matches!(error, LaunchError::SidecarNotFound) => last = error,

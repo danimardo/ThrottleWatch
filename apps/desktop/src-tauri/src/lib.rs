@@ -275,8 +275,17 @@ pub fn run() {
             }
             let observer =
                 std::sync::Arc::new(commands::TauriObserver { app: app.handle().clone() });
+            // FR-088: elevate the sidecar only, never the interface (FR-030) — a dev/e2e build's
+            // stand-in collector is exempt regardless (`collector_launcher` never elevates it).
+            let advanced_access_enabled = app
+                .state::<storage::AppState>()
+                .storage
+                .lock()
+                .ok()
+                .and_then(|storage| storage.advanced_access_enabled().ok())
+                .unwrap_or(true);
             let runtime = telemetry::runtime::CollectorRuntime::start(
-                telemetry::launch::collector_launcher(),
+                telemetry::launch::collector_launcher(advanced_access_enabled),
                 live.0,
                 observer,
                 config,

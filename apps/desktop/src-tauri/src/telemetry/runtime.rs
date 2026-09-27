@@ -578,6 +578,89 @@ impl Drop for ProcessLink {
     }
 }
 
+/// The transport for a sidecar started elevated (FR-088): the child itself runs inside the
+/// scheduled-task process (`ipc::elevated::run_elevated_launcher`, under a different Windows
+/// session/desktop), so there is no local `Child` to hold stdio on — only the authenticated
+/// control pipe [`crate::ipc::elevated::start_registered_sidecar`] returned, over which the far
+/// end proxies the sidecar's own NDJSON lines both ways (and its stderr, marker-prefixed, since
+/// there is no second pipe to carry it separately).
+pub struct PipeLink {
+    write_pipe: std::fs::File,
+    lines: mpsc::Receiver<Option<String>>,
+}
+
+impl PipeLink {
+    /// `write_pipe` is the "commands to the sidecar" pipe (the caller's own, no one else touches
+    /// it); `read_pipe` is the "sidecar's output" pipe, moved into a dedicated reader thread that
+    /// is its sole owner for as long as it lives. Never a single duplex pipe shared between a
+    /// reader thread and this struct's own writes — see [`crate::ipc::elevated::proxy_child_over_pipe`]'s
+    /// doc comment for the deadlock that a shared handle causes on Windows.
+    pub fn connect(write_pipe: std::fs::File, read_pipe: std::fs::File) -> io::Result<Self> {
+        let (sender, lines) = mpsc::channel();
+        thread::Builder::new().name("collector-elevated-stdout".to_owned()).spawn(move || {
+            let mut reader = BufReader::new(read_pipe);
+            loop {
+                let mut line = String::new();
+                let read = reader.by_ref().take(MAX_MESSAGE_BYTES as u64 + 1).read_line(&mut line);
+                match read {
+                    Ok(0) | Err(_) => break,
+                    Ok(_) if line.len() > MAX_MESSAGE_BYTES => break, // desynchronized: end the session
+                    Ok(_) => {
+                        let line = line.trim_end_matches(['\r', '\n']);
+                        if let Some(stderr_line) =
+                            line.strip_prefix(crate::ipc::elevated::STDERR_MARKER)
+                        {
+                            log_elevated_stderr(stderr_line);
+                            continue;
+                        }
+                        if sender.send(Some(line.to_owned())).is_err() {
+                            return;
+                        }
+                    }
+                }
+            }
+            let _ = sender.send(None);
+        })?;
+        Ok(Self { write_pipe, lines })
+    }
+}
+
+fn log_elevated_stderr(line: &str) {
+    match crate::logging::validate_collector_stderr(line) {
+        Ok(event) => match event.level.as_str() {
+            "error" => tracing::error!(component = "agent", code = %event.code, msg = %event.msg),
+            "warn" => tracing::warn!(component = "agent", code = %event.code, msg = %event.msg),
+            _ => tracing::debug!(component = "agent", code = %event.code, msg = %event.msg),
+        },
+        Err(_) => tracing::warn!(
+            component = "core",
+            code = "COLLECTOR_STDERR_INVALID",
+            msg = "collector stderr is outside the contract"
+        ),
+    }
+}
+
+impl CollectorLink for PipeLink {
+    fn send(&mut self, line: &str) -> io::Result<()> {
+        self.write_pipe.write_all(line.as_bytes())?;
+        self.write_pipe.write_all(b"\n")?;
+        self.write_pipe.flush()
+    }
+
+    fn receive(&mut self, timeout: Duration) -> Received {
+        match self.lines.recv_timeout(timeout) {
+            Ok(Some(line)) => Received::Line(line),
+            Ok(None) | Err(mpsc::RecvTimeoutError::Disconnected) => Received::Eof,
+            Err(mpsc::RecvTimeoutError::Timeout) => Received::Timeout,
+        }
+    }
+}
+
+// No custom `Drop`: dropping `write_pipe` (its only field besides the channel) closes our side of
+// the "commands" pipe, which is exactly the shutdown signal `proxy_child_over_pipe`'s own loop
+// waits for; the reader thread notices the resulting chain (see its doc comment) and exits on its
+// own, same as `ProcessLink`'s stdout thread is never explicitly joined either.
+
 /// The shipped sidecar: started only if its SHA-256 equals the one the signed release manifest lists.
 pub struct SidecarLauncher {
     pub executable: PathBuf,
