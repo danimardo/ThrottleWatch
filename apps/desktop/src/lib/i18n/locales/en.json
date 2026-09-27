@@ -74,7 +74,8 @@
     "celsius": "°C",
     "mhz": "MHz",
     "watts": "W",
-    "percent": "%"
+    "percent": "%",
+    "noTemperatureExplanation": "This computer does not report its temperature, so it cannot be diagnosed. \"View coverage\" explains what is missing."
   },
   "screens": {
     "notAvailable": "This view will be available when the collector and history are ready.",
@@ -429,8 +430,8 @@
     "title": "What's new",
     "dismiss": "Got it",
     "lowLevel": {
-      "title": "More reliable sensor coverage",
-      "body": "This version makes advanced access explicit and keeps the main interface usable when it is unavailable."
+      "title": "Missing sensors are now explained",
+      "body": "Some processors need an advanced access component to read their temperature and power. If it is missing or your processor does not support it, ThrottleWatch keeps working with less data and, under \"View coverage\", tells you what is missing and why."
     }
   },
   "common": {

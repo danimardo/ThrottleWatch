@@ -58,7 +58,12 @@ export function toStatusHeroView(
     classificationLabel: t(labelKeys[snapshot.classification]),
     evidenceLine: `${snapshot.confidenceLabel} · ${snapshot.collectorLabel}`,
     performance,
-    noPotentialText: t('dashboard.notQuantifiable'),
+    // Without a temperature nothing can be quantified, and "not quantifiable for this computer"
+    // does not say why: name the missing reading and where to look.
+    noPotentialText:
+      snapshot.temperatureC === null
+        ? t('dashboard.noTemperatureExplanation')
+        : t('dashboard.notQuantifiable'),
     severity: snapshot.severity
   };
 }

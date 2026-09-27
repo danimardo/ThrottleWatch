@@ -204,6 +204,13 @@
     justify-content: center;
     text-align: center;
   }
+  /* The clear width of the ring at the caption's height is ~90 px: a longer caption ("Límite no
+     disponible") wraps onto two balanced lines instead of running over the stroke. */
+  .ring-center .caption {
+    max-width: 82px;
+    line-height: 1.25;
+    text-wrap: balance;
+  }
   .middle {
     display: flex;
     flex-direction: column;

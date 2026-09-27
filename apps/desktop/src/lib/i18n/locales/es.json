@@ -74,7 +74,8 @@
     "celsius": "°C",
     "mhz": "MHz",
     "watts": "W",
-    "percent": "%"
+    "percent": "%",
+    "noTemperatureExplanation": "Este equipo no informa de su temperatura, así que no puede diagnosticarse. «Ver cobertura» explica qué falta."
   },
   "screens": {
     "notAvailable": "Esta vista estará disponible cuando el colector y el historial estén listos.",
@@ -429,8 +430,8 @@
     "title": "Novedades",
     "dismiss": "Entendido",
     "lowLevel": {
-      "title": "Cobertura de sensores más fiable",
-      "body": "Esta versión hace explícito el acceso avanzado y mantiene utilizable la interfaz principal cuando no está disponible."
+      "title": "Ahora se explica qué sensores faltan",
+      "body": "Algunos procesadores necesitan un componente de acceso avanzado para leer su temperatura y su potencia. Si falta o tu procesador no lo admite, ThrottleWatch sigue funcionando con menos datos y, en «Ver cobertura», te dice qué falta y por qué."
     }
   },
   "common": {
