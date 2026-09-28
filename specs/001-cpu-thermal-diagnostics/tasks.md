@@ -620,6 +620,17 @@ Origen: el principio XVII estaba completo en papel y el código no lo cumplía (
   Verificado 2026-09-28: `ACCESS_INSTALL_REQUESTED`/`COMPLETED`/`FAILED` (paso y causa, escenario `a_failed_access_install_says_which_step_failed_and_why`), `ACCESS_DISABLED`, `SAMPLING_PLAN_CHANGED`, `SAMPLING_PLAN_NOT_APPLIED`, `POWER_SOURCE_CHANGED`, `POWER_WATCH_SPAWN_FAILED`, `GLASS_LEVEL_CHANGED`, `GLASS_MONITOR_SPAWN_FAILED`, `TRAY_PAUSE_TOGGLED`/`FAILED`, `TRAY_QUIT`, `TRAY_STATE_CHANGED`, `STARTUP_SET`/`FAILED`, `STARTUP_HIDDEN_IN_TRAY`, `STARTUP_HIDE_FAILED`. El supervisor ya queda cubierto por los eventos del colector y del lanzador. En total, 122 llamadas al envoltorio y 91 códigos distintos; `cargo clippy -D warnings` (0), `cargo fmt --check` (0), `check-logging-gates` (0), `cargo test --lib` 375/375 (0).
 - [x] T-LOG-012 Interfaz: `createLogger` con firma `(code, msg, fields?)`, redacción con la lista permitida, manejadores globales `error` y `unhandledrejection` (`UI_UNHANDLED_ERROR`), migración de los usos existentes y de los `console.warn` del sistema de diseño a un único punto con su excepción documentada. Pruebas unitarias y de componente.
   Verificado 2026-09-28: `createLogger(scope)` con `(code, msg, fields?)`, `redactFields`, `installGlobalErrorLogging` en `main.ts` (`UI_UNHANDLED_ERROR`); ESLint `no-console`/`no-restricted-imports` también en `.svelte`; los avisos del sistema de diseño pasan por `design/lib/dev-warning.ts`, la única excepción documentada. `pnpm lint` (0), `pnpm check` (0), `pnpm test` 127/127 (0), `design:check` y harness/mockup `check`+`build` (0/0).
+  **Dos defectos más, hallados el 2026-09-28 al diagnosticar «Sensores y cobertura» atascado en
+  Ajustes:** (1) `SettingsHost.svelte::load()` no registraba nada cuando una de sus cinco llamadas
+  en paralelo fallaba — `coverage` se quedaba en `null` para siempre, sin ninguna pista en el log;
+  ahora cada fallo emite `SETTINGS_LOAD_STEP_FAILED` con el comando y la razón. (2) `log_frontend`
+  metía todo el objeto `fields` del evento reenviado bajo un único campo llamado literalmente
+  `fields`, formateado entero con `?` — así que cualquier campo suyo, incluido uno ya permitido
+  como `reason`, llegaba censurado como un bloque opaco (visto en vivo: `GUIDED_ACTION_FAILED` con
+  `"fields":{"fields":"[redacted]"}`). Ahora `log_frontend` llama a `logging::__emit` directamente
+  con el mapa real en vez de pasar por las macros `log_*!` (que solo aceptan pares fijos en tiempo
+  de compilación), así que cada campo se censura por su propio nombre. Prueba
+  `a_forwarded_ui_event_keeps_its_own_allow_listed_fields_readable`. `cargo test --lib` 376/376.
 - [x] T-LOG-013 Salida humana: `pnpm logs:view` con `dd/MM/yyyy HH:mm:ss,SSS` y abreviatura de zona; pruebas del script y del formateador de Rust en los instantes exactos de los dos cambios de hora anuales.
   Verificado 2026-09-28: `format_human` (Rust) produce `dd/MM/yyyy HH:mm:ss,SSS CET|CEST`, probado en los instantes de marzo y octubre; `scripts/logs-view.mjs` igual, incluye el fichero del lanzador y los rotados, y `scripts/logs-view.test.mjs` (6) entra en `pnpm test:scripts` (15/15, 0).
 - [ ] T-LOG-014 Errores tragados restantes: cada `let _ =`, `.ok()` o retorno temprano sobre un `Result` en código no trivial se registra o lleva un comentario que justifique por qué no aporta nada al diagnóstico.

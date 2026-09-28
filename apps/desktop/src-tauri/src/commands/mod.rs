@@ -1834,43 +1834,22 @@ pub fn log_frontend(
         {
             continue;
         }
-        match event.level.as_str() {
-            "trace" => crate::log_trace!(
-                component: "ui",
+        // Not the log_*! macros: their fields are `name = value` pairs fixed at compile time, and
+        // a forwarded event's fields are a runtime map from the interface. Nesting that whole map
+        // under one field literally named `fields` (the previous shape here) meant every one of
+        // its entries — including a genuinely safe one like `reason` — got redacted as a single
+        // opaque blob, whatever it held. `__emit` takes a real `Map<String, Value>` and redacts
+        // each entry on its own name, same as any other event's fields.
+        if let Some(level) = crate::logging::LogLevel::parse(&event.level) {
+            crate::logging::__emit(
+                level.to_tracing(),
+                &event.target,
+                Some("ui"),
+                None,
                 &event.code,
                 &event.msg,
-                target = %event.target,
-                fields = ?event.fields
-            ),
-            "debug" => crate::log_debug!(
-                component: "ui",
-                &event.code,
-                &event.msg,
-                target = %event.target,
-                fields = ?event.fields
-            ),
-            "info" => crate::log_info!(
-                component: "ui",
-                &event.code,
-                &event.msg,
-                target = %event.target,
-                fields = ?event.fields
-            ),
-            "warn" => crate::log_warn!(
-                component: "ui",
-                &event.code,
-                &event.msg,
-                target = %event.target,
-                fields = ?event.fields
-            ),
-            "error" => crate::log_error!(
-                component: "ui",
-                &event.code,
-                &event.msg,
-                target = %event.target,
-                fields = ?event.fields
-            ),
-            _ => {}
+                event.fields.clone().unwrap_or_default(),
+            );
         }
     }
     if accepted < requested {
@@ -2702,10 +2681,57 @@ fn freshness(value: Freshness) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::{
-        ConfirmationRequest, FrontendLogLimiter, GuidedController, GuidedPhase, GuidedStopReason,
-        access_step_failed, build_reevaluated_report, effective_analysis_window,
-        log_guided_phase_change, log_guided_stop, technical_summary_text, validate_confirmation,
+        ConfirmationRequest, FrontendLogEventRequest, FrontendLogLimiter, GuidedController,
+        GuidedPhase, GuidedStopReason, access_step_failed, build_reevaluated_report,
+        effective_analysis_window, log_frontend, log_guided_phase_change, log_guided_stop,
+        technical_summary_text, validate_confirmation,
     };
+    use tauri::Manager;
+    use tauri::test::{mock_builder, mock_context, noop_assets};
+
+    /// XVII: a forwarded interface event's fields used to be nested under one field literally
+    /// named `fields` and Debug-formatted whole, so every entry — including one already on the
+    /// redaction allow-list — came out as `[redacted]` inside it. Each entry is now checked on
+    /// its own name, same as a backend event's fields.
+    #[test]
+    fn a_forwarded_ui_event_keeps_its_own_allow_listed_fields_readable() {
+        let _session = crate::logging::session_test_lock();
+        let app = mock_builder()
+            .build(mock_context(noop_assets()))
+            .unwrap_or_else(|error| panic!("mock app: {error}"));
+        app.manage(FrontendLogLimiter::default());
+        app.manage(crate::logging::LogControl::new(crate::logging::LogLevel::Debug));
+        let limiter = app.state::<FrontendLogLimiter>();
+        let logging = app.state::<crate::logging::LogControl>();
+
+        let events = crate::logging::capture_events(|| {
+            let result = log_frontend(
+                limiter,
+                logging,
+                vec![FrontendLogEventRequest {
+                    level: "warn".to_owned(),
+                    code: "SETTINGS_LOAD_STEP_FAILED".to_owned(),
+                    target: "application".to_owned(),
+                    msg: "get_coverage failed to load".to_owned(),
+                    fields: Some(serde_json::Map::from_iter([(
+                        "reason".to_owned(),
+                        serde_json::json!("BRIDGE_VALIDATION_FAILED"),
+                    )])),
+                }],
+            );
+            assert!(result.is_ok());
+        });
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].component, "ui");
+        assert_eq!(events[0].target, "application");
+        assert_eq!(events[0].fields.get("fields"), None, "no longer nested under `fields`");
+        assert_eq!(
+            events[0].fields["reason"],
+            serde_json::json!("BRIDGE_VALIDATION_FAILED"),
+            "an allow-listed field name reaches the file, not [redacted]"
+        );
+    }
 
     /// XVII diagnosis scenario: a failed advanced access install names the step and the cause,
     /// which `map_err(|_| …)` used to drop at every step.

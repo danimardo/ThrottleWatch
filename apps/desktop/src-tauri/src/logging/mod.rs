@@ -65,6 +65,16 @@ impl LogLevel {
         }
     }
 
+    pub const fn to_tracing(self) -> tracing::Level {
+        match self {
+            Self::Error => tracing::Level::ERROR,
+            Self::Warn => tracing::Level::WARN,
+            Self::Info => tracing::Level::INFO,
+            Self::Debug => tracing::Level::DEBUG,
+            Self::Trace => tracing::Level::TRACE,
+        }
+    }
+
     const fn from_u8(value: u8) -> Self {
         match value {
             0 => Self::Error,

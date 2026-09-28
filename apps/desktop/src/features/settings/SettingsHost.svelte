@@ -20,6 +20,7 @@
   import { accessRequestAction } from '../../lib/access-action';
   import { getTranslator, refreshLocale } from '../../lib/i18n/runtime';
   import {
+    getApplicationLogger,
     isDetailedLoggingActive,
     setApplicationDetailedLogging
   } from '../../lib/logging';
@@ -106,6 +107,20 @@
     void setPreference('notifications.quiet_period', { start, end });
   }
 
+  // Each of these used to fail silently: a rejected call just left its `$state` at whatever it
+  // already was (`coverage = null` forever, for instance), so the section it feeds stayed on its
+  // loading state with nothing in the log to say why (XVII).
+  function logIfFailed<T>(
+    command: string,
+    result: { ok: true; value: T } | { ok: false; error: { code: string; message_key: string } }
+  ): void {
+    if (!result.ok) {
+      getApplicationLogger().warn('SETTINGS_LOAD_STEP_FAILED', `${command} failed to load`, {
+        reason: result.error.code
+      });
+    }
+  }
+
   async function load(): Promise<void> {
     const [saved, detected, usage, summary, notices] = await Promise.all([
       invokeValidated(
@@ -139,16 +154,19 @@
       setApplicationDetailedLogging(
         isDetailedLoggingActive(saved.value.values['logging.detailed_until'])
       );
-    }
+    } else logIfFailed('get_preferences', saved);
     if (detected.ok) coverage = detected.value;
+    else logIfFailed('get_coverage', detected);
     if (usage.ok) storageUsage = usage.value;
+    else logIfFailed('get_storage_usage', usage);
     if (summary.ok) technicalSummary = summary.value.text;
+    else logIfFailed('get_technical_summary', summary);
     if (notices.ok) {
       licenseEntries = notices.value.entries.map((entry) => ({
         ...entry,
         version: entry.version ?? undefined
       }));
-    }
+    } else logIfFailed('get_third_party_notices', notices);
     loading = false;
   }
 
