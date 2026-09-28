@@ -24,7 +24,7 @@ código de aplicación** (`apps/`, `packages/`). El primer lote de trabajo es L0
 
 ## Fuentes de verdad (por orden de prioridad)
 
-1. `.specify/memory/constitution.md` — marco innegociable (versión 1.5.3). Manda sobre todo lo demás.
+1. `.specify/memory/constitution.md` — marco innegociable (versión 1.6.0). Manda sobre todo lo demás.
 2. `specs/001-cpu-thermal-diagnostics/spec.md` — requisitos, parámetros del motor y criterios de éxito.
 3. `specs/001-cpu-thermal-diagnostics/plan.md` — arquitectura, excepciones registradas, estrategia de pruebas.
 4. `specs/001-cpu-thermal-diagnostics/tasks.md` — tareas agrupadas en lotes L00–L21 con checkpoints `CHK-Lxx`.
@@ -83,6 +83,11 @@ no verificados, hasta que L00 los cree. No inventes comandos: léelos de `packag
   registra orden, código de salida y avisos. Nunca digas que algo pasó si no lo ejecutaste.
 - **Alcance:** no corrijas problemas ajenos a la tarea; anótalos. No amplíes permisos de agente
   para sortear una limitación.
+- **Diagnóstico con registros:** cuando la persona usuaria describa un fallo o comportamiento
+  inesperado de la aplicación en marcha, contrasta su relato con los registros reales de esa
+  sesión (`logs/`, con detallado activo si lo estaba) antes de proponer una causa o un arreglo —
+  no te bases solo en la narración y en la lectura del código. Hazlo sin que te lo pida. Si no hay
+  registro disponible para ese momento, dilo explícitamente en vez de asumir.
 
 ## Definición de terminado
 

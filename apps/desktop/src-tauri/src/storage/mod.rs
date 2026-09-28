@@ -652,13 +652,7 @@ impl Storage {
         let Some(summary) = summary else {
             return Ok(None);
         };
-        let (start_ms, end_ms): (Option<i64>, Option<i64>) = self.connection.query_row(
-            "SELECT MIN(monotonic_ms), MAX(monotonic_ms) FROM sample_frame WHERE session_id = ?1",
-            params![session_id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )?;
-        let start_ms = start_ms.unwrap_or(0);
-        let end_ms = end_ms.unwrap_or(start_ms);
+        let (start_ms, end_ms) = self.session_bounds(session_id)?.unwrap_or((0, 0));
         let report_events = self
             .analysis_events(session_id, start_ms, end_ms)?
             .into_iter()
@@ -1234,6 +1228,32 @@ impl Storage {
         Ok(deleted as u64)
     }
 
+    /// Sessions kept regardless of the time-based retention window: the ceiling that stops the
+    /// database from growing without bound for someone who runs many sessions inside whatever
+    /// `history.retention` they picked (even the widest, `30d`, has no count limit of its own).
+    pub const MAX_RETAINED_SESSIONS: u32 = 50;
+
+    /// Deletes the oldest sessions once more than `max_sessions` are stored. Never touches a
+    /// `running`/`preparing` session, matching [`Self::prune_sessions`].
+    pub fn enforce_session_cap(&mut self, max_sessions: u32) -> Result<u64> {
+        let transaction = self.connection.unchecked_transaction()?;
+        let deleted = transaction.execute(
+            "DELETE FROM monitoring_session
+             WHERE status NOT IN ('running', 'preparing')
+               AND id NOT IN (
+                   SELECT id FROM monitoring_session
+                   WHERE status NOT IN ('running', 'preparing')
+                   ORDER BY rowid DESC LIMIT ?1
+               )",
+            params![i64::from(max_sessions)],
+        )?;
+        transaction.commit()?;
+        if deleted > 0 {
+            let _ = self.connection.execute_batch("PRAGMA optimize;");
+        }
+        Ok(deleted as u64)
+    }
+
     pub fn frame_count(&self, session_id: &str) -> Result<i64> {
         self.connection.query_row(
             "SELECT COUNT(*) FROM sample_frame WHERE session_id = ?1",
@@ -1486,6 +1506,18 @@ impl Storage {
                 },
             )
             .optional()
+    }
+
+    /// The session's own recorded range, in the collector's monotonic clock — not necessarily
+    /// anywhere near 0: a collector kept alive across several sessions keeps counting from its
+    /// own start, not from this session's. `None` when the session has recorded no frame yet.
+    pub fn session_bounds(&self, session_id: &str) -> Result<Option<(i64, i64)>> {
+        let (start_ms, end_ms): (Option<i64>, Option<i64>) = self.connection.query_row(
+            "SELECT MIN(monotonic_ms), MAX(monotonic_ms) FROM sample_frame WHERE session_id = ?1",
+            params![session_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        Ok(start_ms.map(|start_ms| (start_ms, end_ms.unwrap_or(start_ms))))
     }
 
     pub fn analysis_points(
@@ -1814,6 +1846,40 @@ mod tests {
         assert!(!storage.session_exists("old")?);
         assert!(storage.session_exists("active")?);
         assert!(storage.user_preferences()?.contains_key("history.retention"));
+        Ok(())
+    }
+
+    #[test]
+    fn a_session_cap_keeps_only_the_most_recent_and_never_touches_active_work()
+    -> rusqlite::Result<()> {
+        let mut storage = Storage::in_memory()?;
+        storage.create_cpu("cpu-1", "unknown", "Test CPU")?;
+        for index in 0..55 {
+            storage.create_session(
+                &format!("old-{index:02}"),
+                "cpu-1",
+                "start",
+                "2026-09-01T00:00:00Z",
+            )?;
+        }
+        storage.create_session("running", "cpu-1", "start", "2026-09-20T00:00:00Z")?;
+        storage.connection.execute(
+            "UPDATE monitoring_session SET status = 'completed', ended_at = '2026-09-01T00:00:00Z'
+             WHERE id != 'running'",
+            [],
+        )?;
+        let deleted = storage.enforce_session_cap(50)?;
+        assert_eq!(deleted, 5);
+        assert!(storage.session_exists("running")?);
+        assert!(!storage.session_exists("old-00")?);
+        assert!(storage.session_exists("old-54")?);
+        assert_eq!(
+            storage
+                .connection
+                .query_row("SELECT COUNT(*) FROM monitoring_session", [], |row| row
+                    .get::<_, i64>(0))?,
+            51
+        );
         Ok(())
     }
 

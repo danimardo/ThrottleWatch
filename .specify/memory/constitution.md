@@ -190,15 +190,20 @@ ThrottleWatch es una aplicación de escritorio sin servidor: todo lo que se empa
 
 ### XVII. Registro (logging) y depuración
 
+**Objetivo, que manda sobre el resto del principio.** Con solo los ficheros de registro de una ejecución, alguien (persona o agente de IA) que no vio lo que pasó DEBE poder saber qué hizo la aplicación, qué subsistemas funcionaron, cuáles fallaron o pasaron a modo degradado, y por qué, sin preguntar a la persona usuaria. Una regla de este principio que se cumpla en la letra pero no permita eso se considera incumplida.
+
 **Una única API de registro por capa.** El código de las funcionalidades NO DEBE depender directamente de ninguna biblioteca de registro; usa exclusivamente el envoltorio de su capa, que es el único lugar donde se configura la biblioteca:
 
 | Capa | Biblioteca (oculta tras el envoltorio) | Envoltorio: única API permitida | Prohibido fuera del envoltorio |
 |---|---|---|---|
-| Interfaz (TypeScript) | `loglevel` | módulo `logging` del puente: `createLogger(scope)` devuelve `error`, `warn`, `info`, `debug` y `trace` | `console.*`, `debugger`, importar `loglevel` (ESLint `no-console` y `no-restricted-imports`) |
-| Backend (Rust) | `tracing`, `tracing-subscriber`, `tracing-appender` | macros del módulo `logging` (`log_error!` … `log_trace!`), que exigen un código de evento | `println!`, `eprintln!`, `dbg!`, macros de `tracing` y tipos de `tracing_subscriber` (Clippy `print_stdout`, `print_stderr`, `dbg_macro` y `disallowed_macros`) |
+| Interfaz (TypeScript y Svelte) | `loglevel` | módulo `logging` del puente: `createLogger(scope)` devuelve `error`, `warn`, `info`, `debug` y `trace`, cada uno con firma `(code, msg, fields?)` | `console.*`, `debugger`, importar `loglevel` (ESLint `no-console` y `no-restricted-imports`, aplicados a `.ts` **y** `.svelte`) |
+| Backend (Rust) | `tracing`, `tracing-subscriber`, `tracing-appender` | macros del módulo `logging` (`log_error!` … `log_trace!`), con código obligatorio, mensaje, `component`, `session_id` opcional y campos estructurados | `println!`, `eprintln!`, `dbg!`, las macros de `tracing` (`trace!` … `error!`, `event!`) y los tipos de `tracing_subscriber` (Clippy `print_stdout`, `print_stderr`, `dbg_macro` y `disallowed-macros` en `clippy.toml`) |
+| Lanzador elevado (Rust, proceso aparte) | el mismo envoltorio del backend | las mismas macros, con `component: "launcher"` y su propio fichero `throttlewatch-launcher.log` en la carpeta de registros | lo mismo que el backend; además, NO DEBE descartar su resultado sin registrarlo |
 | Colector (.NET) | `Microsoft.Extensions.Logging` | clase estática única `Log` con métodos generados por `[LoggerMessage]`, uno por evento | `Console.Write*`, `Debug.Write*`, `Trace.Write*` (`BannedApiAnalyzers`) |
 
-El colector NO DEBE escribir ficheros: emite sus eventos como JSON por `stderr` y el backend los valida (principio XIV) y los escribe en el mismo fichero con `component: "agent"`. La interfaz reenvía sus eventos al backend mediante un único comando Tauri (`log_frontend`) validado y limitado a 60 eventos por minuto.
+El colector NO DEBE escribir ficheros: emite sus eventos como JSON por `stderr` y el backend los valida (principio XIV) y los escribe en el mismo fichero con `component: "agent"` y el `session_id` de la sesión en curso. La interfaz reenvía sus eventos al backend mediante un único comando Tauri (`log_frontend`) validado y limitado a 60 eventos por minuto. El lanzador elevado escribe en su propio fichero porque su fallo típico es precisamente no poder comunicarse con la aplicación.
+
+Un evento sin código NO DEBE poder compilarse: el envoltorio lo exige en su firma y nunca descarta en silencio lo que recibe.
 
 **Niveles.** Los cinco niveles tienen el mismo significado en todas las capas (`Critical` de .NET se registra como `error`):
 
@@ -210,16 +215,27 @@ El colector NO DEBE escribir ficheros: emite sus eventos como JSON por `stderr` 
 | `debug` | Detalle para diagnosticar un problema concreto | resumen de mensajes del protocolo, tiempos de escritura por lotes, reglas evaluadas por el motor en cada ventana |
 | `trace` | Detalle por muestra o por mensaje | cada muestra y cada línea NDJSON; solo en desarrollo |
 
+**Cobertura obligatoria (qué se registra).** No es opcional ni queda a criterio de cada funcionalidad:
+
+- **Final de todo proceso o máquina de estados** (sesión pasiva, prueba guiada, importación, exportación, actualización, instalación del acceso avanzado, arranque y cierre del colector): un evento con el resultado (completado, cancelado o fallido) y su motivo, en `info` si terminó bien y en `warn` o `error` si no.
+- **Cambio de fase o de estado relevante** (fases de la prueba guiada, estados del colector, nivel de cobertura, plan de muestreo, nivel de vidrio): en `debug`, con el estado de origen y el de destino.
+- **Caída a modo degradado o a una alternativa** («no se pudo X, se usa Y»): en `warn`, con la causa original completa.
+- **Error tragado:** todo `Result` o excepción que se convierta en un valor por defecto, se ignore (`let _ =`, `.ok()`, `catch` vacío) o corte un flujo con un retorno temprano DEBE registrarse, salvo que se justifique en un comentario por qué no aporta nada al diagnóstico.
+- **Arranque:** versión de la aplicación y del colector, tipo de compilación, nivel de registro efectivo, acceso avanzado (activado o no, elevación conseguida o no) y nivel de cobertura inicial, en `info`.
+- **Acciones de la persona que cambian el comportamiento** (ajustes, activar o desactivar el registro detallado, iniciar o detener una prueba): en `info`, sin valores personales.
+- Cada tarea de `tasks.md` que añada o cambie una funcionalidad DEBE listar los códigos de evento que emite.
+
 **Nivel efectivo.**
 
 - **Producción, de fábrica:** `info` en el backend y el colector; la interfaz reenvía solo `warn` y `error`. El ruido en producción DEBE ser mínimo: ningún evento por muestra y, como objetivo, menos de 100 líneas por hora de monitorización sin incidencias.
 - **Producción, «Registro detallado»:** interruptor en Ajustes › Acerca de y ayuda › Avanzado que sube todas las capas a `debug`. Se desactiva solo a las 24 horas o al reiniciar la aplicación (lo que ocurra antes), su estado es visible mientras dure y su activación y desactivación se registran en `info`. `trace` NUNCA está disponible en producción.
-- **Desarrollo:** `debug` por defecto; `TW_DEV_LOG_LEVEL` (backend y colector) y `PUBLIC_LOG_LEVEL` (interfaz) admiten `error|warn|info|debug|trace`, se validan con el esquema de configuración (principio XV) y solo actúan en compilaciones de desarrollo. Una compilación de producción con `PUBLIC_LOG_LEVEL` definida falla. `RUST_LOG` no se lee nunca.
+- **Desarrollo** (compilación de depuración, `debug_assertions`, y la de pruebas `e2e`): `debug` por defecto en todas las capas, aplicado de verdad al arrancar, sin necesidad de ningún interruptor; `TW_DEV_LOG_LEVEL` (backend, lanzador y colector) y `PUBLIC_LOG_LEVEL` (interfaz) admiten `error|warn|info|debug|trace`, se validan con el esquema de configuración (principio XV) y solo actúan en compilaciones de desarrollo. Una compilación de producción con `PUBLIC_LOG_LEVEL` definida falla. `RUST_LOG` no se lee nunca. En desarrollo, «Registro detallado» sobrevive a los reinicios y solo caduca a las 24 horas (FR-086, enmienda del 2026-09-28).
 - **Pruebas:** silencio por defecto; las pruebas que verifican registros usan un sumidero en memoria del envoltorio.
 
 **Formato.**
 
-- **Fichero (orientado a máquina):** JSON por líneas en UTF-8, un evento por línea, validado por el esquema `log-event` de `packages/contracts/`. Campos: `ts` (UTC, ISO 8601 con milisegundos y `Z`), `level`, `component` (`ui`, `core` o `agent`), `target` (módulo), `code` (código de evento estable en inglés, `snake_case`), `msg` (en inglés), `session_id` y `protocol_version` cuando existan, `fields` (objeto) y `err` (cadena de causas) en los errores.
+- **Fichero (orientado a máquina):** JSON por líneas en UTF-8, un evento por línea, validado por el esquema `log-event` de `packages/contracts/`. Campos: `ts` (UTC, ISO 8601 con milisegundos y `Z`), `level`, `component`, `target` (módulo), `code` (código de evento estable en inglés, `MAYÚSCULAS_CON_GUIONES_BAJOS`, patrón `^[A-Z0-9_]+$` del esquema), `msg` (en inglés), `session_id` y `protocol_version` cuando existan, `fields` (objeto) y `err` (cadena de causas) en los errores. `component` es uno de `ui`, `core`, `agent`, `guided`, `storage` o `launcher` (el esquema los enumera; uno nuevo exige ampliarlo).
+- **Correlación:** mientras haya una sesión de monitorización o una prueba guiada en curso, todo evento que pertenezca a ella (incluidos los del colector reenviados por el backend) DEBE llevar su `session_id`; el envoltorio lo añade, no cada llamada.
 - **Salida para personas (consola de desarrollo y visor `pnpm logs:view` de los ficheros):** fecha y hora en formato español `dd/MM/yyyy HH:mm:ss,SSS` en la zona `Europe/Madrid`, con su abreviatura para evitar la ambigüedad del cambio de hora (`18/09/2026 14:03:07,512 CEST`), seguida de nivel, componente, `target`, código y mensaje. Nunca marcas Unix en bruto. El backend formatea también los eventos del colector, de modo que existe un único formateador por lenguaje (`jiff` con la base de zonas empaquetada en Rust e `Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid' })` en TypeScript), probado en los dos cambios de hora anuales.
 - El formato (`json` o `pretty`) y la zona horaria de la salida humana solo son configurables en desarrollo, y únicamente a través del envoltorio.
 - Esta regla afecta solo a la salida para desarrolladores: la información técnica que ve el usuario sigue su idioma de interfaz y su zona horaria (HU-09).
@@ -230,12 +246,12 @@ El colector NO DEBE escribir ficheros: emite sus eventos como JSON por `stderr` 
 - nombre del equipo o del usuario, números de serie, direcciones MAC o IP, identificador del plan de energía, títulos de ventanas o nombres de procesos de otras aplicaciones, ni rutas absolutas con el perfil del usuario (se escriben como `%LOCALAPPDATA%\…` o `~\…`);
 - contenido de ficheros importados, cargas completas de mensajes ni valores rechazados por una validación (se registran tamaño, código y ruta del campo).
 
-El envoltorio de cada capa aplica una función de redacción basada en la misma lista permitida que la exportación anónima (HU-07), cubierta como módulo crítico (principio XIII).
+El envoltorio de cada capa aplica una función de redacción basada en la misma lista permitida que la exportación anónima (HU-07), cubierta como módulo crítico (principio XIII). La redacción actúa sobre los campos y NUNCA sobre `code`, `msg`, `component`, `target` ni `session_id`, cualquiera que sea la forma en que se pasen al envoltorio: un mensaje que pudiera contener datos prohibidos se construye sin ellos, no se censura después. Un mensaje que llegue al fichero como `[redacted]` es un defecto.
 
 **Volumen, rendimiento y ciclo de vida.**
 
 - Escritura no bloqueante: registrar NUNCA bloquea la interfaz, el muestreo ni el motor. Si el búfer se llena, se descartan eventos y se registra el número descartado.
-- Un mismo código repetido en menos de 60 segundos se agrupa en una sola línea con contador.
+- Un mismo código repetido en menos de 60 segundos se agrupa en una sola línea con contador. Por ello un evento puede tardar hasta 60 segundos en llegar al disco; al cerrar la aplicación se vuelca lo pendiente. Quien lea los registros para diagnosticar DEBE tener en cuenta ese retraso antes de concluir que algo no se registró.
 - Rotación de 5 ficheros de 5 MB. El espacio de los registros se muestra junto al de la base de datos. «Eliminar todos mis datos» y «Restablecer ThrottleWatch» borran los registros, y con la retención «solo esta sesión» se eliminan al salir.
 - Los pánicos de Rust y las excepciones no controladas de .NET y de la interfaz se capturan y se registran en `error` con su código antes de terminar o recuperarse.
 
@@ -244,6 +260,28 @@ El envoltorio de cada capa aplica una función de redacción basada en la misma 
 - Las DevTools de WebView2 y el puerto de depuración remota solo existen en compilaciones de desarrollo y en las compilaciones de prueba E2E de CI; nunca en la versión publicada.
 - No se confirma código con `dbg!`, `debugger`, `console.*`, `Debug.WriteLine` ni registros temporales ajenos al envoltorio.
 - El resumen técnico copiable de Ajustes › Acerca de NO DEBE incluir registros en bruto; el usuario decide si adjunta la carpeta de registros.
+
+**Cumplimiento.** Una regla sin mecanismo automático que la haga cumplir no se da por implantada. Cada regla tiene su mecanismo y un test que demuestra que el mecanismo existe y falla cuando se viola; `pnpm check` los ejecuta todos (principio XVI):
+
+| Regla | Mecanismo | Test que lo demuestra |
+|---|---|---|
+| Rust: nada de `tracing::*!`, `print*!`, `eprint*!` ni `dbg!` en ningún módulo | `disallowed-macros` en `clippy.toml` (macros de `tracing`, `print!`, `println!`, `dbg!`) y los lints `print_stdout`, `print_stderr` y `dbg_macro` en `Cargo.toml` (`print_stderr`, no `disallowed-macros`, cubre `eprintln!`, porque `tauri::generate_context!` expande uno); nadie usa `#[allow(clippy::disallowed_macros)]`: el propio envoltorio construye los eventos con la API de bajo nivel de `tracing` (Clippy informa a nivel de crate de los `static` que generan sus macros, así que ningún `#[allow]` local los eximiría) | `scripts/check-logging-gates.mjs` (dentro de `pnpm check`) comprueba esa configuración y que no haya usos directos ni `#[allow]`; con `--full` (en `verify:batch`) ejecuta Clippy sobre un crate de ejemplo con una violación, que DEBE fallar |
+| Interfaz: nada de `console.*` ni `loglevel` fuera del envoltorio, en `.ts` y `.svelte` | ESLint `no-console` y `no-restricted-imports` | el mismo script ejecuta ESLint sobre un `.ts` y un `.svelte` de ejemplo con violaciones, que DEBEN fallar |
+| Todo evento tiene código y nunca se descarta en silencio | firma de las macros y de `createLogger`; un evento sin código que llegue a la capa se escribe como `LOG_EVENT_WITHOUT_CODE` en `error` | test unitario del backend que emite un evento sin código y lo encuentra en el fichero |
+| `code`, `msg`, `component` y `session_id` nunca se censuran | la capa del backend trata esos nombres igual con cualquier forma de registrar (`%`, `?`, literal) | test de extremo a extremo por capa: se inicializa el registro real en una carpeta temporal, se emite a través del envoltorio, se lee el fichero y se comprueba que llegan íntegros y que un campo prohibido aparece como `[redacted]` |
+| El fichero cumple el esquema `log-event` | salida única del backend | el test de extremo a extremo compara su salida con un fichero de referencia de `packages/trace-fixtures`, y un test de `packages/contracts` valida ese fichero contra el esquema |
+| Desarrollo arranca en `debug`; producción en `info`; «Registro detallado» según FR-086 | función pura de nivel efectivo usada al arrancar | tests de la función para cada tipo de compilación y cada valor de `TW_DEV_LOG_LEVEL` y del interruptor |
+| `PUBLIC_LOG_LEVEL` fija el nivel de la interfaz en desarrollo | `createLogger` lee la configuración validada | test unitario |
+| Errores no controlados de la interfaz registrados | manejadores globales `error` y `unhandledrejection` | test de componente que lanza un error y comprueba el evento enviado |
+| El lanzador elevado registra su resultado | fichero propio inicializado antes de cualquier otra cosa | test del lanzador que fuerza un fallo de conexión y encuentra el evento en su fichero |
+| Correlación por `session_id` | el envoltorio añade la sesión en curso | test que emite durante una sesión, incluido un evento reenviado del colector, y comprueba el `session_id` |
+| Eventos descartados contados | contador de errores del escritor no bloqueante, leído por el hilo de volcado | test de la función que convierte el contador en `LOG_EVENTS_DROPPED` |
+| Salida humana `dd/MM/yyyy HH:mm:ss,SSS` con zona | formateador único por lenguaje y `pnpm logs:view` | tests en los instantes exactos de los dos cambios de hora anuales |
+| Cobertura obligatoria | escenarios de aceptación de diagnóstico (abajo) y lista de códigos en cada tarea | revisión manual del revisor `revisor-constitucion` al cerrar cada lote |
+
+**Escenarios de aceptación de diagnóstico.** Para cada funcionalidad crítica existe al menos un test que provoca un fallo conocido y afirma que el registro contiene el evento que identifica la causa, sin más información: arranque del colector y su elevación, prueba guiada (cada motivo de parada), grabación de la sesión pasiva, almacenamiento (escritura degradada, base de datos dañada, migración), actualizador, importación y exportación. Una funcionalidad crítica nueva no se da por terminada sin su escenario.
+
+**Uso por personas y agentes.** Los registros se abren desde Ajustes › Acerca de y ayuda › «Abrir carpeta de registros». Cuando la persona usuaria describe un fallo, el agente de IA DEBE leer primero los registros de esa ejecución (teniendo en cuenta el retraso de volcado) y contrastarlos con su relato antes de proponer una causa; si los registros no bastan para diagnosticarlo, eso es en sí un defecto de cobertura que se corrige.
 
 **Motivo:** los registros son la única ventana a lo que ocurre en el equipo de un usuario sin telemetría; deben ser útiles para diagnosticar, uniformes entre las tres capas y, a la vez, incapaces de revelar quién es el usuario o de degradar la medición.
 
@@ -446,7 +484,7 @@ Una característica no se considera terminada si incumple cualquiera de estas pu
 12. Ninguna petición de red observada con el actualizador apagado (prueba automatizada de tráfico cero).
 13. `pnpm check` y las comprobaciones equivalentes de Rust y .NET ejecutados en el orden del principio XVI, sin errores ni advertencias, con el resultado registrado en la PR.
 14. Cada frontera de datos nueva o modificada tiene su esquema y pruebas de aceptación y rechazo (principio XIV); cada variable de entorno nueva figura en `.env.example` y en el esquema de configuración (principio XV).
-15. Ningún uso de registro fuera de los envoltorios (lints de la puerta 11); los eventos nuevos tienen código estable y pasan las pruebas de redacción y del esquema `log-event` (principio XVII).
+15. Ningún uso de registro fuera de los envoltorios (lints de la puerta 11, cuya existencia comprueba `scripts/check-logging-gates.mjs`); los eventos nuevos tienen código estable, figuran en la tarea que los introduce, respetan la cobertura obligatoria y pasan las pruebas de redacción, de extremo a extremo y del esquema `log-event`; cada funcionalidad crítica tiene su escenario de aceptación de diagnóstico (principio XVII).
 
 ## Gobernanza
 
@@ -467,5 +505,6 @@ Esta constitución prevalece sobre decisiones locales de implementación. Toda e
 - **1.5.2 (2026-09-18):** aclaraciones derivadas de `/speckit-analyze`: el principio XV admite `TW_DEV_*` en la compilación de pruebas `e2e` de CI (nunca distribuida), en coherencia con el principio XVII; el principio XII fija el comportamiento con altura útil inferior a 500 px lógicos (ventana maximizada con desplazamiento). Documentos afectados: `spec.md`, `plan.md`, `tasks.md`, `ux-visual-spec.md`, `historias.md`.
 - **1.5.3 (2026-09-19):** enmienda PARCHE autorizada por la persona propietaria: entra en la tabla de crates `minisign-verify` 0.2.5 (MIT, sin dependencias) para verificar la firma minisign del manifiesto de release en el lanzador elevado exigida por ADR-0004 (R2, C3); no cambia ningún principio ni puerta de calidad. Documentos afectados: `AGENTS.md`, `.agents/meta/detected-stack.yaml`, `apps/desktop/src-tauri/Cargo.toml`.
 - **1.5.4 (2026-09-22):** enmienda PARCHE autorizada por la persona propietaria (T175): se retiran de la tabla de pila fijada `@tauri-apps/plugin-process` y `tauri-plugin-process` 2.3.1 («reinicio tras instalar»). El motivo original —que el backend pidiera un reinicio tras instalar una actualización— no aplica a la implementación real: el instalador NSIS relanza la aplicación él mismo (`docs/adr/0005-actualizador-firmado.md`), así que Rust nunca necesita ese plugin; mantenerlo habría documentado una dependencia que no se iba a añadir nunca. No cambia ningún principio ni puerta de calidad. Documentos afectados: `specs/001-cpu-thermal-diagnostics/tasks.md` (T175).
+- **1.6.0 (2026-09-28):** enmienda MENOR autorizada por la persona propietaria, a partir del prompt `docs/prompts/principio-de-registro.md`. El principio XVII estaba completo en papel pero el código no lo cumplía (Clippy no prohibía las macros de `tracing`, 34 usos directos, eventos sin código descartados en silencio, mensajes censurados como `[redacted]`, desarrollo arrancando en `info`, subsistemas enteros sin registro). Se añaden: el objetivo de diagnóstico sin preguntar, la cobertura obligatoria (qué se registra), la correlación por `session_id`, el lanzador elevado como capa con fichero propio, la prohibición de censurar `code`/`msg`, el retraso de volcado, la tabla de cumplimiento regla → mecanismo → test, los escenarios de aceptación de diagnóstico y el uso de los registros por agentes; se corrige el formato de `code` (`MAYÚSCULAS_CON_GUIONES_BAJOS`, no `snake_case`) y se amplía la puerta 15. Documentos afectados: `spec.md` (FR-086), `tasks.md`, `AGENTS.md`, `clippy.toml`, `eslint.config.js`, contratos.
 
-**Versión**: 1.5.4 | **Ratificada**: 2026-09-17 | **Última modificación**: 2026-09-22
+**Versión**: 1.6.0 | **Ratificada**: 2026-09-17 | **Última modificación**: 2026-09-28

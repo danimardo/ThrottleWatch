@@ -88,11 +88,7 @@ struct Unavailable {
 
 impl CollectorLauncher for Unavailable {
     fn launch(&mut self) -> io::Result<Box<dyn CollectorLink>> {
-        tracing::warn!(
-            component = "core",
-            code = self.code,
-            msg = "the collector cannot be started"
-        );
+        crate::log_warn!(self.code, "the collector cannot be started");
         Err(io::Error::from(io::ErrorKind::PermissionDenied))
     }
 }
@@ -120,10 +116,11 @@ impl CollectorLauncher for ElevatedSidecarLauncher {
                 Ok(Box::new(PipeLink::connect(to_launcher, from_launcher)?))
             }
             Err(error) => {
-                tracing::warn!(
-                    component = "core",
-                    code = "COLLECTOR_ELEVATED_LAUNCH_FAILED",
-                    msg = %format!("the elevated sidecar could not be started, falling back to an unelevated one this time: {error}")
+                crate::log_warn!(
+                    "COLLECTOR_ELEVATED_LAUNCH_FAILED",
+                    format!(
+                        "the elevated sidecar could not be started, falling back to an unelevated one this time: {error}"
+                    )
                 );
                 let child = spawn_verified(&self.executable, &self.expected_sha256)?;
                 Ok(Box::new(super::runtime::ProcessLink::from_child(child)?))
@@ -152,10 +149,9 @@ pub fn collector_launcher(advanced_access_enabled: bool) -> Box<dyn CollectorLau
     // this branch cannot be taken there. The warning keeps such a run from passing for a real one.
     // It is never elevated: the harness runs unattended and must not depend on a scheduled task.
     if let Some((program, args)) = crate::dev_faults::fake_collector_command() {
-        tracing::warn!(
-            component = "core",
-            code = "COLLECTOR_TEST_DOUBLE_IN_USE",
-            msg = "TW_DEV_COLLECTOR_CMD replaces the collector with a test double"
+        crate::log_warn!(
+            "COLLECTOR_TEST_DOUBLE_IN_USE",
+            "TW_DEV_COLLECTOR_CMD replaces the collector with a test double"
         );
         return Box::new(CommandLauncher { program, args });
     }

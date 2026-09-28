@@ -49,13 +49,27 @@ pub fn apply(app: &AppHandle) {
     let Ok(preferences) = state.storage.lock().map(|storage| storage.user_preferences()) else {
         return;
     };
-    let Ok(preferences) = preferences else { return };
+    let Ok(preferences) = preferences else {
+        crate::log_warn!(
+            "SAMPLING_PLAN_NOT_APPLIED",
+            "the sampling plan was not applied: preferences could not be read"
+        );
+        return;
+    };
     let Ok(rules) = Ruleset::v1() else { return };
-    let Some(sampling) = plan_from_preferences(&rules, &preferences, on_ac_power()) else {
+    let ac_power = on_ac_power();
+    let Some(sampling) = plan_from_preferences(&rules, &preferences, ac_power) else {
         return;
     };
     let Some(handle) = app.try_state::<crate::CollectorHandle>() else { return };
     let Ok(runtime) = handle.0.lock() else { return };
+    crate::log_info!(
+        "SAMPLING_PLAN_CHANGED",
+        "sampling plan applied",
+        duration_ms = sampling.interval.map_or(0, |interval| interval.as_millis() as u64),
+        state = if sampling.interval.is_some() { "sampling" } else { "paused_on_battery" },
+        kind = if ac_power { "ac" } else { "battery" }
+    );
     match sampling.interval {
         Some(interval) => {
             runtime.set_interval(interval);
@@ -67,17 +81,30 @@ pub fn apply(app: &AppHandle) {
 
 /// Watches the power source for the life of the process and re-applies the plan when it changes.
 pub fn spawn_power_watch(app: AppHandle) {
-    let _ = std::thread::Builder::new().name("power-watch".to_owned()).spawn(move || {
+    let spawned = std::thread::Builder::new().name("power-watch".to_owned()).spawn(move || {
         let mut previous = on_ac_power();
         loop {
             std::thread::sleep(POWER_POLL);
             let current = on_ac_power();
             if current != previous {
                 previous = current;
+                crate::log_info!(
+                    "POWER_SOURCE_CHANGED",
+                    "power source changed",
+                    kind = if current { "ac" } else { "battery" }
+                );
                 apply(&app);
             }
         }
     });
+    if let Err(error) = spawned {
+        crate::log_error!(
+            "POWER_WATCH_SPAWN_FAILED",
+            format!(
+                "the power source watch could not start; plan changes on battery are lost: {error}"
+            )
+        );
+    }
 }
 
 #[cfg(test)]

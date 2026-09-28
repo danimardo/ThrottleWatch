@@ -13,13 +13,22 @@ pub fn set_enabled(
     enabled: bool,
 ) -> Result<(), tauri_plugin_autostart::Error> {
     let manager = app.autolaunch();
-    if enabled {
+    let result = if enabled {
         manager.enable()
     } else if manager.is_enabled()? {
         manager.disable()
     } else {
         Ok(())
+    };
+    match &result {
+        Ok(()) => crate::log_info!("STARTUP_SET", "launch with Windows updated", enabled = enabled),
+        Err(error) => crate::log_warn!(
+            "STARTUP_SET_FAILED",
+            format!("launch with Windows could not be updated: {error}"),
+            enabled = enabled
+        ),
     }
+    result
 }
 
 pub fn apply_launch_mode(
@@ -35,6 +44,12 @@ pub fn apply_launch_mode(
         && monitoring
         && let Some(window) = tauri::Manager::get_webview_window(app, "main")
     {
-        let _ = window.hide();
+        crate::log_info!("STARTUP_HIDDEN_IN_TRAY", "started hidden in the tray, as configured");
+        if let Err(error) = window.hide() {
+            crate::log_warn!(
+                "STARTUP_HIDE_FAILED",
+                format!("the window could not start hidden: {error}")
+            );
+        }
     }
 }

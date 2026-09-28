@@ -195,9 +195,22 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 let controller = app.state::<TrayController>();
                 let runtime = app.state::<crate::CollectorHandle>();
                 let paused = !controller.paused.load(Ordering::SeqCst);
-                let _ = crate::commands::apply_tray_pause(app, &controller, &runtime, paused);
+                crate::log_info!(
+                    "TRAY_PAUSE_TOGGLED",
+                    "sampling paused or resumed from the tray",
+                    state = if paused { "paused" } else { "resumed" }
+                );
+                if crate::commands::apply_tray_pause(app, &controller, &runtime, paused).is_err() {
+                    crate::log_warn!(
+                        "TRAY_PAUSE_FAILED",
+                        "the tray could not pause or resume sampling"
+                    );
+                }
             }
-            "quit" => app.exit(0),
+            "quit" => {
+                crate::log_info!("TRAY_QUIT", "quit requested from the tray");
+                app.exit(0);
+            }
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
@@ -268,6 +281,11 @@ pub fn refresh(app: &AppHandle, live: Option<&LiveState>, force: bool) {
     };
     let label = |key: &str| i18n::text(locale, key);
     let state_text = label(&format!("native.tray.state.{}", state.key()));
+    if previous.is_none_or(|(before, _, _)| before != state) {
+        crate::log_debug!("TRAY_STATE_CHANGED", "tray icon state changed", state = state.key());
+    }
+    // The menu labels, tooltip and icon are cosmetic and re-applied on the next change; a failure
+    // here says nothing about what the application is doing, so it is not logged (XVII).
     let _ = ui.status.set_text(format!("{}: {state_text}", label("native.tray.status")));
     let _ = ui.open.set_text(label("native.tray.open"));
     let _ =

@@ -44,6 +44,17 @@ pub struct ExportController {
 pub struct GuidedController {
     pub machine: Arc<Mutex<Option<GuidedMachine>>>,
     pub stop_requested: Arc<AtomicBool>,
+    /// From `start_guided` until its loop has closed the session. Read without any lock (T186):
+    /// the collector asks "is a guided test running?" while it holds the live state, and the
+    /// guided loop reads the live state while it holds `machine` — asking through `machine` made
+    /// the two wait on each other for ever, freezing the test and then every guided command.
+    pub in_progress: Arc<AtomicBool>,
+}
+
+impl GuidedController {
+    pub fn in_progress(&self) -> bool {
+        self.in_progress.load(Ordering::Acquire)
+    }
 }
 
 #[derive(Default)]
@@ -77,10 +88,16 @@ impl FrontendLogLimiter {
 /// phase transition and the final generator join.
 pub fn cancel_guided_for_lifecycle(app: &AppHandle, reason: GuidedStopReason) {
     let Some(state) = app.try_state::<GuidedController>() else { return };
+    // This runs on the window's own thread on every minimise or focus loss: without a test there
+    // is nothing to stop, and no reason to wait on `machine` there.
+    if !state.in_progress() {
+        return;
+    }
     state.stop_requested.store(true, Ordering::Release);
     let Ok(mut guard) = state.machine.lock() else { return };
     let Some(machine) = guard.as_mut() else { return };
     if machine.request_cancel(reason) {
+        log_guided_stop(reason);
         machine.tick(1);
         let _ = app.emit("guided:phase", guided_phase_dto(machine));
     }
@@ -281,9 +298,29 @@ fn persist_guided_tick(
     let monotonic_ms = i64::try_from(machine.elapsed_ms).unwrap_or(i64::MAX);
     let Some(state) = app.try_state::<AppState>() else { return };
     let Ok(storage) = state.storage.lock() else { return };
+    // Debug-only breadcrumbs (2026-09-28): the guided loop holds the *same* `machine` mutex a
+    // fresh `start_guided`/`skip_rest` also needs, for as long as one tick's body takes to run —
+    // a stall anywhere in here (this lock included) freezes not just this session but every
+    // guided command afterward, which read as the whole application hanging. If a future freeze
+    // repeats, whichever of these codes is the last one on disk names where the tick actually
+    // stopped moving.
+    crate::log_debug!(
+        component: "guided",
+        session: session_id,
+        "GUIDED_TICK_STORAGE_LOCKED",
+        "guided tick holds the storage lock",
+        sequence = sequence
+    );
     if storage.insert_sample(session_id, sequence, monotonic_ms, 1_000, &values).is_err() {
         return;
     }
+    crate::log_debug!(
+        component: "guided",
+        session: session_id,
+        "GUIDED_TICK_SAMPLE_INSERTED",
+        "guided tick stored its sample",
+        sequence = sequence
+    );
     let checkpoint = GuidedCheckpoint {
         session_id: session_id.to_owned(),
         phase: guided_phase_name(machine.phase).to_owned(),
@@ -302,31 +339,42 @@ fn run_guided_loop(
     app: AppHandle,
     machine: Arc<Mutex<Option<GuidedMachine>>>,
     stop_requested: Arc<AtomicBool>,
+    in_progress: Arc<AtomicBool>,
     live: LiveHandle,
     session_id: String,
 ) {
+    let _session = crate::logging::session_scope(&session_id);
     let mut timeline = crate::telemetry::timeline::Timeline::default();
     guided_loop_body(&app, &machine, &stop_requested, &live, &session_id, &mut timeline);
     finish_guided_session(&app, &machine, &live, &session_id, &mut timeline);
+    in_progress.store(false, Ordering::Release);
+}
+
+fn log_guided_stop(reason: GuidedStopReason) {
+    crate::log_warn!(
+        component: "guided",
+        "GUIDED_STOP_REQUESTED",
+        "the guided test is being stopped automatically",
+        reason = reason.key()
+    );
+}
+
+fn log_guided_phase_change(from: GuidedPhase, to: GuidedPhase) {
+    if from != to {
+        crate::log_debug!(
+            component: "guided",
+            "GUIDED_PHASE_CHANGED",
+            "guided test phase changed",
+            from = guided_phase_name(from),
+            to = guided_phase_name(to)
+        );
+    }
 }
 
 /// Whether a guided test is running: the passive recorder stands aside meanwhile, so the two never
 /// write overlapping sessions for the same period.
 pub fn guided_in_progress(app: &AppHandle) -> bool {
-    app.try_state::<GuidedController>().is_some_and(|controller| {
-        controller.machine.lock().is_ok_and(|guard| {
-            guard.as_ref().is_some_and(|current| {
-                !matches!(
-                    current.phase,
-                    GuidedPhase::Cancelled
-                        | GuidedPhase::Result
-                        | GuidedPhase::Error
-                        | GuidedPhase::SafetyStop
-                        | GuidedPhase::SensorLost
-                )
-            })
-        })
-    })
+    app.try_state::<GuidedController>().is_some_and(|controller| controller.in_progress())
 }
 
 /// Closes the stored session however the loop ended: without this a finished or aborted test
@@ -351,6 +399,23 @@ fn finish_guided_session(
         CoverageTier::B => "B",
         CoverageTier::C => "C",
     });
+    if status != "completed" {
+        // The only record of why a guided diagnostic ended short of "completed" ("Prueba
+        // incompleta" in the UI) — until this, nothing in `diagnostics::guided` or its stop/cancel
+        // paths logged anything at all, so the log could never say more than the person already
+        // saw on screen.
+        crate::log_warn!(
+            component: "guided",
+            session: session_id,
+            "GUIDED_SESSION_ENDED",
+            "the guided diagnostic ended before completing",
+            status = status,
+            reason = incomplete_reason.unwrap_or("none"),
+            phase = ?phase,
+            tier = tier,
+            duration_ms = elapsed_ms
+        );
+    }
     let Some(state) = app.try_state::<AppState>() else { return };
     let Ok(storage) = state.storage.lock() else { return };
     let _ = storage.set_session_coverage_tier(session_id, tier);
@@ -391,7 +456,7 @@ fn guided_loop_body(
     timeline: &mut crate::telemetry::timeline::Timeline,
 ) {
     let Ok(rules) = crate::diagnostics::Ruleset::v1() else {
-        tracing::error!(component = "core", msg = "guided loop: ruleset failed to parse");
+        crate::log_error!("GUIDED_RULESET_INVALID", "guided loop: ruleset failed to parse");
         return;
     };
     let Some(limits) = safety_limits(&rules) else { return };
@@ -426,8 +491,10 @@ fn guided_loop_body(
             break;
         }
 
-        if parent_pid.is_some_and(|pid| !crate::ipc::supervisor::parent_process_alive(pid)) {
-            current.request_cancel(GuidedStopReason::ParentMissing);
+        if parent_pid.is_some_and(|pid| !crate::ipc::supervisor::parent_process_alive(pid))
+            && current.request_cancel(GuidedStopReason::ParentMissing)
+        {
+            log_guided_stop(GuidedStopReason::ParentMissing);
         }
 
         if let Some(power) = crate::telemetry::power_context::read_windows_power_context()
@@ -435,22 +502,28 @@ fn guided_loop_body(
                 == PowerTransition::Resumed
         {
             current.suspend();
+            log_guided_stop(GuidedStopReason::Suspended);
         }
 
         let collector_failed = live.read(|live| {
             matches!(live.collector(), CollectorState::Stopped | CollectorState::Failed)
         });
-        if collector_failed {
-            current.request_cancel(GuidedStopReason::CriticalSensorLost);
+        if collector_failed && current.request_cancel(GuidedStopReason::CriticalSensorLost) {
+            log_guided_stop(GuidedStopReason::CriticalSensorLost);
         }
 
         // Losing AC mid-run stops the test outright when it was required to start it (independent
         // of the phase timer): this is a cancellation, not a safety-limit stop.
-        if current.requires_ac() && !ac_power_available() {
-            current.request_cancel(GuidedStopReason::Battery);
+        if current.requires_ac()
+            && !ac_power_available()
+            && current.request_cancel(GuidedStopReason::Battery)
+        {
+            log_guided_stop(GuidedStopReason::Battery);
         }
 
+        let phase_before = current.phase;
         current.tick(1_000);
+        log_guided_phase_change(phase_before, current.phase);
 
         let loads = matches!(current.phase, GuidedPhase::Warming | GuidedPhase::SteadyLoad);
         match (loads, generator.is_some()) {
@@ -488,7 +561,9 @@ fn guided_loop_body(
                 sensor_missing,
                 generator_progressed,
             );
+            let phase_before = current.phase;
             current.observe_safety(safety, over_limit, severely_throttled, sensor_missing, limits);
+            log_guided_phase_change(phase_before, current.phase);
         } else {
             safety = GuidedSafetyState::ZERO;
         }
@@ -506,7 +581,21 @@ fn guided_loop_body(
             progress_percent: current.progress_percent(),
         };
         let terminal = current.phase == GuidedPhase::Result;
+        crate::log_debug!(
+            component: "guided",
+            session: session_id,
+            "GUIDED_TICK_BEFORE_PERSIST",
+            "guided tick is about to persist",
+            sequence = sequence
+        );
         persist_guided_tick(app, live, session_id, sequence, current);
+        crate::log_debug!(
+            component: "guided",
+            session: session_id,
+            "GUIDED_TICK_AFTER_PERSIST",
+            "guided tick persisted",
+            sequence = sequence
+        );
         if let Ok(seq) = i64::try_from(sequence) {
             let verdict = live.read(|live| live.diagnostic().cloned());
             timeline.push(current.elapsed_ms, seq, verdict.as_ref());
@@ -969,6 +1058,16 @@ pub fn start_guided(
         "long" => GuidedProfile::Long,
         _ => return Err(CommandError::operation_failed()),
     };
+    // A second loop on the same `machine` would tick the new test as well as its own: one test at
+    // a time, until the previous loop has closed its session.
+    if state.in_progress() {
+        crate::log_warn!(
+            component: "guided",
+            "GUIDED_START_REJECTED",
+            "a guided test is still running; a new one cannot start until it has closed"
+        );
+        return Err(CommandError::operation_failed());
+    }
     let rules = crate::diagnostics::Ruleset::v1().map_err(|_| CommandError::operation_failed())?;
     let config = GuidedConfig::from_ruleset(&rules, profile, request.require_ac)
         .ok_or_else(CommandError::operation_failed)?;
@@ -982,6 +1081,24 @@ pub fn start_guided(
     };
     let mut machine = GuidedMachine::new(profile, config);
     if !machine.complete_preflight(&checks) || !machine.begin() {
+        let failed: Vec<&str> = [
+            ("sensors", checks.sensors),
+            ("ac_power", checks.ac_power || !request.require_ac),
+            ("profile", checks.profile),
+            ("disk_space", checks.disk_space),
+            ("generator", checks.generator),
+        ]
+        .into_iter()
+        .filter_map(|(name, passed)| (!passed).then_some(name))
+        .collect();
+        crate::log_warn!(
+            component: "guided",
+            "GUIDED_PREFLIGHT_FAILED",
+            "the guided test was not started: a preflight check failed",
+            check = failed.join(","),
+            profile = request.profile.as_str(),
+            require_ac = request.require_ac
+        );
         return Err(CommandError::operation_failed());
     }
     if request.skip_rest {
@@ -1007,15 +1124,37 @@ pub fn start_guided(
     storage
         .create_guided_session(&session_id, &cpu.id, &started_at)
         .map_err(|_| CommandError::operation_failed())?;
+    crate::log_info!(
+        component: "guided",
+        session: &session_id,
+        "GUIDED_SESSION_STARTED",
+        "guided test started",
+        profile = request.profile.as_str(),
+        skip_rest = request.skip_rest,
+        require_ac = request.require_ac
+    );
+    // Released before `machine` is taken: the loop takes `machine` and then storage, so holding
+    // storage while waiting for `machine` is the other half of a deadlock (T186).
+    drop(storage);
     state.stop_requested.store(false, Ordering::Release);
     state.machine.lock().map_err(|_| CommandError::operation_failed())?.replace(machine);
+    state.in_progress.store(true, Ordering::Release);
     let machine_ref = Arc::clone(&state.machine);
     let stop_requested = Arc::clone(&state.stop_requested);
+    let in_progress = Arc::clone(&state.in_progress);
     let loop_app = app.clone();
     let loop_live = live.inner().clone();
-    let _ = thread::Builder::new().name("guided-watchdog".to_owned()).spawn(move || {
-        run_guided_loop(loop_app, machine_ref, stop_requested, loop_live, session_id)
-    });
+    if let Err(error) = thread::Builder::new().name("guided-watchdog".to_owned()).spawn(move || {
+        run_guided_loop(loop_app, machine_ref, stop_requested, in_progress, loop_live, session_id)
+    }) {
+        state.in_progress.store(false, Ordering::Release);
+        crate::log_error!(
+            component: "guided",
+            "GUIDED_LOOP_SPAWN_FAILED",
+            format!("the guided test's loop thread could not start: {error}")
+        );
+        return Err(CommandError::operation_failed());
+    }
     app.emit("guided:phase", &dto).map_err(|_| CommandError::operation_failed())?;
     Ok(dto)
 }
@@ -1031,10 +1170,40 @@ pub fn stop_guided(
     if !machine.request_cancel(GuidedStopReason::UserRequested) {
         return Err(CommandError::operation_failed());
     }
+    crate::log_info!(
+        component: "guided",
+        "GUIDED_STOP_REQUESTED",
+        "the person stopped the guided test",
+        reason = GuidedStopReason::UserRequested.key()
+    );
     machine.tick(1);
     let dto = guided_phase_dto(machine);
     app.emit("guided:phase", &dto).map_err(|_| CommandError::operation_failed())?;
     Ok(dto)
+}
+
+/// The window `get_analysis_window` actually queries: `requested` is a guess (the frontend's own
+/// first request always is — it does not know a session's real range before asking), and
+/// `session_bounds` is that session's real recorded range in the collector's own monotonic clock.
+/// A collector kept alive across several sessions keeps counting from when *it* started, not from
+/// this session's start, so the frontend's guess can land nowhere near the session's real frames.
+/// When it does not overlap them at all, the session's own range is used instead of returning
+/// nothing; a deliberate zoom into a narrower, previously-seen range always does overlap and is
+/// kept exactly as asked. `None` bounds (nothing recorded yet) keeps the request as-is — there is
+/// nothing to fall back to, and the caller ends up with an honest empty result either way.
+fn effective_analysis_window(
+    requested: (i64, i64),
+    session_bounds: Option<(i64, i64)>,
+) -> (i64, i64) {
+    let (requested_start_ms, requested_end_ms) = requested;
+    match session_bounds {
+        Some((session_start_ms, session_end_ms))
+            if requested_end_ms < session_start_ms || requested_start_ms > session_end_ms =>
+        {
+            (session_start_ms, session_end_ms.max(session_start_ms + 1))
+        }
+        _ => (requested_start_ms, requested_end_ms),
+    }
 }
 
 #[tauri::command]
@@ -1057,8 +1226,16 @@ pub fn get_analysis_window(
     } else {
         request.session_id.clone()
     };
-    let start_ms = i64::try_from(request.start_ms).map_err(|_| CommandError::operation_failed())?;
-    let end_ms = i64::try_from(request.end_ms).map_err(|_| CommandError::operation_failed())?;
+    let requested_start_ms =
+        i64::try_from(request.start_ms).map_err(|_| CommandError::operation_failed())?;
+    let requested_end_ms =
+        i64::try_from(request.end_ms).map_err(|_| CommandError::operation_failed())?;
+    let session_bounds =
+        guard.session_bounds(&session_id).map_err(|_| CommandError::operation_failed())?;
+    let (start_ms, end_ms) =
+        effective_analysis_window((requested_start_ms, requested_end_ms), session_bounds);
+    let effective_start_ms = u64::try_from(start_ms).unwrap_or(0);
+    let effective_end_ms = u64::try_from(end_ms).unwrap_or(effective_start_ms);
     let source_points = guard
         .analysis_points(&session_id, start_ms, end_ms)
         .map_err(|_| CommandError::operation_failed())?;
@@ -1098,8 +1275,8 @@ pub fn get_analysis_window(
         }
         let points = aggregate_track(
             &raw,
-            request.start_ms,
-            request.end_ms,
+            effective_start_ms,
+            effective_end_ms,
             request.target_points_per_track as usize,
             &boundaries,
         )
@@ -1141,8 +1318,8 @@ pub fn get_analysis_window(
         .collect();
     Ok(AnalysisWindowDto {
         session_id,
-        start_ms: request.start_ms,
-        end_ms: request.end_ms,
+        start_ms: effective_start_ms,
+        end_ms: effective_end_ms,
         is_aggregated: source_count > request.target_points_per_track as usize,
         tracks,
         events,
@@ -1321,9 +1498,11 @@ pub async fn export(
     // No snapshot needed yet: the proposed name only depends on the scope and format.
     let preview = build_export_preview(&request.scope, request.format, request.anonymize, 0);
     let Some(path) = pick_save_path(&app, &preview.proposed_file_name).await else {
+        crate::log_info!("EXPORT_CANCELLED", "export cancelled before choosing where to save");
         return Err(CommandError { code: "export.cancelled", message_key: "export.cancelled" });
     };
     if cancelled.load(Ordering::SeqCst) {
+        crate::log_info!("EXPORT_CANCELLED", "export cancelled before writing");
         return Err(CommandError { code: "export.cancelled", message_key: "export.cancelled" });
     }
 
@@ -1331,14 +1510,33 @@ pub async fn export(
     let format = request.format;
     let anonymize = request.anonymize;
     let write_app = app.clone();
-    let bytes = tauri::async_runtime::spawn_blocking(move || -> Result<usize, CommandError> {
+    let outcome = tauri::async_runtime::spawn_blocking(move || -> Result<usize, CommandError> {
         let state = write_app.state::<AppState>();
         let snapshot = export_snapshot(&state, &scope)?;
         write_export_file(&path, &snapshot, format, anonymize, &cancelled)
     })
     .await
-    .map_err(|_| CommandError::operation_failed())??;
-
+    .map_err(|_| CommandError::operation_failed())
+    .and_then(|result| result);
+    match &outcome {
+        Ok(bytes) => crate::log_info!(
+            "EXPORT_COMPLETED",
+            "export written",
+            size_bytes = *bytes as u64,
+            kind = format!("{format:?}"),
+            action = if anonymize { "anonymized" } else { "complete" }
+        ),
+        Err(error) if error.code == "export.cancelled" => {
+            crate::log_info!("EXPORT_CANCELLED", "export cancelled while writing");
+        }
+        Err(error) => crate::log_warn!(
+            "EXPORT_FAILED",
+            "export failed",
+            reason = error.code,
+            kind = format!("{format:?}")
+        ),
+    }
+    let bytes = outcome?;
     Ok(ExportResultDto { bytes, anonymized: request.anonymize, warnings: Vec::new() })
 }
 
@@ -1443,47 +1641,78 @@ pub async fn import_session(app: AppHandle) -> Result<ImportResultDto, CommandEr
     let _ = app.emit("import:progress", serde_json::json!({ "phase": "reading" }));
 
     let Some(path) = pick_open_path(&app, "ThrottleWatch JSON", &["json"]).await else {
+        crate::log_info!("IMPORT_CANCELLED", "import cancelled before choosing a file");
         return Err(CommandError { code: "import.cancelled", message_key: "import.cancelled" });
     };
 
     let worker_app = app.clone();
-    tauri::async_runtime::spawn_blocking(move || -> Result<ImportResultDto, CommandError> {
-        let bytes = fs::read(path).map_err(|_| CommandError::operation_failed())?;
-        let _ = worker_app.emit("import:progress", serde_json::json!({ "phase": "validating" }));
-        let bundle = crate::export::import_bundle(&bytes).map_err(|error| match error {
-            crate::export::ImportError::SchemaTooNew { .. } => {
-                CommandError { code: "import.schema_too_new", message_key: "import.schema_too_new" }
+    let outcome =
+        tauri::async_runtime::spawn_blocking(move || -> Result<ImportResultDto, CommandError> {
+            let bytes = fs::read(path).map_err(|error| {
+                crate::log_warn!(
+                    "IMPORT_READ_FAILED",
+                    format!("the chosen file could not be read: {error}")
+                );
+                CommandError::operation_failed()
+            })?;
+            let _ =
+                worker_app.emit("import:progress", serde_json::json!({ "phase": "validating" }));
+            let bundle = crate::export::import_bundle(&bytes).map_err(|error| match error {
+                crate::export::ImportError::SchemaTooNew { .. } => CommandError {
+                    code: "import.schema_too_new",
+                    message_key: "import.schema_too_new",
+                },
+                crate::export::ImportError::InvalidDocument => CommandError {
+                    code: "import.invalid_document",
+                    message_key: "import.invalid_document",
+                },
+            })?;
+            let migrated = bundle.schema_version < crate::export::EXPORT_SCHEMA_VERSION;
+            if migrated {
+                let _ =
+                    worker_app.emit("import:progress", serde_json::json!({ "phase": "migrating" }));
             }
-            crate::export::ImportError::InvalidDocument => CommandError {
-                code: "import.invalid_document",
-                message_key: "import.invalid_document",
-            },
-        })?;
-        let migrated = bundle.schema_version < crate::export::EXPORT_SCHEMA_VERSION;
-        if migrated {
-            let _ = worker_app.emit("import:progress", serde_json::json!({ "phase": "migrating" }));
-        }
-        let _ = worker_app.emit("import:progress", serde_json::json!({ "phase": "storing" }));
-        let session_id = worker_app
-            .state::<AppState>()
-            .storage
-            .lock()
-            .map_err(|_| CommandError::operation_failed())?
-            .import_export_bundle(&bundle)
-            .map_err(|_| CommandError::operation_failed())?;
-        let _ = worker_app.emit(
-            "session:changed",
-            serde_json::json!({ "session_id": session_id, "status": "imported" }),
-        );
-        Ok(ImportResultDto {
-            session_id,
-            schema_version: bundle.schema_version,
-            migrated,
-            warnings: Vec::new(),
+            let _ = worker_app.emit("import:progress", serde_json::json!({ "phase": "storing" }));
+            let session_id = worker_app
+                .state::<AppState>()
+                .storage
+                .lock()
+                .map_err(|_| CommandError::operation_failed())?
+                .import_export_bundle(&bundle)
+                .map_err(|error| {
+                    crate::log_warn!(
+                        component: "storage",
+                        "IMPORT_STORE_FAILED",
+                        format!("the imported session could not be stored: {error}")
+                    );
+                    CommandError::operation_failed()
+                })?;
+            let _ = worker_app.emit(
+                "session:changed",
+                serde_json::json!({ "session_id": session_id, "status": "imported" }),
+            );
+            Ok(ImportResultDto {
+                session_id,
+                schema_version: bundle.schema_version,
+                migrated,
+                warnings: Vec::new(),
+            })
         })
-    })
-    .await
-    .map_err(|_| CommandError::operation_failed())?
+        .await
+        .map_err(|_| CommandError::operation_failed())
+        .and_then(|result| result);
+    match &outcome {
+        Ok(result) => crate::log_info!(
+            session: &result.session_id,
+            "IMPORT_COMPLETED",
+            "session imported",
+            version = result.schema_version,
+            action = if result.migrated { "migrated" } else { "current" }
+        ),
+        // Code and field path only: never the content of the rejected file (XVII).
+        Err(error) => crate::log_warn!("IMPORT_REJECTED", "import failed", reason = error.code),
+    }
+    outcome
 }
 
 #[tauri::command]
@@ -1595,38 +1824,61 @@ pub fn log_frontend(
             });
         }
     }
-    let detailed = logging.is_detailed();
     let requested = events.len();
     let accepted = limiter.take(requested, Instant::now());
     for event in events.into_iter().take(accepted) {
-        if matches!(event.level.as_str(), "trace" | "debug" | "info") && !detailed {
+        // The same effective level as the backend's own events (`debug` in development, `info`
+        // in production, raised by «Registro detallado»), not just the detailed switch.
+        if !crate::logging::LogLevel::parse(&event.level)
+            .is_some_and(|level| logging.enabled(level))
+        {
             continue;
         }
         match event.level.as_str() {
-            "trace" => {
-                tracing::event!(target: "ui", tracing::Level::TRACE, component = "ui", target = %event.target, code = %event.code, msg = %event.msg, fields = ?event.fields)
-            }
-            "debug" => {
-                tracing::event!(target: "ui", tracing::Level::DEBUG, component = "ui", target = %event.target, code = %event.code, msg = %event.msg, fields = ?event.fields)
-            }
-            "info" => {
-                tracing::event!(target: "ui", tracing::Level::INFO, component = "ui", target = %event.target, code = %event.code, msg = %event.msg, fields = ?event.fields)
-            }
-            "warn" => {
-                tracing::event!(target: "ui", tracing::Level::WARN, component = "ui", target = %event.target, code = %event.code, msg = %event.msg, fields = ?event.fields)
-            }
-            "error" => {
-                tracing::event!(target: "ui", tracing::Level::ERROR, component = "ui", target = %event.target, code = %event.code, msg = %event.msg, fields = ?event.fields)
-            }
+            "trace" => crate::log_trace!(
+                component: "ui",
+                &event.code,
+                &event.msg,
+                target = %event.target,
+                fields = ?event.fields
+            ),
+            "debug" => crate::log_debug!(
+                component: "ui",
+                &event.code,
+                &event.msg,
+                target = %event.target,
+                fields = ?event.fields
+            ),
+            "info" => crate::log_info!(
+                component: "ui",
+                &event.code,
+                &event.msg,
+                target = %event.target,
+                fields = ?event.fields
+            ),
+            "warn" => crate::log_warn!(
+                component: "ui",
+                &event.code,
+                &event.msg,
+                target = %event.target,
+                fields = ?event.fields
+            ),
+            "error" => crate::log_error!(
+                component: "ui",
+                &event.code,
+                &event.msg,
+                target = %event.target,
+                fields = ?event.fields
+            ),
             _ => {}
         }
     }
     if accepted < requested {
-        tracing::warn!(
-            component = "ui",
-            code = "FRONTEND_LOG_RATE_LIMIT",
-            msg = "frontend log events were rate limited",
-            discarded = requested.saturating_sub(accepted)
+        crate::log_warn!(
+            component: "ui",
+            "FRONTEND_LOG_RATE_LIMIT",
+            "frontend log events were rate limited",
+            dropped = requested.saturating_sub(accepted) as u64
         );
     }
     Ok(())
@@ -1978,27 +2230,111 @@ pub fn get_live_snapshot(
     })
 }
 
+/// Rebuilds the running collector in place, mirroring `lib.rs`'s own startup sequence, so that
+/// enabling or disabling advanced access takes effect immediately instead of only on the next
+/// app launch. `CollectorHandle`'s Mutex is the only place a runtime is kept — `set_tray_paused`
+/// and `sampling_control::apply` always re-fetch it fresh — so swapping its contents here cannot
+/// desync any other subsystem.
+fn restart_collector(app: &AppHandle) -> Result<(), CommandError> {
+    let advanced_access_enabled = app
+        .state::<AppState>()
+        .storage
+        .lock()
+        .ok()
+        .and_then(|storage| storage.advanced_access_enabled().ok())
+        .unwrap_or(true);
+    let rules = crate::diagnostics::Ruleset::v1().map_err(|_| CommandError::operation_failed())?;
+    let config = crate::telemetry::runtime::RuntimeConfig::from_ruleset(&rules)
+        .ok_or_else(CommandError::operation_failed)?;
+    let live = app.state::<LiveHandle>().0.clone();
+    let observer = Arc::new(TauriObserver { app: app.clone() });
+    let launcher = crate::telemetry::launch::collector_launcher(advanced_access_enabled);
+    let runtime_state = app.state::<crate::CollectorHandle>();
+    let mut guard = runtime_state.0.lock().map_err(|_| CommandError::operation_failed())?;
+    let was_paused = guard.is_paused();
+    // The old collector stops before the new one starts: starting first left two collectors (and
+    // two elevated launches) running side by side until the assignment dropped the old one.
+    guard.stop();
+    let new_runtime = match crate::telemetry::runtime::CollectorRuntime::start(
+        launcher, live, observer, config,
+    ) {
+        Ok(runtime) => runtime,
+        Err(error) => {
+            crate::log_error!(
+                "COLLECTOR_RESTART_FAILED",
+                format!("the collector could not be restarted: {error}")
+            );
+            return Err(CommandError::operation_failed());
+        }
+    };
+    if was_paused {
+        new_runtime.set_paused(true);
+    }
+    *guard = new_runtime;
+    drop(guard);
+    crate::log_info!(
+        "COLLECTOR_RESTARTED",
+        "collector restarted after an advanced access change",
+        enabled = advanced_access_enabled
+    );
+    crate::sampling_control::apply(app);
+    Ok(())
+}
+
+/// Maps a failed step of the advanced access installation to the command error, logging which
+/// step failed and why — the cause used to be dropped by `map_err(|_| …)` at every step.
+fn access_step_failed<E: std::fmt::Debug>(step: &'static str) -> impl FnOnce(E) -> CommandError {
+    move |error| {
+        crate::log_warn!(
+            "ACCESS_INSTALL_FAILED",
+            format!("advanced access: step '{step}' failed: {error:?}"),
+            reason = step
+        );
+        CommandError::operation_failed()
+    }
+}
+
 #[tauri::command]
 pub fn request_low_level_access(
     app: AppHandle,
     state: State<'_, AppState>,
     request: AccessRequest,
 ) -> Result<AccessRequestResult, CommandError> {
-    let manifest = access::manifest().map_err(|_| CommandError::operation_failed())?;
+    crate::log_info!(
+        "ACCESS_INSTALL_REQUESTED",
+        "advanced access install or repair requested",
+        action = format!("{:?}", request.action)
+    );
+    let manifest = access::manifest().map_err(access_step_failed("manifest"))?;
     let installation = access::detect_installation(&manifest.minimum_version)
-        .map_err(|_| CommandError::operation_failed())?;
+        .map_err(access_step_failed("detect_installation"))?;
     if !access::action_is_compatible(request.action, &installation) {
+        crate::log_warn!(
+            "ACCESS_INSTALL_FAILED",
+            "advanced access: the requested action does not match the installed driver",
+            reason = "not_installable"
+        );
         return Err(CommandError::access_not_installable());
     }
-    let resource_dir = app.path().resource_dir().map_err(|_| CommandError::operation_failed())?;
+    let resource_dir = app.path().resource_dir().map_err(access_step_failed("resource_dir"))?;
     let installer = access::installer_path(&resource_dir, &manifest);
     access::verify_installer(&installer, &manifest)
-        .map_err(|_| CommandError::operation_failed())?;
-    let launcher = std::env::current_exe().map_err(|_| CommandError::operation_failed())?;
+        .map_err(access_step_failed("verify_installer"))?;
+    let launcher = std::env::current_exe().map_err(access_step_failed("current_exe"))?;
     access::launch_installer_and_register_task(&installer, &launcher, request.action)
-        .map_err(|_| CommandError::operation_failed())?;
-    let guard = state.storage.lock().map_err(|_| CommandError::operation_failed())?;
-    guard.set_advanced_access_enabled(true).map_err(|_| CommandError::operation_failed())?;
+        .map_err(access_step_failed("launch_installer_and_register_task"))?;
+    {
+        let guard = state.storage.lock().map_err(|_| CommandError::operation_failed())?;
+        guard.set_advanced_access_enabled(true).map_err(access_step_failed("store_enabled"))?;
+    }
+    crate::log_info!(
+        "ACCESS_INSTALL_COMPLETED",
+        "advanced access installed and its scheduled task registered"
+    );
+    // The scheduled task now exists, but the collector already running for this session was
+    // launched before it did — restart it so "Reparar acceso avanzado" is reflected right away
+    // instead of only after the person closes and reopens the app.
+    restart_collector(&app)?;
     Ok(AccessRequestResult {
         state: "install_requested",
         action: request.action,
@@ -2008,6 +2344,7 @@ pub fn request_low_level_access(
 
 #[tauri::command]
 pub fn disable_advanced_access(
+    app: AppHandle,
     state: State<'_, AppState>,
     live: State<'_, LiveHandle>,
 ) -> Result<CoverageMatrixDto, CommandError> {
@@ -2016,6 +2353,8 @@ pub fn disable_advanced_access(
         let guard = state.storage.lock().map_err(|_| CommandError::operation_failed())?;
         guard.set_advanced_access_enabled(false).map_err(|_| CommandError::operation_failed())?;
     }
+    crate::log_info!("ACCESS_DISABLED", "advanced access disabled by the person");
+    restart_collector(&app)?;
     Ok(live.read(|live| live::coverage_dto(live, false, || None)))
 }
 
@@ -2363,11 +2702,125 @@ fn freshness(value: Freshness) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::{
-        ConfirmationRequest, FrontendLogLimiter, build_reevaluated_report, technical_summary_text,
-        validate_confirmation,
+        ConfirmationRequest, FrontendLogLimiter, GuidedController, GuidedPhase, GuidedStopReason,
+        access_step_failed, build_reevaluated_report, effective_analysis_window,
+        log_guided_phase_change, log_guided_stop, technical_summary_text, validate_confirmation,
     };
+
+    /// XVII diagnosis scenario: a failed advanced access install names the step and the cause,
+    /// which `map_err(|_| …)` used to drop at every step.
+    #[test]
+    fn a_failed_access_install_says_which_step_failed_and_why() {
+        let _session = crate::logging::session_test_lock();
+        let events = crate::logging::capture_events(|| {
+            let _ = access_step_failed("verify_installer")(std::io::Error::other(
+                "installer digest does not match the manifest",
+            ));
+        });
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].code, "ACCESS_INSTALL_FAILED");
+        assert_eq!(events[0].fields["reason"], serde_json::json!("verify_installer"));
+        assert!(events[0].msg.contains("installer digest does not match the manifest"));
+    }
+
+    /// XVII diagnosis scenario: every automatic stop of a guided test, and every phase it went
+    /// through, can be told apart in the log.
+    #[test]
+    fn guided_stops_and_phase_changes_are_readable_from_the_log() {
+        let _session = crate::logging::session_test_lock();
+        let reasons = [
+            GuidedStopReason::ParentMissing,
+            GuidedStopReason::CriticalSensorLost,
+            GuidedStopReason::Battery,
+            GuidedStopReason::Suspended,
+            GuidedStopReason::ThermalSafety,
+        ];
+        let events = crate::logging::capture_events(|| {
+            for reason in reasons {
+                log_guided_stop(reason);
+            }
+            log_guided_phase_change(GuidedPhase::Rest, GuidedPhase::Warming);
+            log_guided_phase_change(GuidedPhase::Warming, GuidedPhase::Warming);
+        });
+        let stops: Vec<&serde_json::Value> = events
+            .iter()
+            .filter(|event| event.code == "GUIDED_STOP_REQUESTED")
+            .map(|event| &event.fields["reason"])
+            .collect();
+        let expected: Vec<serde_json::Value> =
+            reasons.iter().map(|reason| serde_json::json!(reason.key())).collect();
+        assert_eq!(stops, expected.iter().collect::<Vec<_>>());
+        let changes: Vec<_> =
+            events.iter().filter(|event| event.code == "GUIDED_PHASE_CHANGED").collect();
+        assert_eq!(changes.len(), 1, "an unchanged phase is not logged");
+        assert_eq!(changes[0].fields["from"], serde_json::json!("rest"));
+        assert_eq!(changes[0].fields["to"], serde_json::json!("warming"));
+        assert!(events.iter().all(|event| event.component == "guided"));
+    }
     use crate::storage::{Storage, StoredSampleValue};
+    use std::sync::Arc;
+    use std::sync::atomic::Ordering;
     use std::time::{Duration, Instant};
+
+    /// T186: the collector asks this while it holds the live state, and the guided loop reads the
+    /// live state while it holds `machine`. If answering required `machine`, the two waited on
+    /// each other for ever — the test froze mid-phase and every guided command after it hung.
+    #[test]
+    fn asking_whether_a_guided_test_runs_never_waits_for_the_machine_lock() {
+        let controller = Arc::new(GuidedController::default());
+        controller.in_progress.store(true, Ordering::Release);
+        let held = controller.machine.lock().unwrap_or_else(|error| panic!("{error}"));
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let asking = Arc::clone(&controller);
+        std::thread::spawn(move || {
+            let _ = sender.send(asking.in_progress());
+        });
+        let answer = receiver.recv_timeout(Duration::from_secs(2));
+        drop(held);
+        assert_eq!(answer, Ok(true), "in_progress() blocked while `machine` was held");
+    }
+
+    #[test]
+    fn a_requested_window_that_overlaps_the_session_is_kept_exactly_as_asked() {
+        // A deliberate zoom into a sub-range the frontend already knows has real points.
+        assert_eq!(
+            effective_analysis_window((10_000, 20_000), Some((0, 60_000))),
+            (10_000, 20_000)
+        );
+    }
+
+    #[test]
+    fn a_requested_window_entirely_before_the_session_falls_back_to_the_sessions_own_range() {
+        // The exact bug: the frontend's first guess ("the first 24h") against a collector whose
+        // own monotonic clock had already run for far longer before this session started.
+        assert_eq!(
+            effective_analysis_window((0, 86_400_000), Some((200_000_000, 200_060_000))),
+            (200_000_000, 200_060_000)
+        );
+    }
+
+    #[test]
+    fn a_requested_window_entirely_after_the_session_also_falls_back() {
+        assert_eq!(
+            effective_analysis_window((1_000_000, 2_000_000), Some((0, 60_000))),
+            (0, 60_000)
+        );
+    }
+
+    #[test]
+    fn a_single_frame_session_outside_the_request_still_yields_a_non_empty_window() {
+        // `end_ms <= start_ms` would break the aggregation math downstream.
+        assert_eq!(
+            effective_analysis_window((0, 60_000), Some((200_000_000, 200_000_000))),
+            (200_000_000, 200_000_001)
+        );
+    }
+
+    #[test]
+    fn no_recorded_frame_at_all_keeps_the_request_as_is() {
+        // Nothing to fall back to; the caller ends up with an honest empty result either way.
+        assert_eq!(effective_analysis_window((0, 86_400_000), None), (0, 86_400_000));
+    }
 
     #[test]
     fn technical_summary_contains_metrics_but_never_raw_log_content() {

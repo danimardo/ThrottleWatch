@@ -364,20 +364,21 @@ fn write_actions(app: &AppHandle, cpu: &sink::CpuIdentity, actions: &[RecorderAc
         // E2E-13: `TW_DEV_STORAGE_FAIL_WRITES` makes the write fail as if the disk were full,
         // without touching storage. Always false outside debug/`e2e` builds.
         if crate::dev_faults::storage_write_should_fail() {
-            tracing::warn!(
-                component = "storage",
-                code = "STORAGE_WRITE_FAULT_INJECTED",
-                msg = "TW_DEV_STORAGE_FAIL_WRITES forced this write to fail"
+            crate::log_warn!(
+                component: "storage",
+                "STORAGE_WRITE_FAULT_INJECTED",
+                "TW_DEV_STORAGE_FAIL_WRITES forced this write to fail"
             );
             return false;
         }
         match sink::execute(&storage, cpu, std::slice::from_ref(action)) {
             Ok(()) => true,
             Err(error) => {
-                tracing::warn!(
-                    component = "storage",
-                    msg = "session recording failed",
-                    error = %error
+                // Had no code, so the layer used to drop it: this failure never reached the file.
+                crate::log_warn!(
+                    component: "storage",
+                    "SESSION_RECORDING_FAILED",
+                    format!("session recording failed: {error}")
                 );
                 false
             }
@@ -387,18 +388,18 @@ fn write_actions(app: &AppHandle, cpu: &sink::CpuIdentity, actions: &[RecorderAc
     drop(storage);
     match transition {
         Transition::EnteredDegraded => {
-            tracing::warn!(
-                component = "storage",
-                code = "STORAGE_WRITE_DEGRADED",
-                msg = "storage stopped accepting writes; sampling continues in memory and retries"
+            crate::log_warn!(
+                component: "storage",
+                "STORAGE_WRITE_DEGRADED",
+                "storage stopped accepting writes; sampling continues in memory and retries"
             );
             let _ = app.emit("storage:degraded", ());
         }
         Transition::Recovered => {
-            tracing::info!(
-                component = "storage",
-                code = "STORAGE_WRITE_RECOVERED",
-                msg = "storage accepts writes again; the in-memory backlog is drained"
+            crate::log_info!(
+                component: "storage",
+                "STORAGE_WRITE_RECOVERED",
+                "storage accepts writes again; the in-memory backlog is drained"
             );
             let _ = app.emit("storage:recovered", ());
         }
@@ -510,6 +511,27 @@ impl LiveObserver for TauriObserver {
             crate::tray::refresh(&self.app, Some(live), false);
         }
         if change == Change::Collector {
+            let state = live.collector().as_str();
+            let reason = live.message_key().unwrap_or("none");
+            if matches!(live.collector(), CollectorState::Failed | CollectorState::Stopped) {
+                crate::log_warn!(
+                    component: "core",
+                    "COLLECTOR_STATE_CHANGED",
+                    "the collector stopped delivering samples",
+                    state = state,
+                    attempt = live.attempt(),
+                    reason = reason
+                );
+            } else {
+                crate::log_info!(
+                    component: "core",
+                    "COLLECTOR_STATE_CHANGED",
+                    "collector state changed",
+                    state = state,
+                    attempt = live.attempt(),
+                    reason = reason
+                );
+            }
             let mut payload =
                 json!({"state": live.collector().as_str(), "attempt": live.attempt()});
             if let (Some(key), Some(object)) = (live.message_key(), payload.as_object_mut()) {
@@ -521,6 +543,13 @@ impl LiveObserver for TauriObserver {
             let _ = self.app.emit("coverage:changed", coverage_dto(live, enabled, detect_pawnio));
         }
         if let Change::Coverage { from, to, reason } = change {
+            crate::log_info!(
+                "COVERAGE_TIER_CHANGED",
+                "sensor coverage tier changed",
+                from = tier_name(from),
+                to = tier_name(to),
+                reason = reason.as_str()
+            );
             let mut payload = match serde_json::to_value(coverage_dto(live, enabled, detect_pawnio))
             {
                 Ok(value) => value,
@@ -548,14 +577,22 @@ impl LiveObserver for TauriObserver {
                     .and_then(|input| i64::try_from(input.captured_at_ms).ok())
                     .zip(started_ms)
                     .map_or(0, |(captured, started)| (captured - started).max(0));
-                let _ = storage.record_coverage_change(
-                    &session_id,
-                    at,
-                    tier_name(from),
-                    tier_name(to),
-                    reason.as_str(),
-                );
-                let _ = storage.set_session_coverage_tier(&session_id, tier_name(to));
+                if let Err(error) = storage
+                    .record_coverage_change(
+                        &session_id,
+                        at,
+                        tier_name(from),
+                        tier_name(to),
+                        reason.as_str(),
+                    )
+                    .and_then(|()| storage.set_session_coverage_tier(&session_id, tier_name(to)))
+                {
+                    crate::log_warn!(
+                        component: "storage",
+                        "COVERAGE_CHANGE_NOT_STORED",
+                        format!("the coverage change could not be stored in the session: {error}")
+                    );
+                }
             }
         }
         let locale = crate::tray::current_locale(&self.app);

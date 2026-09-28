@@ -25,6 +25,7 @@
    */
   import type { Snippet } from 'svelte';
   import { TONE_TOKENS, type Tone } from '../tokens/tokens';
+  import { devWarning } from '../lib/dev-warning';
 
   export interface CausalNode {
     id: string;
@@ -41,9 +42,10 @@
   let { nodes }: Props = $props();
 
   $effect(() => {
-    if (import.meta.env?.DEV && (nodes.length < 2 || nodes.length > 4)) {
-      console.warn(
-        `[ThrottleWatch/CausalRail] received ${nodes.length} nodes — this component expects 2 to 4. ` +
+    if (nodes.length < 2 || nodes.length > 4) {
+      devWarning(
+        'CausalRail',
+        `received ${nodes.length} nodes — this component expects 2 to 4. ` +
           'Do not pad the sequence with an invented step; if you have fewer than 2, do not render this component at all.'
       );
     }

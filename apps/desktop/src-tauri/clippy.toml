@@ -1,5 +1,11 @@
 disallowed-macros = [
   { path = "std::print", reason = "usa el envoltorio de logging" },
   { path = "std::println", reason = "usa el envoltorio de logging" },
-  { path = "std::dbg", reason = "no se permite depuración temporal" }
+  { path = "std::dbg", reason = "no se permite depuración temporal" },
+  { path = "tracing::trace", reason = "usa log_trace! del envoltorio de logging (principio XVII)" },
+  { path = "tracing::debug", reason = "usa log_debug! del envoltorio de logging (principio XVII)" },
+  { path = "tracing::info", reason = "usa log_info! del envoltorio de logging (principio XVII)" },
+  { path = "tracing::warn", reason = "usa log_warn! del envoltorio de logging (principio XVII)" },
+  { path = "tracing::error", reason = "usa log_error! del envoltorio de logging (principio XVII)" },
+  { path = "tracing::event", reason = "usa las macros log_*! del envoltorio de logging (principio XVII)" }
 ]

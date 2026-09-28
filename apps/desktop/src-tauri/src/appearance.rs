@@ -421,6 +421,13 @@ fn recompute_and_emit(app: &tauri::AppHandle, state: &GlassMonitorState, now: In
     let mut last_emitted =
         state.last_emitted.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     if *last_emitted != Some(effective) {
+        crate::log_info!(
+            "GLASS_LEVEL_CHANGED",
+            "effective glass level changed",
+            from = last_emitted.map_or("none", GlassLevel::as_str),
+            to = effective.as_str(),
+            reason = if ceiling < base { "performance_ceiling" } else { "preference_or_system" }
+        );
         *last_emitted = Some(effective);
         let _ = app.emit(GLASS_EFFECTIVE_EVENT, serde_json::json!({ "level": effective.as_str() }));
     }
@@ -437,7 +444,7 @@ pub fn spawn_glass_monitor(app: tauri::AppHandle, state: std::sync::Arc<GlassMon
     // possible (it needs two points GLASS_POLL apart) — otherwise the frontend would sit on its
     // own local placeholder for a few seconds after every launch.
     recompute_and_emit(&app, &state, Instant::now());
-    let _ = std::thread::Builder::new().name("glass-monitor".to_owned()).spawn(move || {
+    let spawned = std::thread::Builder::new().name("glass-monitor".to_owned()).spawn(move || {
         let mut previous_tick = Instant::now();
         loop {
             std::thread::sleep(GLASS_POLL);
@@ -461,6 +468,14 @@ pub fn spawn_glass_monitor(app: tauri::AppHandle, state: std::sync::Arc<GlassMon
             recompute_and_emit(&app, &state, now);
         }
     });
+    if let Err(error) = spawned {
+        crate::log_error!(
+            "GLASS_MONITOR_SPAWN_FAILED",
+            format!(
+                "the glass monitor could not start; glass will not degrade under load: {error}"
+            )
+        );
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize)]

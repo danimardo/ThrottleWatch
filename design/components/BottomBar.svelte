@@ -24,6 +24,7 @@
    * category as Select's popup). Escape closes it and returns focus.
    */
   import type { Snippet } from 'svelte';
+  import { devWarning } from '../lib/dev-warning';
 
   export interface BottomBarItem {
     id: string;
@@ -64,9 +65,10 @@
 
   $effect(() => {
     const max = menu ? 3 : 4;
-    if (import.meta.env?.DEV && items.length > max) {
-      console.warn(
-        `[ThrottleWatch/BottomBar] ${items.length} direct items passed — the compact bar shows at most ${max}${menu ? ' plus the menu' : ''}. ` +
+    if (items.length > max) {
+      devWarning(
+        'BottomBar',
+        `${items.length} direct items passed — the compact bar shows at most ${max}${menu ? ' plus the menu' : ''}. ` +
           'Move extra destinations into `menu.items` instead of crowding this bar.'
       );
     }

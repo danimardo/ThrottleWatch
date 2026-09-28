@@ -38,11 +38,17 @@ const E2E_CDP_PORT: &str = "9222";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let (base_level, level_override_rejected) =
+        logging::base_level(logging::BuildKind::current(), config::DevConfig::load().log_level);
     if std::env::args().any(|argument| argument == "--elevated-launcher") {
+        // Its own file (XVII): the launcher's typical failure is not reaching the application.
+        // Without a log directory it still runs; there is simply nowhere to write.
+        let _log = ipc::elevated::launcher_log_directory()
+            .and_then(|directory| logging::init_launcher(directory, base_level).ok());
+        // Every step and the final result are logged inside; nothing is left to report here.
         let _ = ipc::elevated::run_elevated_launcher();
         return;
     }
-    let _dev_config = config::DevConfig::load();
     tauri::Builder::default()
         // Must be the first plugin: a second launch focuses the running window instead of
         // opening another process (and another collector).
@@ -103,7 +109,7 @@ pub fn run() {
             }
             _ => {}
         })
-        .setup(|app| {
+        .setup(move |app| {
             let window_config = app.config().app.windows.first().cloned().ok_or_else(|| {
                 std::io::Error::other("tauri.conf.json must declare the main window")
             })?;
@@ -122,14 +128,16 @@ pub fn run() {
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
             std::fs::create_dir_all(&data_dir)?;
             let database = data_dir.join("throttlewatch.db");
+            // The log only opens once the preferences say whether to clear it (retention
+            // «solo esta sesión»), so what happens before is held here and written right after.
+            let mut before_log: Vec<(&'static str, &'static str)> = Vec::new();
             // E2E-13: `TW_DEV_CORRUPT_DB=1` damages the existing database on purpose so the
             // recovery below is the real one, not a simulation. No-op outside debug/`e2e`.
             if dev_faults::corrupt_database_if_requested(&database) {
-                tracing::warn!(
-                    component = "core",
-                    code = "STORAGE_CORRUPTION_FAULT_INJECTED",
-                    msg = "TW_DEV_CORRUPT_DB damaged the database before opening it"
-                );
+                before_log.push((
+                    "STORAGE_CORRUPTION_FAULT_INJECTED",
+                    "TW_DEV_CORRUPT_DB damaged the database before opening it",
+                ));
             }
             let (mut storage, recovered) = storage::Storage::open_recovering_corruption(
                 database,
@@ -141,11 +149,10 @@ pub fn run() {
                 // the new one, `throttlewatch.db.corrupt-<fecha>`), not gone — and the app starts
                 // on a fresh database instead of failing outright. The path is not logged: it is
                 // exactly where the person already knows to look, in their own data directory.
-                tracing::warn!(
-                    component = "core",
-                    code = "STORAGE_DATABASE_CORRUPT_RECOVERED",
-                    msg = "the database could not be opened and was moved aside; a new one was created"
-                );
+                before_log.push((
+                    "STORAGE_DATABASE_CORRUPT_RECOVERED",
+                    "the database could not be opened and was moved aside; a new one was created",
+                ));
             }
             app.manage(commands::CorruptBackupNotice(std::sync::Mutex::new(recovered)));
             // T181: `TW_DEV_SEED_BUNDLE` leaves a session with history without minutes of recording
@@ -153,30 +160,33 @@ pub fn run() {
             // Always logged either way: a seed that silently did not land would make a scenario pass
             // or fail for reasons that have nothing to do with what it tests. No-op outside debug/`e2e`.
             match dev_faults::import_seed_if_requested(&storage) {
-                Some(Ok(_)) => tracing::warn!(
-                    component = "core",
-                    code = "STORAGE_TEST_SEED_IMPORTED",
-                    msg = "TW_DEV_SEED_BUNDLE imported a session into the database"
-                ),
-                Some(Err(error)) => tracing::warn!(
-                    component = "core",
-                    code = error.code(),
-                    msg = "TW_DEV_SEED_BUNDLE could not be imported"
-                ),
+                Some(Ok(_)) => before_log.push((
+                    "STORAGE_TEST_SEED_IMPORTED",
+                    "TW_DEV_SEED_BUNDLE imported a session into the database",
+                )),
+                Some(Err(error)) => {
+                    before_log.push((error.code(), "TW_DEV_SEED_BUNDLE could not be imported"))
+                }
                 None => {}
             }
             let mut preferences = storage
                 .user_preferences()
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
             // FR-086: detailed logging never survives a process restart, even if its stored
-            // expiry timestamp has not elapsed yet.
-            if preferences.get("logging.detailed_until").is_some_and(|value| !value.is_null()) {
+            // expiry timestamp has not elapsed yet — except in a debug build (`cargo build`,
+            // no `--release`), which is always a development machine: restoring it here saves
+            // re-enabling it by hand on every single launch (spec.md amendment, 2026-09-28).
+            let stored_detailed_until = preferences
+                .get("logging.detailed_until")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned);
+            if !cfg!(debug_assertions) && stored_detailed_until.is_some() {
                 preferences.insert("logging.detailed_until".to_owned(), serde_json::Value::Null);
                 storage
                     .set_user_preferences(&preferences)
                     .map_err(|error| std::io::Error::other(error.to_string()))?;
             }
-            storage
+            let orphaned = storage
                 .abort_orphaned_sessions()
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
             let now = jiff::Timestamp::now().to_string();
@@ -184,21 +194,60 @@ pub fn run() {
                 .get("history.retention")
                 .and_then(serde_json::Value::as_str)
                 .unwrap_or("7d");
-            storage
+            let pruned = storage
                 .prune_sessions(retention, &now)
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
+            let capped = storage
+                .enforce_session_cap(storage::Storage::MAX_RETAINED_SESSIONS)
+                .map_err(|error| std::io::Error::other(error.to_string()))?;
+            let schema_version = storage.schema_version().unwrap_or(-1);
             if retention == "session" {
                 let _ = logging::clear_directory(data_dir.join("logs"));
             }
-            let log_guard = logging::init(data_dir.join("logs"), false)?;
+            let log_guard = logging::init(data_dir.join("logs"), base_level)?;
+            if cfg!(debug_assertions)
+                && let Some(until) = stored_detailed_until
+            {
+                log_guard.control().set_detailed_until(Some(until));
+            }
+            log_info!(
+                "APP_STARTED",
+                "ThrottleWatch started",
+                version = env!("CARGO_PKG_VERSION"),
+                build = logging::BuildKind::current().as_str()
+            );
+            log_info!(
+                "LOG_LEVEL_EFFECTIVE",
+                "effective log level at startup",
+                level = log_guard.control().effective_level().as_str(),
+                build = logging::BuildKind::current().as_str(),
+                detailed = log_guard.control().is_detailed()
+            );
+            if level_override_rejected {
+                log_warn!(
+                    "LOG_LEVEL_OVERRIDE_INVALID",
+                    "TW_DEV_LOG_LEVEL is not one of error|warn|info|debug|trace; the default applies"
+                );
+            }
+            for (code, message) in before_log {
+                log_warn!(code, message);
+            }
+            log_info!(
+                component: "storage",
+                "STORAGE_OPENED",
+                "database opened and retention applied",
+                version = schema_version,
+                count = orphaned as u64,
+                dropped = pruned + capped,
+                reason = retention
+            );
             if release_manifest::built_for_testing_only() {
                 // T112: an optimised build that trusts the development key. It can start a
                 // locally signed collector, which a real release must never do — say so, so a
                 // test installer is never mistaken for a release one.
-                tracing::warn!(
-                    component = "core",
-                    code = "BUILD_TRUSTS_DEVELOPMENT_KEY",
-                    msg = "this build trusts the development signing key and must not be distributed"
+                log_warn!(
+                    "BUILD_TRUSTS_DEVELOPMENT_KEY",
+                    "this build trusts the development signing key and must not be distributed"
                 );
             }
             let logging_control = log_guard.control();
@@ -284,6 +333,12 @@ pub fn run() {
                 .ok()
                 .and_then(|storage| storage.advanced_access_enabled().ok())
                 .unwrap_or(true);
+            log_info!(
+                "ADVANCED_ACCESS_STATE",
+                "advanced access at startup (whether elevation succeeds is logged by the launch)",
+                enabled = advanced_access_enabled,
+                elevated = telemetry::launch::should_launch_elevated(advanced_access_enabled)
+            );
             let runtime = telemetry::runtime::CollectorRuntime::start(
                 telemetry::launch::collector_launcher(advanced_access_enabled),
                 live.0,
@@ -363,6 +418,7 @@ pub fn run() {
 /// Runs on exit and, because the Windows installer ends the process without an exit event, right
 /// before an update is installed. Safe to run twice.
 pub(crate) fn shutdown_services(app: &tauri::AppHandle) {
+    log_info!("APP_SHUTTING_DOWN", "stopping the collector and closing the session in progress");
     let Some(collector) = app.try_state::<CollectorHandle>() else { return };
     let Ok(mut runtime) = collector.0.lock() else { return };
     runtime.stop();
@@ -378,11 +434,22 @@ pub(crate) fn shutdown_services(app: &tauri::AppHandle) {
             .get("history.retention")
             .and_then(serde_json::Value::as_str)
             .unwrap_or("7d");
+        if let Err(error) = storage
+            .prune_sessions(retention, &jiff::Timestamp::now().to_string())
+            .and_then(|_| storage.enforce_session_cap(storage::Storage::MAX_RETAINED_SESSIONS))
+        {
+            log_warn!(
+                component: "storage",
+                "STORAGE_RETENTION_FAILED",
+                format!("retention could not be applied on exit: {error}")
+            );
+        }
+        // Last: with retention «solo esta sesión» this removes the very file the lines above went
+        // to, so nothing is logged after it.
         if retention == "session"
             && let Ok(logs) = dev_faults::resolve_data_dir(app).map(|path| path.join("logs"))
         {
             let _ = logging::clear_directory(logs);
         }
-        let _ = storage.prune_sessions(retention, &jiff::Timestamp::now().to_string());
     }
 }

@@ -120,11 +120,7 @@ impl NotificationPort for TauriNotifier<'_> {
 pub fn notify(app: &AppHandle, title: &str, body: &str) {
     let mut notifier = TauriNotifier(app);
     if let Err(error) = notifier.notify(title, body) {
-        tracing::warn!(
-            component = "core",
-            code = error.code,
-            msg = "a notification could not be shown"
-        );
+        crate::log_warn!(error.code, "a notification could not be shown");
     }
 }
 
@@ -134,11 +130,7 @@ fn raise(app: &AppHandle, locale: Locale, events: &[AlertEvent]) {
     }
     let mut notifier = TauriNotifier(app);
     for error in dispatch(locale, events, &mut notifier) {
-        tracing::warn!(
-            component = "core",
-            code = error.code,
-            msg = "a notification could not be shown"
-        );
+        crate::log_warn!(error.code, "a notification could not be shown");
     }
 }
 

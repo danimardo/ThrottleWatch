@@ -539,11 +539,16 @@ impl ProcessLink {
                 for line in BufReader::new(stderr).lines().map_while(Result::ok) {
                     match crate::logging::validate_collector_stderr(&line) {
                         Ok(event) => match event.level.as_str() {
-                            "error" => tracing::error!(component = "agent", code = %event.code, msg = %event.msg),
-                            "warn" => tracing::warn!(component = "agent", code = %event.code, msg = %event.msg),
-                            _ => tracing::debug!(component = "agent", code = %event.code, msg = %event.msg),
+                            "error" => {
+                                crate::log_error!(component: "agent", &event.code, &event.msg)
+                            }
+                            "warn" => crate::log_warn!(component: "agent", &event.code, &event.msg),
+                            _ => crate::log_debug!(component: "agent", &event.code, &event.msg),
                         },
-                        Err(_) => tracing::warn!(component = "core", code = "COLLECTOR_STDERR_INVALID", msg = "collector stderr is outside the contract"),
+                        Err(_) => crate::log_warn!(
+                            "COLLECTOR_STDERR_INVALID",
+                            "collector stderr is outside the contract"
+                        ),
                     }
                 }
             })?;
@@ -628,15 +633,13 @@ impl PipeLink {
 fn log_elevated_stderr(line: &str) {
     match crate::logging::validate_collector_stderr(line) {
         Ok(event) => match event.level.as_str() {
-            "error" => tracing::error!(component = "agent", code = %event.code, msg = %event.msg),
-            "warn" => tracing::warn!(component = "agent", code = %event.code, msg = %event.msg),
-            _ => tracing::debug!(component = "agent", code = %event.code, msg = %event.msg),
+            "error" => crate::log_error!(component: "agent", &event.code, &event.msg),
+            "warn" => crate::log_warn!(component: "agent", &event.code, &event.msg),
+            _ => crate::log_debug!(component: "agent", &event.code, &event.msg),
         },
-        Err(_) => tracing::warn!(
-            component = "core",
-            code = "COLLECTOR_STDERR_INVALID",
-            msg = "collector stderr is outside the contract"
-        ),
+        Err(_) => {
+            crate::log_warn!("COLLECTOR_STDERR_INVALID", "collector stderr is outside the contract")
+        }
     }
 }
 

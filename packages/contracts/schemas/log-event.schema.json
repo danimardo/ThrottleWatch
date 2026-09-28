@@ -8,7 +8,7 @@
   "properties": {
     "ts": { "type": "string", "format": "date-time" },
     "level": { "enum": ["trace", "debug", "info", "warn", "error"] },
-    "component": { "enum": ["ui", "core", "agent"] },
+    "component": { "enum": ["ui", "core", "agent", "guided", "storage", "launcher"] },
     "target": { "type": "string", "minLength": 1, "maxLength": 128 },
     "code": { "type": "string", "pattern": "^[A-Z0-9_]+$" },
     "msg": { "type": "string", "minLength": 1, "maxLength": 256 },

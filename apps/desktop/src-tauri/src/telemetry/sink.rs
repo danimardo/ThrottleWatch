@@ -64,6 +64,15 @@ pub fn execute(
                     &started_at,
                 )?;
                 storage.create_session(session_id, &cpu.id, split_reason, &started_at)?;
+                // XVII: every event from here on (collector, storage, alerts) carries this session.
+                crate::logging::set_current_session(Some(session_id.clone()));
+                crate::log_info!(
+                    component: "storage",
+                    session: session_id,
+                    "SESSION_STARTED",
+                    "passive monitoring session started",
+                    reason = *split_reason
+                );
             }
             RecorderAction::Frame { session_id, sequence, at_ms, duration_ms, values } => {
                 storage.insert_sample(session_id, *sequence, *at_ms, *duration_ms, values)?;
@@ -88,6 +97,20 @@ pub fn execute(
                     None,
                 )?;
                 storage.freeze_report(session_id, verdict.as_ref())?;
+                crate::log_info!(
+                    component: "storage",
+                    session: session_id,
+                    "SESSION_ENDED",
+                    "passive monitoring session closed and its report frozen",
+                    duration_ms = *duration_ms,
+                    tier = format!("{tier:?}"),
+                    classification = verdict
+                        .as_ref()
+                        .map_or_else(|| "none".to_owned(), |verdict| format!("{:?}", verdict.classification))
+                );
+                if crate::logging::current_session().as_deref() == Some(session_id.as_str()) {
+                    crate::logging::set_current_session(None);
+                }
             }
         }
     }
@@ -178,6 +201,49 @@ mod tests {
         let points = storage.analysis_points(&session.session_id, 0, 200_000)?;
         assert_eq!(points.len(), 150, "frames are placed relative to the session start");
         assert_eq!(points[0].monotonic_ms, 0);
+        Ok(())
+    }
+
+    /// XVII diagnosis scenario: with only the log, the passive session's start, its end (duration,
+    /// tier, what the engine concluded) and which events belonged to it are all there.
+    #[test]
+    fn a_passive_session_is_readable_from_the_log_alone() -> rusqlite::Result<()> {
+        let _session = crate::logging::session_test_lock();
+        crate::logging::set_current_session(None);
+        let storage = Storage::in_memory()?;
+        let rules = Ruleset::v1().unwrap_or_else(|error| panic!("ruleset: {error}"));
+        let mut recorder = SessionRecorder::new(rules)
+            .unwrap_or_else(|| panic!("ruleset carries the session block"));
+        let normal = verdict(Classification::Normal, vec!["stable"]);
+        let start = 1_790_000_000_000_u64;
+        let mut actions = Vec::new();
+        for second in 0..70_u64 {
+            actions.extend(recorder.observe(RecorderInput {
+                epoch_ms: start + second * 1_000,
+                values: vec![value("cpu.package.temp", 55.0)],
+                verdict: Some(&normal),
+                tier: CoverageTier::B,
+                quality: SampleQuality::Complete,
+                resumed: false,
+            }));
+        }
+        actions.extend(recorder.close(start + 70_000));
+        let mut result = Ok(());
+        let events = crate::logging::capture_events(|| {
+            result = execute(&storage, &cpu_identity(None), &actions);
+        });
+        result?;
+        let session_id = storage.list_sessions(1)?[0].session_id.clone();
+        let codes: Vec<&str> = events.iter().map(|event| event.code.as_str()).collect();
+        assert_eq!(codes, ["SESSION_STARTED", "SESSION_ENDED"]);
+        assert!(
+            events.iter().all(|event| event.session_id.as_deref() == Some(session_id.as_str()))
+        );
+        let ended = &events[1];
+        assert_eq!(ended.fields["duration_ms"], serde_json::json!(69_000));
+        assert_eq!(ended.fields["tier"], serde_json::json!("B"));
+        assert_eq!(ended.fields["classification"], serde_json::json!("Normal"));
+        assert_eq!(crate::logging::current_session(), None, "a closed session stops correlating");
         Ok(())
     }
 

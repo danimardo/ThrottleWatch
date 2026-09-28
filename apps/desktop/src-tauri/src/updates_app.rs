@@ -234,8 +234,12 @@ fn install_blocker(app: &AppHandle) -> Option<Blocker> {
 fn persist(app: &AppHandle, service: &UpdateService) {
     if let Some(state) = app.try_state::<AppState>()
         && let Ok(storage) = state.storage.lock()
+        && let Err(error) = storage.set_updater_state(service.machine())
     {
-        let _ = storage.set_updater_state(service.machine());
+        crate::log_warn!(
+            "UPDATE_STATE_NOT_STORED",
+            format!("the updater state could not be stored: {error}")
+        );
     }
 }
 
@@ -251,6 +255,12 @@ fn publish(app: &AppHandle, handle: &UpdateHandle, dto: &UpdateStateDto) {
 }
 
 fn announce_failure(app: &AppHandle, failure: UpdateFailure, recoverable: bool) {
+    crate::log_warn!(
+        "UPDATE_FAILED",
+        "an update step failed",
+        reason = failure.code(),
+        state = if recoverable { "recoverable" } else { "not_recoverable" }
+    );
     let _ = app.emit(
         "update:error",
         serde_json::json!({
@@ -275,11 +285,28 @@ fn command_error(failure: UpdateFailure) -> CommandError {
 /// One check, off the interface's thread. `automatic` checks also raise the native notification.
 fn run_check(app: &AppHandle, manual: bool) {
     let Some(handle) = app.try_state::<UpdateHandle>() else { return };
-    let Ok(mut service) = handle.service.try_lock() else { return };
+    let Ok(mut service) = handle.service.try_lock() else {
+        crate::log_debug!("UPDATE_BUSY", "an update check was skipped: another step is running");
+        return;
+    };
+    crate::log_info!(
+        "UPDATE_CHECK_STARTED",
+        "checking for an update",
+        action = if manual { "manual" } else { "scheduled" }
+    );
     let now = jiff::Timestamp::now().to_string();
     let result = service.check(&now, manual, &mut |dto| publish(app, &handle, dto));
     persist(app, &service);
     drop(service);
+    match &result {
+        Ok(Some(release)) => crate::log_info!(
+            "UPDATE_CHECK_RESULT",
+            "an update is available",
+            version = release.version.as_str()
+        ),
+        Ok(None) => crate::log_info!("UPDATE_CHECK_RESULT", "no update is available"),
+        Err(_) => {}
+    }
     match result {
         Ok(Some(release)) => {
             let _ = app.emit(
@@ -314,10 +341,20 @@ fn notify_available(app: &AppHandle, version: &str) {
 
 fn run_download(app: &AppHandle) {
     let Some(handle) = app.try_state::<UpdateHandle>() else { return };
-    let Ok(mut service) = handle.service.try_lock() else { return };
+    let Ok(mut service) = handle.service.try_lock() else {
+        crate::log_debug!("UPDATE_BUSY", "a download was skipped: another step is running");
+        return;
+    };
+    crate::log_info!("UPDATE_DOWNLOAD_STARTED", "downloading the update");
     let result = service.download(&mut |dto| publish(app, &handle, dto));
     persist(app, &service);
     drop(service);
+    if result.is_ok() {
+        crate::log_info!(
+            "UPDATE_DOWNLOAD_VERIFIED",
+            "update downloaded and its signature verified"
+        );
+    }
     if let Err(failure) = result {
         announce_failure(
             app,
@@ -329,8 +366,16 @@ fn run_download(app: &AppHandle) {
 
 fn run_install(app: &AppHandle) {
     let Some(handle) = app.try_state::<UpdateHandle>() else { return };
-    let Ok(mut service) = handle.service.try_lock() else { return };
+    let Ok(mut service) = handle.service.try_lock() else {
+        crate::log_debug!("UPDATE_BUSY", "an install was skipped: another step is running");
+        return;
+    };
     let blocker = install_blocker(app);
+    crate::log_info!(
+        "UPDATE_INSTALL_STARTED",
+        "installing the update",
+        state = if blocker.is_some() { "blocked" } else { "proceeding" }
+    );
     let result = service.install(blocker, &mut |dto| publish(app, &handle, dto));
     persist(app, &service);
     drop(service);

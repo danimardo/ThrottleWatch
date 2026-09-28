@@ -256,13 +256,71 @@ pub fn start_registered_sidecar(
     }
 }
 
+/// Tauri's `app_data_dir` for this identifier; the launcher runs before (and without) Tauri, so it
+/// derives the same folder itself. A test keeps it equal to `tauri.conf.json`.
+const APP_IDENTIFIER: &str = "com.throttlewatch.desktop";
+
+/// Where the launcher writes `throttlewatch-launcher.log`: the application's own `logs\`, so one
+/// «Abrir carpeta de registros» shows both. `APPDATA` only locates the OS folder Tauri itself uses
+/// (the scheduled task runs as the same user); it configures nothing.
+pub fn launcher_log_directory() -> Option<PathBuf> {
+    crate::dev_faults::data_dir_override()
+        .or_else(|| {
+            std::env::var_os("APPDATA").map(|folder| PathBuf::from(folder).join(APP_IDENTIFIER))
+        })
+        .map(|data_dir| data_dir.join("logs"))
+}
+
 /// Entry point used by the scheduled task. It accepts one authenticated
 /// request, verifies that the sidecar stays inside the installed directory,
 /// verifies its digest, and kills it when the control pipe closes.
 pub fn run_elevated_launcher() -> io::Result<()> {
     #[cfg(windows)]
     {
-        let (to_launcher, from_launcher) = open_session_pipes()?;
+        launcher_main(open_session_pipes)
+    }
+
+    #[cfg(not(windows))]
+    {
+        Err(io::Error::new(io::ErrorKind::Unsupported, "elevated launcher is Windows-only"))
+    }
+}
+
+/// Every step is logged (T-LOG-005): this process has no other way to say why the application
+/// ended up with an unelevated collector.
+#[cfg(windows)]
+fn launcher_main(
+    open_pipes: impl FnOnce() -> io::Result<(std::fs::File, std::fs::File)>,
+) -> io::Result<()> {
+    crate::log_info!("LAUNCHER_STARTED", "elevated launcher started");
+    let result = launcher_steps(open_pipes);
+    match &result {
+        Ok(()) => crate::log_info!("LAUNCHER_EXITED", "elevated launcher exited normally"),
+        Err(error) => {
+            crate::log_error!("LAUNCHER_EXITED", format!("elevated launcher stopped: {error}"))
+        }
+    }
+    result
+}
+
+#[cfg(windows)]
+fn launcher_steps(
+    open_pipes: impl FnOnce() -> io::Result<(std::fs::File, std::fs::File)>,
+) -> io::Result<()> {
+    {
+        let (to_launcher, from_launcher) = match open_pipes() {
+            Ok(pipes) => {
+                crate::log_info!("LAUNCHER_PIPES_OPENED", "connected to the application's pipes");
+                pipes
+            }
+            Err(error) => {
+                crate::log_error!(
+                    "LAUNCHER_PIPE_CONNECT_FAILED",
+                    format!("could not connect to the application's pipes: {error}")
+                );
+                return Err(error);
+            }
+        };
         let mut reader = BufReader::new(to_launcher);
         let mut hello_line = String::new();
         reader.read_line(&mut hello_line)?;
@@ -304,7 +362,22 @@ pub fn run_elevated_launcher() -> io::Result<()> {
                 "sidecar is outside the installed directory",
             ));
         }
-        let signed_sha256 = verify_signed_sidecar(sidecar_dir, &payload.sidecar_path)?;
+        let signed_sha256 = match verify_signed_sidecar(sidecar_dir, &payload.sidecar_path) {
+            Ok(digest) => {
+                crate::log_info!(
+                    "LAUNCHER_SIDECAR_VERIFIED",
+                    "the sidecar matches the signed release manifest"
+                );
+                digest
+            }
+            Err(error) => {
+                crate::log_error!(
+                    "LAUNCHER_SIDECAR_VERIFY_FAILED",
+                    format!("the sidecar could not be verified: {error}")
+                );
+                return Err(error);
+            }
+        };
         let _validated = validate_launch_request(
             request_line.as_bytes(),
             nonce,
@@ -314,13 +387,20 @@ pub fn run_elevated_launcher() -> io::Result<()> {
         )
         .map_err(|error| io::Error::new(io::ErrorKind::PermissionDenied, error))?;
         ensure_pawnio_service_running()?;
-        let child = super::supervisor::spawn_verified(&payload.sidecar_path, &signed_sha256)?;
+        let child = match super::supervisor::spawn_verified(&payload.sidecar_path, &signed_sha256) {
+            Ok(child) => {
+                crate::log_info!("LAUNCHER_CHILD_SPAWNED", "the elevated sidecar is running");
+                child
+            }
+            Err(error) => {
+                crate::log_error!(
+                    "LAUNCHER_CHILD_SPAWN_FAILED",
+                    format!("the sidecar could not be started: {error}")
+                );
+                return Err(error);
+            }
+        };
         proxy_child_over_pipe(child, reader, from_launcher)
-    }
-
-    #[cfg(not(windows))]
-    {
-        Err(io::Error::new(io::ErrorKind::Unsupported, "elevated launcher is Windows-only"))
     }
 }
 
@@ -678,8 +758,55 @@ unsafe extern "system" {
 
 #[cfg(test)]
 mod tests {
-    use super::{ELEVATED_PIPE_PREFIX, validate_launch_request};
+    use super::{APP_IDENTIFIER, ELEVATED_PIPE_PREFIX, validate_launch_request};
     use std::path::Path;
+
+    #[test]
+    fn the_launcher_logs_into_the_same_folder_as_the_application() {
+        let config: serde_json::Value =
+            serde_json::from_str(include_str!("../../tauri.conf.json")).unwrap_or_default();
+        assert_eq!(config["identifier"].as_str(), Some(APP_IDENTIFIER));
+    }
+
+    /// T-LOG-005 diagnosis scenario: the failure behind «the elevated launcher never connected to
+    /// the pipe» must be readable in the launcher's own file, not just its symptom in the app's.
+    #[cfg(windows)]
+    #[test]
+    fn a_launcher_that_cannot_reach_the_pipes_says_so_in_its_own_file() -> std::io::Result<()> {
+        let _session = crate::logging::session_test_lock();
+        let directory =
+            std::env::temp_dir().join(format!("throttlewatch-launcher-log-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        let (subscriber, guard) = crate::logging::scoped_file_subscriber(
+            &directory,
+            "throttlewatch-launcher.log",
+            crate::logging::LogLevel::Debug,
+            "launcher",
+        )?;
+        let result = tracing::subscriber::with_default(subscriber, || {
+            super::launcher_main(|| {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    "elevated launcher pipes did not open",
+                ))
+            })
+        });
+        assert!(result.is_err());
+        drop(guard);
+        let written = std::fs::read_to_string(directory.join("throttlewatch-launcher.log"))?;
+        std::fs::remove_dir_all(&directory)?;
+        let events: Vec<serde_json::Value> =
+            written.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
+        let codes: Vec<&str> = events.iter().filter_map(|event| event["code"].as_str()).collect();
+        assert_eq!(codes, ["LAUNCHER_STARTED", "LAUNCHER_PIPE_CONNECT_FAILED", "LAUNCHER_EXITED"]);
+        assert!(events.iter().all(|event| event["component"] == "launcher"));
+        assert_eq!(
+            events[1]["msg"],
+            "could not connect to the application's pipes: elevated launcher pipes did not open"
+        );
+        assert_eq!(events[2]["level"], "error");
+        Ok(())
+    }
 
     #[test]
     fn rejects_wrong_nonce_and_sidecar_identity() {
