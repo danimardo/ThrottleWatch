@@ -24,7 +24,15 @@
   let exportPreview = $state<ExportPreview | null>(null);
   let exportBusy = $state(false);
 
-  async function loadWindow(startMs = 0, endMs = 86_400_000): Promise<void> {
+  // The initial load has no way to know this session's real range yet (a collector kept alive
+  // across several sessions keeps counting its own monotonic clock from when *it* started, not
+  // from this session's start, so guessing "the first 24h" can land nowhere near the real
+  // frames): ask for the whole session and let the backend answer with the range it actually
+  // used, which every later zoom is relative to.
+  async function loadWindow(
+    startMs = 0,
+    endMs = Number.MAX_SAFE_INTEGER
+  ): Promise<void> {
     // Keep the chart mounted while a zoom asks for a higher-resolution window.
     // Otherwise AnalysisChart loses its keyboard range anchor/selection during
     // the request and the user sees the evidence panel disappear briefly.

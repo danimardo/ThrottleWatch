@@ -5,6 +5,15 @@
   color: var(--text-primary);
   background: var(--surface);
 }
+/* Matches design/mockup/src/App.svelte's own `html, body, #app` rule: without a hard height and
+   `overflow: hidden` here, a tall screen made the document itself scroll, dragging the title bar
+   and the sidebar along with it instead of leaving them fixed. */
+html,
+body,
+#app {
+  height: 100%;
+  overflow: hidden;
+}
 body {
   margin: 0;
   min-width: 320px;

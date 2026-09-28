@@ -273,3 +273,191 @@ test('@critical guided start uses the duration and AC choices from Settings', as
   );
   expect(start).toMatchObject({ profile: 'long', require_ac: true });
 });
+
+test('@critical guided recovers after a sensor-lost stop and Cerrar, without leftover state', async ({
+  page
+}) => {
+  await page.goto('/');
+  await page
+    .getByRole('button', { name: /guided diagnostic|diagnóstico guiado/i })
+    .click();
+  await page.getByRole('button', { name: /start|iniciar/i }).click();
+
+  await page.evaluate(() => {
+    const emit = (
+      window as unknown as {
+        __THROTTLEWATCH_EMIT__: (event: string, payload: unknown) => void;
+      }
+    ).__THROTTLEWATCH_EMIT__;
+    emit('guided:phase', {
+      phase: 'sensor_lost',
+      elapsed_ms: 60_000,
+      remaining_ms: null,
+      reason_key: 'guided.sensor_lost',
+      temperature_c: null,
+      thermal_limit_c: null,
+      active_clock_mhz: null,
+      base_clock_mhz: null,
+      throughput_ops_s: null,
+      progress_percent: null
+    });
+  });
+  await expect(page.getByText(/sensor lost|sensor perdido/i)).toBeVisible();
+
+  await page
+    .getByRole('main', { name: /guided diagnostic|diagnóstico guiado/i })
+    .getByRole('button', { name: /^(close|cerrar)$/i })
+    .click();
+  // Cerrar takes a non-result finish back to "Ahora".
+  await expect(page.getByRole('main', { name: /now|ahora/i })).toBeVisible();
+
+  await page
+    .getByRole('button', { name: /guided diagnostic|diagnóstico guiado/i })
+    .click();
+  const startAgain = page.getByRole('button', { name: /^(start|iniciar)$/i });
+  await expect(startAgain).toBeVisible();
+  await startAgain.click();
+  await expect(
+    page.getByRole('button', { name: /skip rest|omitir reposo/i })
+  ).toBeVisible();
+});
+
+test('@critical a start_guided rejection the client-side checks did not predict still says so', async ({
+  page
+}) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    const bridge = (
+      window as unknown as {
+        __THROTTLEWATCH_FAKE_BRIDGE__: {
+          invoke: (command: string, args: unknown) => Promise<unknown>;
+        };
+      }
+    ).__THROTTLEWATCH_FAKE_BRIDGE__;
+    const originalInvoke = bridge.invoke.bind(bridge);
+    let attempt = 0;
+    bridge.invoke = async (command: string, args: unknown) => {
+      if (command === 'start_guided') {
+        attempt += 1;
+        if (attempt > 1) {
+          throw {
+            code: 'LOW_LEVEL_ACCESS_OPERATION_FAILED',
+            message_key: 'access.operation_failed'
+          };
+        }
+      }
+      return originalInvoke(command, args);
+    };
+  });
+
+  await page
+    .getByRole('button', { name: /guided diagnostic|diagnóstico guiado/i })
+    .click();
+  await page.getByRole('button', { name: /start|iniciar/i }).click();
+  await page.evaluate(() => {
+    const emit = (
+      window as unknown as {
+        __THROTTLEWATCH_EMIT__: (event: string, payload: unknown) => void;
+      }
+    ).__THROTTLEWATCH_EMIT__;
+    emit('guided:phase', {
+      phase: 'sensor_lost',
+      elapsed_ms: 60_000,
+      remaining_ms: null,
+      reason_key: 'guided.sensor_lost',
+      temperature_c: null,
+      thermal_limit_c: null,
+      active_clock_mhz: null,
+      base_clock_mhz: null,
+      throughput_ops_s: null,
+      progress_percent: null
+    });
+  });
+  await page
+    .getByRole('main', { name: /guided diagnostic|diagnóstico guiado/i })
+    .getByRole('button', { name: /^(close|cerrar)$/i })
+    .click();
+  await page
+    .getByRole('button', { name: /guided diagnostic|diagnóstico guiado/i })
+    .click();
+
+  const startButton = page.getByRole('button', { name: /^(start|iniciar)$/i });
+  await expect(startButton).toBeVisible();
+  await startButton.click();
+  // The client-side checks all passed (the fake bridge's `get_guided_preflight` never changed),
+  // so this is the one case the new proactive checklist cannot catch: the server rejected the
+  // attempt for a reason only it could see. The person must still be told, not left looking at
+  // the same "Start" screen with no visible change.
+  await expect(
+    page.getByText(/could not be completed|no se pudo completar/i)
+  ).toBeVisible();
+});
+
+test('@critical a still-failing sensor after Cerrar shows the checklist up front, not a blank retry', async ({
+  page
+}) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    const bridge = (
+      window as unknown as {
+        __THROTTLEWATCH_FAKE_BRIDGE__: {
+          invoke: (command: string, args: unknown) => Promise<unknown>;
+        };
+      }
+    ).__THROTTLEWATCH_FAKE_BRIDGE__;
+    // Captured once, on `window`, so the later override can restore the real thing instead of
+    // re-wrapping whatever override happens to be installed at that point.
+    const holder = window as unknown as {
+      __ORIGINAL_INVOKE__?: typeof bridge.invoke;
+    };
+    holder.__ORIGINAL_INVOKE__ ??= bridge.invoke.bind(bridge);
+    const original = holder.__ORIGINAL_INVOKE__;
+    bridge.invoke = async (command: string, args: unknown) => {
+      if (command === 'get_guided_preflight') {
+        return {
+          sensors: false,
+          ac_power: true,
+          profile: true,
+          disk_space: true,
+          generator: true,
+          require_ac: true
+        };
+      }
+      return original(command, args);
+    };
+  });
+
+  await page
+    .getByRole('button', { name: /guided diagnostic|diagnóstico guiado/i })
+    .click();
+
+  // The checklist shows the failing check up front — no need to click Start first to find out.
+  await expect(page.getByText(/^(sensors|sensores)$/i)).toBeVisible();
+  await expect(
+    page.getByText(/review the conditions|revisa las condiciones/i)
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: /^(start|iniciar)$/i })
+  ).toBeHidden();
+
+  const recheck = page.getByRole('button', {
+    name: /check again|comprobar de nuevo/i
+  });
+  await expect(recheck).toBeVisible();
+  await recheck.click();
+  // Recovers once the sensor genuinely reports again: swap back to the real (pristine) invoke
+  // captured above, so the fake bridge answers truthfully on the next check.
+  await page.evaluate(() => {
+    const holder = window as unknown as {
+      __THROTTLEWATCH_FAKE_BRIDGE__: {
+        invoke: (command: string, args: unknown) => Promise<unknown>;
+      };
+      __ORIGINAL_INVOKE__: (command: string, args: unknown) => Promise<unknown>;
+    };
+    holder.__THROTTLEWATCH_FAKE_BRIDGE__.invoke = holder.__ORIGINAL_INVOKE__;
+  });
+  await recheck.click();
+  await expect(
+    page.getByRole('button', { name: /^(start|iniciar)$/i })
+  ).toBeVisible();
+});

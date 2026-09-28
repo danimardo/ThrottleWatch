@@ -752,7 +752,11 @@
 
 <style>
   .app-shell {
-    min-height: 100vh;
+    /* Was `min-height: 100vh`: without a hard ceiling here, a tall screen made the whole
+       document scroll, dragging the title bar and the sidebar along with it instead of
+       leaving them fixed and scrolling only `.content` (below). */
+    height: 100%;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     /* `background-color`, not the `background` shorthand: the shorthand resets
@@ -777,6 +781,7 @@
     min-height: 0;
     flex: 1;
     display: flex;
+    overflow: hidden;
   }
   .guided-session-banner {
     position: fixed;
@@ -798,10 +803,13 @@
     background-image: var(--glass-sheen);
     -webkit-backdrop-filter: var(--glass-filter);
     backdrop-filter: var(--glass-filter);
+    overflow-y: auto;
   }
   .content {
     min-width: 0;
+    min-height: 0;
     flex: 1;
+    overflow-y: auto;
   }
   /* The notices sit above the screen, outside its own padding, so they need the same column and
      the same inset as the screens (`.dashboard`: 1100px centred, `--space-6`). Without it the

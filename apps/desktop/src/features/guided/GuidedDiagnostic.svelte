@@ -49,7 +49,11 @@
 
   function reportFailure(action: string, messageKey: string): void {
     failed = true;
-    getApplicationLogger().warn(`guided ${action} failed: ${messageKey}`);
+    getApplicationLogger().warn(
+      'GUIDED_ACTION_FAILED',
+      `guided ${action} failed`,
+      { reason: messageKey }
+    );
   }
 
   async function loadPreferences(): Promise<void> {
@@ -190,8 +194,17 @@
     };
   });
 
+  // A failed preflight check used to be discovered only after `start_guided` rejected the
+  // attempt with one generic error, whatever the reason: the person saw "Iniciar" the whole
+  // time and a small error line only appeared after clicking it, which read as "it does
+  // nothing" (nothing here visually changes). Once the checks are loaded, show the failure
+  // up front instead — the phase this component already has for exactly that.
   let currentPhase = $derived(
-    guidedState ? toDiagnosticPhase(guidedState.phase) : 'intro'
+    guidedState
+      ? toDiagnosticPhase(guidedState.phase)
+      : checks.some((check) => check.status === 'failed')
+        ? 'preflight'
+        : 'intro'
   );
   let progress = $derived(
     guidedState
@@ -263,6 +276,8 @@
   stepperLabel={t('guided.phasesLabel')}
   preflightChecks={checks}
   preflightFailedTitle={t('guided.reviewConditions')}
+  preflightRetryLabel={t('settings.recheck')}
+  onPreflightRetry={() => void loadPreflight()}
   {batteryState}
   batteryMessage={requireAc
     ? t('guided.needsAc')

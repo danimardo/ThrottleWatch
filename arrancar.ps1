@@ -5,10 +5,12 @@
     del colector, SensorAgent.exe).
 
 .DESCRIPCION
-    No recompila nada: usa el .exe que ya exista en
-    apps\desktop\src-tauri\target\debug\throttlewatch.exe (con la feature
-    `custom-protocol`, que incrusta el frontend). Si no existe, avisa con el
-    comando para generarlo.
+    Usa el .exe en apps\desktop\src-tauri\target\debug\throttlewatch.exe (con
+    la feature `custom-protocol`, que incrusta el frontend). Si no existe,
+    avisa con el comando para generarlo. Si existe pero es mas antiguo que el
+    codigo fuente (frontend, Rust o sistema de diseno), lo recompila antes de
+    arrancar — sin este chequeo, `arrancar.ps1` seguia lanzando una version
+    vieja del binario aunque el codigo hubiera cambiado, sin ningun aviso.
 
 .EJEMPLO
     .\arrancar.ps1
@@ -53,6 +55,65 @@ function Stop-Zombie([string]$processName) {
 # se cierra limpio.
 Stop-Zombie 'throttlewatch'
 Stop-Zombie 'SensorAgent'
+
+# Compara el binario contra el codigo fuente que lo produce: si hay una edicion mas reciente que
+# el .exe, arrancarlo tal cual mostraria una version vieja sin ningun aviso (lo que paso el
+# 2026-09-28: varios arreglos de UI no se veian porque este script solo relanzaba el binario ya
+# compilado). Se compara despues de matar zombies, no antes: un throttlewatch.exe todavia vivo
+# bloquea el propio fichero que `cargo build` necesita sobrescribir.
+function Get-LatestSourceWriteUtc {
+    $rutas = @(
+        (Join-Path $PSScriptRoot 'apps\desktop\src'),
+        (Join-Path $PSScriptRoot 'apps\desktop\src-tauri\src'),
+        (Join-Path $PSScriptRoot 'apps\desktop\src-tauri\build.rs'),
+        (Join-Path $PSScriptRoot 'apps\desktop\src-tauri\Cargo.toml'),
+        (Join-Path $PSScriptRoot 'apps\desktop\src-tauri\Cargo.lock'),
+        (Join-Path $PSScriptRoot 'apps\desktop\package.json'),
+        (Join-Path $PSScriptRoot 'apps\desktop\vite.config.ts'),
+        (Join-Path $PSScriptRoot 'design\components')
+    )
+    $masReciente = $null
+    foreach ($ruta in $rutas) {
+        if (-not (Test-Path $ruta)) { continue }
+        $item = Get-Item $ruta
+        $fechas = if ($item.PSIsContainer) {
+            (Get-ChildItem $ruta -Recurse -File -ErrorAction SilentlyContinue).LastWriteTimeUtc
+        } else {
+            @($item.LastWriteTimeUtc)
+        }
+        foreach ($fecha in $fechas) {
+            if (-not $masReciente -or $fecha -gt $masReciente) { $masReciente = $fecha }
+        }
+    }
+    return $masReciente
+}
+
+$fuenteReciente = Get-LatestSourceWriteUtc
+$binarioFechaUtc = (Get-Item $exePath).LastWriteTimeUtc
+if ($fuenteReciente -and $fuenteReciente -gt $binarioFechaUtc) {
+    Write-Warning (
+        "El binario ($($binarioFechaUtc.ToLocalTime())) es mas antiguo que el codigo fuente " +
+        "(cambio mas reciente: $($fuenteReciente.ToLocalTime())). Recompilando antes de arrancar..."
+    )
+    $raizDesktop = Join-Path $PSScriptRoot 'apps\desktop'
+    Push-Location $raizDesktop
+    try {
+        # Directo con node al vite local, no via `pnpm exec`: el shim de pnpm 12.4.2 en este equipo
+        # esta roto (falla con MODULE_NOT_FOUND buscando pnpm.cjs), y esto no depende de que
+        # pnpm funcione, solo de que node_modules ya este instalado.
+        & node (Join-Path $raizDesktop 'node_modules\vite\bin\vite.js') build
+        if ($LASTEXITCODE -ne 0) {
+            throw "vite build fallo (codigo de salida $LASTEXITCODE)."
+        }
+        & cargo build --locked --features custom-protocol --manifest-path src-tauri\Cargo.toml
+        if ($LASTEXITCODE -ne 0) {
+            throw "cargo build fallo (codigo de salida $LASTEXITCODE)."
+        }
+    } finally {
+        Pop-Location
+    }
+    Write-Output 'Recompilado.'
+}
 
 # El colector solo arranca si SensorAgent.exe coincide con el manifiesto firmado que lo acompana
 # (ADR-0004). Si se recompila o se republica sin volver a firmar, la aplicacion arranca pero sin

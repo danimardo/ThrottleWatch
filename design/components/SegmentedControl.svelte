@@ -90,6 +90,11 @@
     background: var(--glass-bg-strong);
     color: var(--text-primary);
     box-shadow: var(--glass-shadow);
+    /* `--glass-bg-strong` and `--glass-bg-subtle` (this segment's own background and the
+       track's) collapse to the exact same value under `[data-glass='off']` — a ring that
+       never depends on the glass tokens keeps the selected segment visible at every level. */
+    outline: 1.5px solid var(--accent-blue);
+    outline-offset: -1.5px;
     animation: tw-bump var(--motion-base) var(--motion-spring);
   }
   .segment:focus-visible {
