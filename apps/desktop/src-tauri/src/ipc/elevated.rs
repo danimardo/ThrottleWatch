@@ -8,6 +8,20 @@ use std::time::Duration;
 pub const ELEVATED_TASK_NAME: &str = "ThrottleWatch\\SidecarElevated";
 pub const ELEVATED_PIPE_PREFIX: &str = r"\\.\pipe\ThrottleWatch.ElevatedSidecar.";
 const FILE_FLAG_FIRST_PIPE_INSTANCE: u32 = 0x0008_0000;
+/// `CREATE_NO_WINDOW` (2026-09-28): `schtasks.exe`/`sc.exe` are console tools with no window of
+/// their own to inherit from this GUI app, so Windows allocated them a brand new, visible console
+/// — the black window a person saw pop up over "Reparar acceso avanzado", showing `schtasks`'s own
+/// "CORRECTO: ..." line after the command had already finished.
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+#[cfg(windows)]
+fn hidden_command(program: &str) -> Command {
+    use std::os::windows::process::CommandExt;
+    let mut command = Command::new(program);
+    command.creation_flags(CREATE_NO_WINDOW);
+    command
+}
 const RELEASE_MANIFEST_NAME: &str = "release-manifest.json";
 const RELEASE_SIGNATURE_NAME: &str = "release-manifest.json.minisig";
 
@@ -114,7 +128,7 @@ pub fn run_registered_task() -> io::Result<()> {
     #[cfg(windows)]
     {
         let status =
-            Command::new("schtasks.exe").args(["/Run", "/TN", ELEVATED_TASK_NAME]).status()?;
+            hidden_command("schtasks.exe").args(["/Run", "/TN", ELEVATED_TASK_NAME]).status()?;
         if status.success() {
             return Ok(());
         }
@@ -555,7 +569,7 @@ struct WindowsPawnIoServiceController;
 impl PawnIoServiceController for WindowsPawnIoServiceController {
     fn query_running(&self) -> io::Result<Option<bool>> {
         let query =
-            Command::new(r"C:\Windows\System32\sc.exe").args(["query", "PawnIO"]).output()?;
+            hidden_command(r"C:\Windows\System32\sc.exe").args(["query", "PawnIO"]).output()?;
         if !query.status.success() {
             return Ok(None);
         }
@@ -564,7 +578,7 @@ impl PawnIoServiceController for WindowsPawnIoServiceController {
 
     fn start(&self) -> io::Result<()> {
         let status =
-            Command::new(r"C:\Windows\System32\sc.exe").args(["start", "PawnIO"]).status()?;
+            hidden_command(r"C:\Windows\System32\sc.exe").args(["start", "PawnIO"]).status()?;
         if status.success() {
             Ok(())
         } else {

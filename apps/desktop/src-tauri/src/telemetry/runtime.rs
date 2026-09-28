@@ -414,6 +414,11 @@ fn run_forever_with_pause(
     stop: &AtomicBool,
     pause: &AtomicBool,
 ) {
+    crate::log_debug!(
+        component: "core",
+        "COLLECTOR_RUNTIME_THREAD_STARTED",
+        "the collector runtime's own thread is now running"
+    );
     let mut attempts: Vec<Instant> = Vec::new();
     let mut restart_number = 0_u32;
     while !stop.load(Ordering::SeqCst) {

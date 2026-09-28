@@ -2215,6 +2215,10 @@ pub fn get_live_snapshot(
 /// and `sampling_control::apply` always re-fetch it fresh — so swapping its contents here cannot
 /// desync any other subsystem.
 fn restart_collector(app: &AppHandle) -> Result<(), CommandError> {
+    crate::log_debug!(
+        "COLLECTOR_RESTART_STARTED",
+        "restart: about to read the advanced access preference"
+    );
     let advanced_access_enabled = app
         .state::<AppState>()
         .storage
@@ -2227,13 +2231,20 @@ fn restart_collector(app: &AppHandle) -> Result<(), CommandError> {
         .ok_or_else(CommandError::operation_failed)?;
     let live = app.state::<LiveHandle>().0.clone();
     let observer = Arc::new(TauriObserver { app: app.clone() });
+    // Debug-only breadcrumbs (2026-09-28): a restart from "Reparar acceso avanzado" once left no
+    // trace at all for 40+ seconds before the app had to be killed — this names which of these
+    // steps a future stall is actually stuck in.
+    crate::log_debug!("COLLECTOR_RESTART_BUILDING_LAUNCHER", "restart: choosing a launcher");
     let launcher = crate::telemetry::launch::collector_launcher(advanced_access_enabled);
+    crate::log_debug!("COLLECTOR_RESTART_LOCKING", "restart: about to lock the runtime handle");
     let runtime_state = app.state::<crate::CollectorHandle>();
     let mut guard = runtime_state.0.lock().map_err(|_| CommandError::operation_failed())?;
     let was_paused = guard.is_paused();
     // The old collector stops before the new one starts: starting first left two collectors (and
     // two elevated launches) running side by side until the assignment dropped the old one.
+    crate::log_debug!("COLLECTOR_RESTART_STOPPING_OLD", "restart: stopping the previous runtime");
     guard.stop();
+    crate::log_debug!("COLLECTOR_RESTART_STARTING_NEW", "restart: starting the new runtime");
     let new_runtime = match crate::telemetry::runtime::CollectorRuntime::start(
         launcher, live, observer, config,
     ) {

@@ -676,4 +676,19 @@ Origen: el principio XVII estaba completo en papel y el código no lo cumplía (
   colector al entrar en «Calentamiento» en primer lugar. Sin el reenvío de eventos del colector
   (`component: "agent"`, nunca visto en el log — T-LOG-011/T-LOG-014) no hay forma de saberlo desde
   los registros todavía.
+- [ ] T188 [US1] «Reparar acceso avanzado» dejó la aplicación sin responder (hallazgo 2026-09-28,
+  máquina real, tuvo que matarse el proceso — no queda `APP_SHUTTING_DOWN` en el log, así que no
+  fue un cierre normal). Secuencia exacta: `ACCESS_INSTALL_COMPLETED` (6,5 s tras pulsar, UAC
+  incluido) → `SESSION_ENDED` casi inmediato (`restart_collector` para el colector viejo,
+  `guard.stop()` completa) → **43+ segundos sin ni una línea más**, ni siquiera el
+  `COLLECTOR_STATE_CHANGED state:"starting"` que el runtime nuevo debería emitir en su primer
+  instante. De paso, una ventana negra visible con la salida de `schtasks.exe /Run` («CORRECTO: se
+  ha intentado ejecutar la tarea programada…») — `Command::new("schtasks.exe"/"sc.exe")` no pedía
+  `CREATE_NO_WINDOW`, así que Windows le creaba una consola nueva; ya corregido (`ipc/elevated.rs`,
+  helper `hidden_command`, aplicado también a los dos usos de `sc.exe` para PawnIO). No se sabe
+  todavía si la ventana era la causa del bloqueo percibido o solo un síntoma aparte.
+  Añadidas migas de depuración (`COLLECTOR_RESTART_STARTED`, `_BUILDING_LAUNCHER`, `_LOCKING`,
+  `_STOPPING_OLD`, `_STARTING_NEW` en `restart_collector`; `COLLECTOR_RUNTIME_THREAD_STARTED` al
+  entrar en `run_forever_with_pause`) para localizar el paso exacto la próxima vez. `cargo test
+  --lib` 376/376, `cargo clippy -D warnings` (0). Pendiente de reproducir con la app reconstruida.
 - [ ] CHK-L22 Checkpoint: `pnpm check` (incluido `check-logging-gates`), `cargo clippy -D warnings` y las suites afectadas en verde; ningún `tracing::*!` fuera de `src/logging/`; escenarios de diagnóstico de T-LOG-005 a T-LOG-010 en verde; revisión de `revisor-constitucion` sobre XVII.
