@@ -629,5 +629,28 @@ Origen: el principio XVII estaba completo en papel y el código no lo cumplía (
 - [ ] T186 [US4] Prueba guiada congelada en «Reposo» (hallazgo 2026-09-28): el contador se paró a los 26 s y, al pulsar «Omitir reposo», la aplicación entera dejó de responder. Hipótesis: el hilo del lazo se bloquea sujetando el `Mutex` de `GuidedMachine` y `start_guided` espera ese mismo bloqueo. Pendiente de reproducir con las migas `GUIDED_TICK_*` activas (en desarrollo ya arrancan en `debug` tras T-LOG-003).
   **Causa encontrada y corregida el 2026-09-28:** interbloqueo en orden inverso. El hilo del colector llama al observador con el estado en vivo bloqueado (`runtime.rs`, `observer.updated(…, &guard)`), y `TauriObserver::record` preguntaba `guided_in_progress`, que bloqueaba `GuidedController::machine`; el lazo del guiado, con `machine` bloqueado, lee el estado en vivo. Cada uno esperaba al otro: la prueba se paraba en cualquier segundo y todo comando que tocara `machine` (`start_guided` al «Omitir reposo», `stop_guided`, y `cancel_guided_for_lifecycle`, que corre en el hilo de la ventana al minimizar) colgaba la interfaz. Además, `start_guided` sostenía el almacenamiento mientras pedía `machine` (el lazo los pide al revés), y una segunda sesión podía arrancar con el lazo anterior aún vivo, que habría avanzado la máquina nueva. Corrección: `GuidedController::in_progress`, un `AtomicBool` que se lee sin bloqueo; `start_guided` suelta el almacenamiento antes de `machine` y rechaza arrancar con una prueba en curso (`GUIDED_START_REJECTED`); `cancel_guided_for_lifecycle` sale sin bloquear si no hay prueba. Prueba de regresión `asking_whether_a_guided_test_runs_never_waits_for_the_machine_lock`.
   **Confirmado en la aplicación real el 2026-09-28:** misma cadena que ayer (colector se cae al entrar en «Calentamiento», la reelevación falla, sensor perdido a nivel C) pero esta vez **la aplicación no se congeló** — el interbloqueo está resuelto. Apareció un segundo síntoma, distinto y ya corregido: al pulsar «Repetir» desde la pantalla terminal (sensor perdido), `start_guided` rechaza el reinicio (los sensores siguen sin volver, registrado como `GUIDED_PREFLIGHT_FAILED`), pero la interfaz nunca refrescaba el checklist ni salía de esa pantalla, así que el rechazo no se veía — leía como «no hace nada». `GuidedDiagnostic.svelte::start()` ahora, si `start_guided` falla, limpia `guidedState` y vuelve a pedir el preflight, que reutiliza la vista de checklist que ya existía para el primer intento. Prueba nueva `Repetir on a failed restart shows the checklist instead of doing nothing` (12/12 en la suite del guiado).
-- [ ] T187 [US1] El lanzador elevado nunca conecta el pipe («the elevated launcher never connected to the pipe») en cada arranque de esta máquina, aunque la tarea `\ThrottleWatch\SidecarElevated` existe y Windows la marca «En ejecución»; la cobertura queda en nivel B. Diagnóstico pendiente del registro propio del lanzador (T-LOG-005).
+- [x] T187 [US1] El lanzador elevado nunca conecta el pipe («the elevated launcher never connected to the pipe») en cada arranque de esta máquina, aunque la tarea `\ThrottleWatch\SidecarElevated` existe y Windows la marca «En ejecución»; la cobertura queda en nivel B. Diagnóstico pendiente del registro propio del lanzador (T-LOG-005).
+  **Causa encontrada y corregida el 2026-09-28**, con el registro propio del lanzador (T-LOG-005)
+  y el del colector (`COLLECTOR_STATE_CHANGED`) cruzados por hora: la tarea programada se registraba
+  con `<MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>` (`access.rs`). El lanzador del
+  arranque inicial vive mientras dura la sesión del colector; cuando la app reinicia esa sesión a
+  mitad de una prueba guiada, pide un lanzador nuevo (`schtasks /Run`) mientras el anterior sigue
+  «en ejecución» a ojos de Task Scheduler, que **descarta la petición en silencio** — y aun así
+  `schtasks /Run` devuelve código 0, así que nada en el código se entera. La espera de
+  `CONNECT_TIMEOUT` (8 s) agota sin que el lanzador nuevo llegue a arrancar; el anterior tarda unos
+  14 s en notar sus pipes abandonados y salir por su cuenta, 6 s después de que la app ya se hubiera
+  rendido y hubiera caído a sin elevar. Secuencia exacta capturada dos veces (05:00 y 10:10 UTC) con
+  los dos ficheros de log cruzados.
+
+  Corrección: la política pasa a `Parallel` — cada lanzamiento ya se autentica con su propio nombre
+  de pipe aleatorio y su propio *nonce* de sesión, así que dos instancias solapadas no necesitan ser
+  mutuamente excluyentes. Sin test unitario (la función ya no tenía ninguno: lanza `Start-Process
+  -Verb RunAs`, UAC real, no se puede probar sin elevación). Pendiente de verificar en caliente:
+  hace falta volver a pulsar «Reparar acceso avanzado» para que la tarea ya registrada en esta
+  máquina recoja la política nueva (el cambio de código no toca la tarea que ya existe).
+
+  Queda sin explicar la causa de fondo, distinta de esto: por qué termina la sesión original del
+  colector al entrar en «Calentamiento» en primer lugar. Sin el reenvío de eventos del colector
+  (`component: "agent"`, nunca visto en el log — T-LOG-011/T-LOG-014) no hay forma de saberlo desde
+  los registros todavía.
 - [ ] CHK-L22 Checkpoint: `pnpm check` (incluido `check-logging-gates`), `cargo clippy -D warnings` y las suites afectadas en verde; ningún `tracing::*!` fuera de `src/logging/`; escenarios de diagnóstico de T-LOG-005 a T-LOG-010 en verde; revisión de `revisor-constitucion` sobre XVII.
