@@ -1791,7 +1791,7 @@
           "notes": "the Límite StatWidget label in the live-reading pair"
         }
       ],
-      "notes": "Presentational — see nonNegotiableRules. Renders its own fixed 5-step stepper and a battery-state Banner. See GuidedDiagnosticScreen.svelte's own Props interface for the exact phase-specific action callbacks (onStart/onStop/onCancel/onRetry/onViewReport/etc.). stepLabels/stepperLabel/preflightFailedTitle/preflightCheckingLabel/temperatureStatLabel/limitStatLabel replaced what used to be hardcoded Spanish copy and aria-labels. 12+1 phases including `rest` (optional, onSkipRest); 6 stepLabels; structured intro via whatWillHappen[] + introDisclaimer; reading.headroomLabel/remainingLabel; result offers onUseAsReference."
+      "notes": "Presentational — see nonNegotiableRules. Renders its own fixed 5-step stepper and a battery-state Banner. See GuidedDiagnosticScreen.svelte's own Props interface for the exact phase-specific action callbacks (onStart/onStop/onCancel/onRetry/onViewReport/etc.). stepLabels/stepperLabel/preflightFailedTitle/preflightCheckingLabel/temperatureStatLabel/limitStatLabel replaced what used to be hardcoded Spanish copy and aria-labels. 12+1 phases including `rest` (optional, onSkipRest); 6 stepLabels; structured intro via whatWillHappen[] + introDisclaimer; reading.headroomLabel/remainingLabel; result offers onUseAsReference. warming/steadyLoad/recovery each have their own title+description props (warmingTitle/warmingDescription, steadyLoadTitle/steadyLoadDescription, recoveryTitle/recoveryDescription) instead of one shared phaseTitle/phaseDescription, same pattern as restTitle/restDescription."
     },
     "AnalysisChart": {
       "path": "components/AnalysisChart.svelte",

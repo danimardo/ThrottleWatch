@@ -68,19 +68,12 @@
     return undefined;
   });
 
-  let phaseTitle = $derived.by(() => {
-    if (phase === 'warming') return 'Calentamiento';
-    if (phase === 'steadyLoad') return 'Carga sostenida';
-    if (phase === 'recovery') return 'Recuperación';
-    return undefined;
-  });
-
-  let phaseDescription = $derived.by(() => {
-    if (phase === 'warming') return 'Aplicando una carga creciente para observar cómo responde la temperatura.';
-    if (phase === 'steadyLoad') return 'Carga constante tras el fin del turbo. Frecuencia activa 2,1 GHz (base 2,6 GHz) · rendimiento medido 1.184 op/s (inicial 1.520). Llegar al límite de temperatura no detiene la prueba: el procesador se protege solo.';
-    if (phase === 'recovery') return 'Retirando la carga para medir cuánto tarda la temperatura en volver a un rango normal.';
-    return undefined;
-  });
+  const warmingTitle = 'Calentamiento';
+  const warmingDescription = 'Sube la carga hasta el nivel de la prueba y deja pasar el impulso inicial (turbo) antes de empezar a medir.';
+  const steadyLoadTitle = 'Carga sostenida';
+  const steadyLoadDescription = 'Mantiene la carga fija para comprobar si la CPU sostiene su frecuencia garantizada o si el calor o la potencia la obligan a bajarla. Frecuencia activa 2,1 GHz (base 2,6 GHz) · rendimiento medido 1.184 op/s (inicial 1.520). Llegar al límite de temperatura no detiene la prueba: el procesador se protege solo.';
+  const recoveryTitle = 'Recuperación';
+  const recoveryDescription = 'Retira la carga y observa cómo baja la temperatura, para valorar si la refrigeración responde con normalidad.';
 </script>
 
 <div class="tw-ds guided-demo">
@@ -120,6 +113,7 @@
       whatWillHappen={[
         { label: 'Carga', value: 'Todos los núcleos, progresiva, sin instrucciones AVX extremas' },
         { label: 'Duración', value: 'Unos 9 minutos (estándar): reposo 1 min · calentamiento 1,5 min · carga 4 min · recuperación 2 min' },
+        { label: 'Fases', value: 'Reposo → calentamiento → carga sostenida → recuperación' },
         { label: 'Sensores', value: 'Temperatura de paquete, frecuencia activa frente a base, potencia y razones de limitación (si hay acceso avanzado)' },
         { label: 'Se detiene sola si', value: 'La temperatura supera el límite en más de 2 °C, la frecuencia cae por debajo de la mitad de la base estando al límite, se pierde el sensor 3 s o el generador no responde 5 s. Llegar al límite no la detiene.' }
       ]}
@@ -143,8 +137,12 @@
       onPreflightRetry={() => (lastAction = 'reintentar preflight')}
       readyTitle="Todo listo"
       readyBody="Se comprobaron los sensores y la alimentación. Puedes iniciar el diagnóstico cuando quieras."
-      {phaseTitle}
-      {phaseDescription}
+      {warmingTitle}
+      {warmingDescription}
+      {steadyLoadTitle}
+      {steadyLoadDescription}
+      {recoveryTitle}
+      {recoveryDescription}
       {reading}
       temperatureStatLabel="Temperatura"
       limitStatLabel="Límite"

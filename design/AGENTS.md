@@ -865,6 +865,7 @@ Recuperación/Resultado) and a battery-state `Banner` when
 |---|---|---|---|
 | `phase` | `DiagnosticPhase` (13 values: `'intro'\|'preflight'\|'ready'\|'rest'\|'warming'\|'steadyLoad'\|'recovery'\|'cancelling'\|'cancelled'\|'result'\|'safetyStop'\|'sensorLost'\|'error'`) | yes | `rest` is the optional stabilisation wait (`restTitle`/`restDescription`/`skipRestLabel`/`onSkipRest`) |
 | `whatWillHappenTitle` / `whatWillHappen` / `introDisclaimer` | `string` / `{ label, value }[]` / `string` | no | the structured "Qué va a pasar" list on `intro` (HU-04) |
+| `warmingTitle`/`warmingDescription`, `steadyLoadTitle`/`steadyLoadDescription`, `recoveryTitle`/`recoveryDescription` | `string` | no | own title+description per load phase (each explains what that phase measures and why), same pattern as `restTitle`/`restDescription` — no longer a single shared `phaseTitle`/`phaseDescription` |
 | `useAsReferenceLabel` / `onUseAsReference` / `referenceNote` | `string` / `() => void` / `string` | no | on `result` |
 | `batteryState` | `BatteryState` (`'ok'\|'warning'\|'blocked'`) | yes | |
 | `preflightChecks` | `PreflightCheck[]` | no | shown during `'preflight'` |

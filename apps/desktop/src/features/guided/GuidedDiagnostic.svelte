@@ -299,7 +299,8 @@
   whatWillHappenTitle={t('guided.whatWillHappen')}
   whatWillHappen={[
     { label: t('guided.load'), value: t('guided.fixedLoop') },
-    { label: t('guided.duration'), value: t(`guided.${profile}Profile`) }
+    { label: t('guided.duration'), value: t(`guided.${profile}Profile`) },
+    { label: t('guided.phases'), value: t('guided.phasesSummary') }
   ]}
   introDisclaimer={t('guided.disclaimer')}
   startLabel={t('guided.start')}
@@ -310,8 +311,12 @@
   onSkipRest={() => void start(true)}
   stopLabel={t('guided.stop')}
   onStop={stop}
-  phaseTitle={t('guided.running')}
-  phaseDescription={t('guided.runningDescription')}
+  warmingTitle={t('guided.steps.warming')}
+  warmingDescription={t('guided.warmingDescription')}
+  steadyLoadTitle={t('guided.steps.load')}
+  steadyLoadDescription={t('guided.loadDescription')}
+  recoveryTitle={t('guided.steps.recovery')}
+  recoveryDescription={t('guided.recoveryDescription')}
   temperatureStatLabel={t('guided.temperature')}
   limitStatLabel={t('guided.effectiveLimit')}
   headroomStatLabel={t('guided.headroom')}

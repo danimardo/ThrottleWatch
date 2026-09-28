@@ -140,8 +140,15 @@
     readyTitle?: string;
     readyBody?: string;
 
-    phaseTitle?: string;
-    phaseDescription?: string;
+    /** `'warming'` phase: load ramps up to the test level. */
+    warmingTitle?: string;
+    warmingDescription?: string;
+    /** `'steadyLoad'` phase: the sustained measurement window. */
+    steadyLoadTitle?: string;
+    steadyLoadDescription?: string;
+    /** `'recovery'` phase: load removed, cooldown observed. */
+    recoveryTitle?: string;
+    recoveryDescription?: string;
     reading?: DiagnosticLiveReading;
     temperatureStatLabel?: string;
     limitStatLabel?: string;
@@ -204,8 +211,12 @@
     onPreflightRetry,
     readyTitle,
     readyBody,
-    phaseTitle,
-    phaseDescription,
+    warmingTitle,
+    warmingDescription,
+    steadyLoadTitle,
+    steadyLoadDescription,
+    recoveryTitle,
+    recoveryDescription,
     reading,
     temperatureStatLabel,
     limitStatLabel,
@@ -265,6 +276,40 @@
 {/snippet}
 {#snippet errorRetryAction()}
   <Button variant="secondary" label={retryLabel ?? ''} onclick={onRetry} />
+{/snippet}
+{#snippet loadPhaseBody(phaseBodyTitle: string | undefined, phaseBodyDescription: string | undefined)}
+  <span class="body-strong" style:color="var(--text-primary)">{phaseBodyTitle}</span>
+  {#if phaseBodyDescription}
+    <p class="body" style:color="var(--text-secondary)">{phaseBodyDescription}</p>
+  {/if}
+  {#if reading}
+    <div class="reading-grid">
+      {#snippet tempIcon()}
+        <svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 3 a2.5 2.5 0 0 0-2.5 2.5 v8.7 a4 4 0 1 0 5 0 V5.5 A2.5 2.5 0 0 0 12 3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg>
+      {/snippet}
+      {#snippet limitIcon()}
+        <svg viewBox="0 0 24 24" width="12" height="12"><path d="M4 18 L10 10 L14 14 L20 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /><path d="M15 6 H20 V11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      {/snippet}
+      {#snippet headroomIcon()}
+        <svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 5v14M6 11l6-6 6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      {/snippet}
+      <StatWidget icon={tempIcon} tone="warm" label={temperatureStatLabel ?? ''} value={reading.temperatureLabel} footnote={reading.temperatureFootnote ?? ''} />
+      <StatWidget icon={limitIcon} tone="unknown" label={limitStatLabel ?? ''} value={reading.limitLabel} footnote={reading.limitFootnote ?? ''} />
+      {#if reading.headroomLabel}
+        <StatWidget icon={headroomIcon} tone="accent" label={headroomStatLabel ?? ''} value={reading.headroomLabel} footnote={reading.headroomFootnote ?? ''} />
+      {/if}
+    </div>
+    <div class="phase-progress">
+      {#if reading.progressPercent !== undefined}
+        <ProgressBar percent={reading.progressPercent} tone="accent" label={phaseBodyTitle} />
+      {:else}
+        <ProgressBar indeterminate tone="accent" label={phaseBodyTitle} />
+      {/if}
+      {#if reading.remainingLabel}
+        <span class="caption" style:color="var(--text-tertiary)">{reading.remainingLabel}</span>
+      {/if}
+    </div>
+  {/if}
 {/snippet}
 
 <div class="tw-ds tw-guided-diagnostic">
@@ -379,40 +424,17 @@
           </div>
         {/if}
       </div>
-    {:else if phase === 'warming' || phase === 'steadyLoad' || phase === 'recovery'}
+    {:else if phase === 'warming'}
       <div class="panel">
-        <span class="body-strong" style:color="var(--text-primary)">{phaseTitle}</span>
-        {#if phaseDescription}
-          <p class="body" style:color="var(--text-secondary)">{phaseDescription}</p>
-        {/if}
-        {#if reading}
-          <div class="reading-grid">
-            {#snippet tempIcon()}
-              <svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 3 a2.5 2.5 0 0 0-2.5 2.5 v8.7 a4 4 0 1 0 5 0 V5.5 A2.5 2.5 0 0 0 12 3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg>
-            {/snippet}
-            {#snippet limitIcon()}
-              <svg viewBox="0 0 24 24" width="12" height="12"><path d="M4 18 L10 10 L14 14 L20 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /><path d="M15 6 H20 V11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
-            {/snippet}
-            {#snippet headroomIcon()}
-              <svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 5v14M6 11l6-6 6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
-            {/snippet}
-            <StatWidget icon={tempIcon} tone="warm" label={temperatureStatLabel ?? ''} value={reading.temperatureLabel} footnote={reading.temperatureFootnote ?? ''} />
-            <StatWidget icon={limitIcon} tone="unknown" label={limitStatLabel ?? ''} value={reading.limitLabel} footnote={reading.limitFootnote ?? ''} />
-            {#if reading.headroomLabel}
-              <StatWidget icon={headroomIcon} tone="accent" label={headroomStatLabel ?? ''} value={reading.headroomLabel} footnote={reading.headroomFootnote ?? ''} />
-            {/if}
-          </div>
-          <div class="phase-progress">
-            {#if reading.progressPercent !== undefined}
-              <ProgressBar percent={reading.progressPercent} tone="accent" label={phaseTitle} />
-            {:else}
-              <ProgressBar indeterminate tone="accent" label={phaseTitle} />
-            {/if}
-            {#if reading.remainingLabel}
-              <span class="caption" style:color="var(--text-tertiary)">{reading.remainingLabel}</span>
-            {/if}
-          </div>
-        {/if}
+        {@render loadPhaseBody(warmingTitle, warmingDescription)}
+      </div>
+    {:else if phase === 'steadyLoad'}
+      <div class="panel">
+        {@render loadPhaseBody(steadyLoadTitle, steadyLoadDescription)}
+      </div>
+    {:else if phase === 'recovery'}
+      <div class="panel">
+        {@render loadPhaseBody(recoveryTitle, recoveryDescription)}
       </div>
     {:else if phase === 'cancelling'}
       <div class="panel">
