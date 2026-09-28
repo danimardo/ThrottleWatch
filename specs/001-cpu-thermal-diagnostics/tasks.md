@@ -691,4 +691,19 @@ Origen: el principio XVII estaba completo en papel y el código no lo cumplía (
   `_STOPPING_OLD`, `_STARTING_NEW` en `restart_collector`; `COLLECTOR_RUNTIME_THREAD_STARTED` al
   entrar en `run_forever_with_pause`) para localizar el paso exacto la próxima vez. `cargo test
   --lib` 376/376, `cargo clippy -D warnings` (0). Pendiente de reproducir con la app reconstruida.
+  **Causa real, distinta de lo que se pensaba, encontrada el 2026-09-28** cruzando
+  `throttlewatch.log` con `throttlewatch-launcher.log` por hora exacta en tres reinicios reales
+  (uno de ellos justo el de esta tarea): el lanzador elevado anterior tarda unos 14-15 s en
+  notarse abandonado, matar su sidecar y salir (`LAUNCHER_EXITED`) — y el lanzador **nuevo** no
+  arranca hasta ese mismo instante (130 ms de diferencia en el caso mejor documentado), pase lo
+  que pase con `MultipleInstancesPolicy` (ya en `Parallel` desde el commit anterior). El
+  `CONNECT_TIMEOUT` de 8 s se agotaba mientras el lanzador nuevo *todavía estaba arrancando* —
+  no es que nunca llegara. Peor: el intento siguiente sí conectó sus pipes casi de inmediato, pero
+  la app ya los había abandonado, así que el lanzador recibió un «hello» de una conexión que ya
+  no era la suya y salió con error («invalid launcher hello») — un segundo fallo autoinfligido
+  encima del primero. `CONNECT_TIMEOUT` pasa de 8 a 20 s (`ipc/elevated.rs`), con margen sobre
+  los ~15 s observados. No hay test unitario nuevo (es una constante de espera frente a un
+  proceso de Windows real; el test de temporización existente pasa su propio valor, no toca esta
+  constante). Pendiente de confirmar con la app reconstruida que esto basta para que un reinicio
+  a mitad de sesión —incluido durante la prueba guiada— consiga elevarse.
 - [ ] CHK-L22 Checkpoint: `pnpm check` (incluido `check-logging-gates`), `cargo clippy -D warnings` y las suites afectadas en verde; ningún `tracing::*!` fuera de `src/logging/`; escenarios de diagnóstico de T-LOG-005 a T-LOG-010 en verde; revisión de `revisor-constitucion` sobre XVII.

@@ -183,8 +183,19 @@ fn finish_connect(pipe_handle: *mut std::ffi::c_void) -> io::Result<std::fs::Fil
 /// How long each pipe waits for the elevated launcher to connect to it, before giving up rather
 /// than blocking the whole collector runtime thread forever (see the call site's comment for the
 /// real failure this guards against).
+///
+/// 20 s, not 8 (2026-09-28, three real restarts logged with matching timestamps on both sides —
+/// `throttlewatch.log` and `throttlewatch-launcher.log`): a restart mid-session (the collector's
+/// own, or "Reparar acceso avanzado") abandons the previous elevated launcher's pipes, and that
+/// process takes some 14-15 s on this machine to notice, kill its sidecar, and exit — apparently
+/// serialized with starting the next instance of the same interactive scheduled task regardless of
+/// `MultipleInstancesPolicy`. At 8 s the new launcher was still starting when this side gave up, so
+/// the previous restart it *did* manage to start ended up talking to already-abandoned pipes and
+/// exited immediately with "invalid launcher hello" — a second, self-inflicted failure on top of
+/// the first. 20 s comfortably covers the observed ~15 s with margin, at the cost of a slower
+/// fallback to unelevated on a launcher that is genuinely never going to answer.
 #[cfg(windows)]
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(8);
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// A Windows `HANDLE` has no thread affinity; moving the raw value into another thread to finish
 /// the (possibly forever-blocking) connect there is safe even though `*mut c_void` is not `Send`.
