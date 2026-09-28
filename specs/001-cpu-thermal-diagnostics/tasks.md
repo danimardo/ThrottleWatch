@@ -631,6 +631,18 @@ Origen: el principio XVII estaba completo en papel y el código no lo cumplía (
   con el mapa real en vez de pasar por las macros `log_*!` (que solo aceptan pares fijos en tiempo
   de compilación), así que cada campo se censura por su propio nombre. Prueba
   `a_forwarded_ui_event_keeps_its_own_allow_listed_fields_readable`. `cargo test --lib` 376/376.
+  **Causa real encontrada el 2026-09-28**, gracias al registro de arriba: `SETTINGS_LOAD_STEP_FAILED`
+  señaló `get_coverage failed to load, reason: BRIDGE_VALIDATION_FAILED` — un fallo de validación
+  Zod, no del backend. `CoverageRowDto.reason_key` es `Option<&'static str>` sin
+  `skip_serializing_if` (como ningún DTO de este fichero usa esa anotación), así que una fila
+  disponible (que no necesita motivo) envía literalmente `"reason_key": null`; el esquema tenía
+  `reason_key: z.string().optional()`, que acepta la clave ausente pero rechaza `null` —
+  `get_coverage` fallaba la validación en cuanto había una sola fila disponible, es decir, casi
+  siempre. El propio `Dashboard.svelte` ya trataba `row.reason_key` como `string | null |
+  undefined` (`?? 'coverage.unavailable'`), y otro `reason_key` de este mismo fichero ya usa
+  `.nullable()` — el esquema de esta fila concreta era la única discrepancia. Corrección:
+  `reason_key: z.string().optional().nullable()`. Prueba `coverage row reason_key › accepts null,
+  exactly what an available row sends`. `pnpm test` 128/128, `pnpm check`/`lint` 0.
 - [x] T-LOG-013 Salida humana: `pnpm logs:view` con `dd/MM/yyyy HH:mm:ss,SSS` y abreviatura de zona; pruebas del script y del formateador de Rust en los instantes exactos de los dos cambios de hora anuales.
   Verificado 2026-09-28: `format_human` (Rust) produce `dd/MM/yyyy HH:mm:ss,SSS CET|CEST`, probado en los instantes de marzo y octubre; `scripts/logs-view.mjs` igual, incluye el fichero del lanzador y los rotados, y `scripts/logs-view.test.mjs` (6) entra en `pnpm test:scripts` (15/15, 0).
 - [ ] T-LOG-014 Errores tragados restantes: cada `let _ =`, `.ok()` o retorno temprano sobre un `Result` en código no trivial se registra o lleva un comentario que justifique por qué no aporta nada al diagnóstico.

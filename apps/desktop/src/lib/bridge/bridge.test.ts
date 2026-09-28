@@ -171,3 +171,31 @@ describe('advanced access vocabulary', () => {
     expect(parsed.success).toBe(false);
   });
 });
+
+describe('coverage row reason_key', () => {
+  // 2026-09-28: "Sensores y cobertura" stayed on "Cargando ajustes..." for ever. Rust's
+  // `Option<&'static str>` serializes `None` as the JSON value `null` (no
+  // `skip_serializing_if` on this field) — an available row, which needs no reason, sends
+  // `"reason_key": null`. `z.string().optional()` accepts a *missing* key, not a `null` one,
+  // so get_coverage's own real response failed validation every time a row was available.
+  it('accepts null, exactly what an available row sends', () => {
+    const parsed = coverageMatrixSchema.safeParse({
+      tier: 'B',
+      confidence_ceiling: 'medium',
+      advanced_access: 'not_needed',
+      rows: [
+        {
+          id: 'cpu.package.temp',
+          label: 'Temperature',
+          available: true,
+          quality: 'direct',
+          quality_label: 'Direct',
+          source_label: 'LibreHardwareMonitor',
+          reason_key: null
+        }
+      ],
+      conclusion_key: 'coverage.conclusion.b'
+    });
+    expect(parsed.success).toBe(true);
+  });
+});

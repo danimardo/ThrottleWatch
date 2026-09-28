@@ -184,7 +184,12 @@ const coverageRowSchema = z.object({
   quality: z.enum(['direct', 'derived', 'substitute', 'unknown']).optional(),
   quality_label: z.string().optional(),
   source_label: z.string().optional(),
-  reason_key: z.string().optional()
+  // Rust's `Option<&'static str>` serializes `None` as the JSON value `null`, not an absent key
+  // (there is no `skip_serializing_if` on this field) — `.optional()` alone accepts a missing
+  // key but rejects `null`, which is what an available row (no reason needed) actually sends.
+  // That is why "Sensores y cobertura" stayed on "Cargando ajustes..." forever (2026-09-28):
+  // get_coverage failed Zod validation on every row that didn't need a reason.
+  reason_key: z.string().optional().nullable()
 });
 
 export const coverageMatrixSchema = z.object({
