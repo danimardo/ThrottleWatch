@@ -99,7 +99,16 @@
       finishedSessionId = null;
       guidedState = result.value;
       publishGuidedPhase(result.value);
-    } else reportFailure('start', result.error.message_key);
+    } else {
+      reportFailure('start', result.error.message_key);
+      // A retry from a terminal phase (sensor lost, safety stop…) that fails the same way used to
+      // leave `guidedState` on that stale phase, so the screen never visibly reacted — "Repetir"
+      // read as doing nothing. Refreshing the checklist here re-derives `currentPhase` to
+      // 'preflight', the same view a first attempt's failed preflight already shows.
+      guidedState = null;
+      publishGuidedPhase(null);
+      await loadPreflight();
+    }
   }
 
   async function loadFinished(sessionId: string): Promise<void> {

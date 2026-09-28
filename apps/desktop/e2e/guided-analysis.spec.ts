@@ -461,3 +461,79 @@ test('@critical a still-failing sensor after Cerrar shows the checklist up front
     page.getByRole('button', { name: /^(start|iniciar)$/i })
   ).toBeVisible();
 });
+
+test('@critical Repetir on a failed restart shows the checklist instead of doing nothing', async ({
+  page
+}) => {
+  // T186/T187 (2026-09-28): the backend correctly rejects a restart when the sensors it needs
+  // are still gone (a collector that just lost elevation), but the screen used to stay frozen on
+  // the terminal phase with no visible reaction — "Repetir" read as doing nothing.
+  await page.goto('/');
+  await page.evaluate(() => {
+    const bridge = (
+      window as unknown as {
+        __THROTTLEWATCH_FAKE_BRIDGE__: {
+          invoke: (command: string, args: unknown) => Promise<unknown>;
+        };
+      }
+    ).__THROTTLEWATCH_FAKE_BRIDGE__;
+    const holder = window as unknown as {
+      __ORIGINAL_INVOKE__?: typeof bridge.invoke;
+    };
+    holder.__ORIGINAL_INVOKE__ ??= bridge.invoke.bind(bridge);
+    const original = holder.__ORIGINAL_INVOKE__;
+    bridge.invoke = async (command: string, args: unknown) => {
+      if (command === 'get_guided_preflight') {
+        return {
+          sensors: false,
+          ac_power: true,
+          profile: true,
+          disk_space: true,
+          generator: true,
+          require_ac: true
+        };
+      }
+      if (command === 'start_guided') {
+        throw {
+          code: 'LOW_LEVEL_ACCESS_OPERATION_FAILED',
+          message_key: 'access.operation_failed'
+        };
+      }
+      return original(command, args);
+    };
+  });
+
+  await page
+    .getByRole('button', { name: /guided diagnostic|diagnóstico guiado/i })
+    .click();
+  // Reaches the terminal "sensor lost" screen directly, as the real backend would once a
+  // running test loses its sensors mid-run — no need to wait out the phase timers.
+  await page.evaluate(() => {
+    const emit = (
+      window as unknown as {
+        __THROTTLEWATCH_EMIT__: (event: string, payload: unknown) => void;
+      }
+    ).__THROTTLEWATCH_EMIT__;
+    emit('guided:phase', {
+      phase: 'sensor_lost',
+      elapsed_ms: 14_000,
+      remaining_ms: null,
+      reason_key: 'guided.sensor_lost',
+      temperature_c: null,
+      thermal_limit_c: null,
+      active_clock_mhz: null,
+      base_clock_mhz: null,
+      throughput_ops_s: null,
+      progress_percent: null
+    });
+  });
+  await expect(page.getByText(/sensor lost|sensor perdido/i)).toBeVisible();
+
+  await page.getByRole('button', { name: /try again|repetir/i }).click();
+
+  // The rejected restart shows why, instead of leaving the stale "sensor lost" screen untouched.
+  await expect(page.getByText(/^(sensors|sensores)$/i)).toBeVisible();
+  await expect(
+    page.getByText(/review the conditions|revisa las condiciones/i)
+  ).toBeVisible();
+});
