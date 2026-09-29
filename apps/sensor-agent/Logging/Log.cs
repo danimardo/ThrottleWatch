@@ -33,6 +33,18 @@ public static partial class Log
     [LoggerMessage(EventId = 1006, Level = LogLevel.Warning, Message = "{Code}: MSR read failed ({ExceptionType})")]
     public static partial void MsrReadFailed(this ILogger logger, string Code, string ExceptionType, Exception exception);
 
+    [LoggerMessage(EventId = 1007, Level = LogLevel.Warning, Message = "{Code}: {Stage} still running after {ElapsedMs} ms")]
+    public static partial void StageStuck(this ILogger logger, string Code, string Stage, long ElapsedMs);
+
+    [LoggerMessage(EventId = 1008, Level = LogLevel.Warning, Message = "{Code}: {Stage} finished after {ElapsedMs} ms")]
+    public static partial void StageFinishedLate(this ILogger logger, string Code, string Stage, long ElapsedMs);
+
+    [LoggerMessage(EventId = 1009, Level = LogLevel.Warning, Message = "{Code}: hardware {HardwareId} update still running after {ElapsedMs} ms; its sensors are reported stale until it finishes")]
+    public static partial void HardwareUpdatePending(this ILogger logger, string Code, string HardwareId, long ElapsedMs);
+
+    [LoggerMessage(EventId = 1010, Level = LogLevel.Warning, Message = "{Code}: hardware {HardwareId} update finished after {ElapsedMs} ms")]
+    public static partial void HardwareUpdateFinishedLate(this ILogger logger, string Code, string HardwareId, long ElapsedMs);
+
     public static void AttachUnhandledExceptionHandlers(ILogger logger)
     {
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>

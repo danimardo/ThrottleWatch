@@ -144,9 +144,15 @@ public sealed class SidecarSession
         nonce = document.RootElement.GetProperty("session_nonce").GetString();
         lastReceived = document.RootElement.GetProperty("sequence").GetInt64();
         sequence = 1; // hello_ack used sequence 0
-        rawCatalog = source.ReadCatalog();
+        using (StageWatchdog.Enter("read catalog"))
+        {
+            rawCatalog = source.ReadCatalog();
+        }
         catalog = CatalogNormalizer.Build(rawCatalog, detail);
-        return [Encoding.UTF8.GetString(ack), Envelope("capabilities", BuildCapabilities())];
+        using (StageWatchdog.Enter("build capabilities"))
+        {
+            return [Encoding.UTF8.GetString(ack), Envelope("capabilities", BuildCapabilities())];
+        }
     }
 
     private CapabilitiesPayload BuildCapabilities()

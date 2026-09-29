@@ -52,8 +52,8 @@ fn bootstrap() -> io::Result<()> {
     let sidecar_hash = sha256_hex(&std::fs::read(&sidecar)?);
     for _ in 0..60 {
         match elevated::start_registered_sidecar(&sidecar, &sidecar_hash) {
-            Ok(pipe) => {
-                drop(pipe);
+            Ok(pipes) => {
+                drop(pipes);
                 return Ok(());
             }
             Err(_) => thread::sleep(Duration::from_millis(500)),

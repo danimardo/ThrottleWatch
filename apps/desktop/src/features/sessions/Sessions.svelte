@@ -27,12 +27,25 @@
   import { takeRequestedSessionReport } from './handoff';
   import { narrativeFor, type ChainKind } from './report-narrative';
   import { createWidthTracker } from '../../design-system/lib/responsive.svelte';
-  import { evidenceLines, impactText, noImpactReason } from './report-view';
+  import {
+    evidenceLines,
+    impactText,
+    noImpactReason,
+    noImpactTitle
+  } from './report-view';
+
+  const SESSIONS_PER_PAGE = 8;
 
   const { t, locale } = getTranslator();
 
   let listStatus = $state<'loading' | 'error' | 'loaded'>('loading');
   let sessions = $state<SessionSummary[]>([]);
+  // This machine's current advanced-access state (found 2026-09-28): a report otherwise always
+  // recommended installing advanced access whenever its verdict was an estimate, even with
+  // advanced access already active and working — on AMD, permanently, since level A is not
+  // reachable there yet. `undefined` (not fetched, or an imported session from another machine)
+  // keeps today's behaviour: the recommendation still shows, same as before this fix.
+  let advancedAccess = $state<string | undefined>(undefined);
   let view = $state<'list' | 'report'>('list');
   let selectedSession = $state<SessionSummary | null>(null);
   let selectedReport = $state<Record<string, unknown> | null>(null);
@@ -109,6 +122,11 @@
       classificationLabel: classified
         ? classificationLabel(summary.report_classification)
         : undefined,
+      classificationHelp:
+        classified && summary.report_classification === 'indeterminate'
+          ? t('help.insufficient')
+          : undefined,
+      helpLabel: t('help.more'),
       importedLabel:
         summary.status === 'imported'
           ? t('sessions.statusImported')
@@ -180,7 +198,7 @@
     platform: platformIcon,
     clock: clockIcon
   };
-  let narrative = $derived(narrativeFor(t, selectedReport));
+  let narrative = $derived(narrativeFor(t, selectedReport, advancedAccess));
   // The rail needs horizontal room and has no stacked fallback: below the expanded tier it is
   // not mounted at all.
   let causalChain = $derived(
@@ -370,6 +388,11 @@
 
   onMount(() => {
     void loadSessions();
+    invokeValidated('get_coverage', undefined, commandResponseSchemas.get_coverage).then(
+      (result) => {
+        if (result.ok) advancedAccess = result.value.advanced_access;
+      }
+    );
     const requestedReport = takeRequestedSessionReport();
     if (requestedReport !== null) void openSession(requestedReport);
     const onOpenExport = (): void => {
@@ -483,6 +506,13 @@
       deleteDialogDescription={t('sessions.deleteDescription')}
       deleteDialogCancelLabel={t('sessions.deleteCancel')}
       deleteDialogConfirmLabel={t('sessions.deleteConfirm')}
+      pageSize={SESSIONS_PER_PAGE}
+      previousPageLabel={t('sessions.previousPage')}
+      nextPageLabel={t('sessions.nextPage')}
+      pageLabel={(page, count) =>
+        t('sessions.pageOf')
+          .replace('{page}', String(page))
+          .replace('{count}', String(count))}
     />
   </div>
 {:else}
@@ -523,12 +553,14 @@
       provisionalNoticeTitle={t('sessions.reportProvisional')}
       reducedConfidence={selectedSession?.coverage_tier !== 'A'}
       reducedConfidenceNoticeTitle={t('sessions.reportReducedConfidence')}
+      reducedConfidenceNoticeHelp={t('help.reducedConfidence')}
+      helpLabel={t('help.more')}
       observedTitle={t('sessions.reportObservedTitle')}
       observedText={narrative.observed}
       {causalChain}
       impactTitle={t('sessions.reportImpactTitle')}
       impactValue={reportImpact}
-      impactUnavailableTitle={t('sessions.reportNoImpact')}
+      impactUnavailableTitle={noImpactTitle(t, selectedReport)}
       impactUnavailableReason={noImpactReason(t, selectedReport)}
       evidenceTitle={t('sessions.reportEvidenceTitle')}
       evidence={reportEvidence}

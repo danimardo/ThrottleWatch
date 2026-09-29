@@ -191,7 +191,7 @@
           title={detection.advancedAccessNote ?? ''}
           action={detection.onAccessRetry ? accessRetryAction : undefined}
         />
-      {:else if (detection.advancedAccess === 'available' || detection.advancedAccess === 'not_needed') && detection.advancedAccessNote}
+      {:else if (detection.advancedAccess === 'available' || detection.advancedAccess === 'not_needed' || detection.advancedAccess === 'capped_by_vendor') && detection.advancedAccessNote}
         <span class="caption access-line" style:color="var(--text-tertiary)">{detection.advancedAccessNote}</span>
       {/if}
     </div>

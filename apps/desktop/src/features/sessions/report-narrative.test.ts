@@ -145,6 +145,24 @@ describe('report narrative', () => {
     );
   });
 
+  it('does not recommend advanced access when it is already active on this machine', () => {
+    const report = { classification: 'thermal_probable', coverage_tier: 'B' };
+    expect(
+      narrativeFor(raw, report).recommendations
+    ).toContain('reportNarrative.recAdvancedAccess');
+    expect(
+      narrativeFor(raw, report, 'available').recommendations
+    ).not.toContain('reportNarrative.recAdvancedAccess');
+    // Found 2026-09-28: this is the actual AMD case — level A is unreachable there, so every
+    // session reads as `inferred`, and the recommendation used to fire forever regardless.
+    expect(
+      narrativeFor(raw, report, 'capped_by_vendor').recommendations
+    ).not.toContain('reportNarrative.recAdvancedAccess');
+    expect(
+      narrativeFor(raw, report, 'installable').recommendations
+    ).toContain('reportNarrative.recAdvancedAccess');
+  });
+
   it('does not judge the coverage when the report does not carry its tier', () => {
     const narrative = narrativeFor(raw, { classification: 'thermal_probable' });
     expect(narrative.cannotConclude).not.toContain(

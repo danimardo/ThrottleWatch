@@ -21,7 +21,8 @@
     installable: 'Recomendado: el acceso avanzado sube este equipo al nivel A (confirmar la causa y estimar cuánto ayudaría enfriar mejor).',
     upgradable: 'Hay una versión anterior del controlador de acceso avanzado; actualizarla mejora la cobertura.',
     denied: 'El acceso avanzado está bloqueado por una directiva del sistema o por el antivirus.',
-    error: 'No se pudo comprobar el acceso avanzado.'
+    error: 'No se pudo comprobar el acceso avanzado.',
+    capped_by_vendor: 'Acceso avanzado activo (nivel B, el máximo disponible en este procesador).'
   };
   let resumed = $state(false);
   let lastAction = $state('(ninguna todavía)');
@@ -115,7 +116,8 @@
           { value: 'available', label: 'Disponible' },
           { value: 'installable', label: 'Instalable' },
           { value: 'denied', label: 'Bloqueado' },
-          { value: 'error', label: 'Error' }
+          { value: 'error', label: 'Error' },
+          { value: 'capped_by_vendor', label: 'Activo, nivel B (fabricante)' }
         ]}
       />
     </div>

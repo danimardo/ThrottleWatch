@@ -184,6 +184,10 @@
       deleteDialogDescription="Se borrará esta sesión y su informe asociado. Esta acción no se puede deshacer."
       deleteDialogCancelLabel="Cancelar"
       deleteDialogConfirmLabel="Eliminar"
+      pageSize={3}
+      previousPageLabel="Anterior"
+      nextPageLabel="Siguiente"
+      pageLabel={(page, count) => `Página ${page} de ${count}`}
     />
   </div>
 </div>

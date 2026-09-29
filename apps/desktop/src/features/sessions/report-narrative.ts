@@ -61,13 +61,32 @@ function hasEvent(report: Report, kind: string): boolean {
  * (coverage tier A), and never with the end of turbo as a link; below tier A the sequence is an
  * inference and is not drawn.
  */
-export function narrativeFor(t: Translate, report: Report): ReportNarrative {
+/**
+ * `advancedAccess` is this machine's *current* advanced-access state (`get_coverage`), used only
+ * to decide whether recommending it makes sense — never to judge the session itself, which stays
+ * governed entirely by `report.coverage_tier` (a past session may have run under different
+ * conditions, or on a different machine entirely for an imported one). `undefined`/`null` (not
+ * fetched yet, or truly unknown) keeps the recommendation showing, same as before this parameter
+ * existed.
+ */
+export function narrativeFor(
+  t: Translate,
+  report: Report,
+  advancedAccess?: string | null
+): ReportNarrative {
   const cls = classOf(report);
   const tier =
     typeof report?.coverage_tier === 'string' ? report.coverage_tier : null;
   const direct = tier === 'A';
   const inferred = tier === 'B' || tier === 'C';
   const oem = hasEvent(report, 'oem_mode_change');
+  // Found 2026-09-28: this recommendation used to fire on every inferred verdict, even with
+  // advanced access already active — permanently on AMD, since level A is not reachable there yet
+  // (`spec.md` §421) and every session is `inferred` regardless of how well access works.
+  const advancedAccessAlreadyActive =
+    advancedAccess === 'available' ||
+    advancedAccess === 'capped_by_vendor' ||
+    advancedAccess === 'not_needed';
   const key = (name: string): string => t(`reportNarrative.${name}`);
 
   const alternativeCauses: string[] = [];
@@ -107,7 +126,9 @@ export function narrativeFor(t: Translate, report: Report): ReportNarrative {
     if (oem) recommendations.push(key('recNoVentilationForOem'));
   }
   if (cls === 'hot_unproven') recommendations.push(key('recRepeatSustained'));
-  if (cls !== null && inferred) recommendations.push(key('recAdvancedAccess'));
+  if (cls !== null && inferred && !advancedAccessAlreadyActive) {
+    recommendations.push(key('recAdvancedAccess'));
+  }
 
   return {
     observed:

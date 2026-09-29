@@ -32,6 +32,7 @@
    */
   import StatusIcon from '../icons/StatusIcon.svelte';
   import ProgressBar from './ProgressBar.svelte';
+  import InfoTip from './InfoTip.svelte';
   import { CLASSIFICATION_META, type Classification } from '../lib/classification';
 
   interface PerformanceInfo {
@@ -61,6 +62,15 @@
     noPotentialText?: string;
     /** `boost` = limited above the base clock (within spec) → warm tone; `below_base` = real throttling. */
     severity?: 'boost' | 'below_base';
+    /**
+     * Plain-language explanations, already translated; each shows as an `InfoTip` when given
+     * (with `helpLabel`, the accessible name of the trigger): what the ring, the status tag and the
+     * performance block mean.
+     */
+    ringHelp?: string;
+    statusHelp?: string;
+    potentialHelp?: string;
+    helpLabel?: string;
   }
 
   let {
@@ -72,7 +82,11 @@
     evidenceLine,
     performance = null,
     noPotentialText = 'No cuantificable en este equipo',
-    severity
+    severity,
+    ringHelp,
+    statusHelp,
+    potentialHelp,
+    helpLabel
   }: Props = $props();
 
   let meta = $derived(CLASSIFICATION_META[classification]);
@@ -113,6 +127,9 @@
         {/key}
         <span class="caption" style:color="var(--text-tertiary)">{ringCaption}</span>
       </div>
+      {#if ringHelp && helpLabel}
+        <span class="ring-help"><InfoTip text={ringHelp} label={helpLabel} placement="bottom" /></span>
+      {/if}
     </div>
 
     <div class="middle">
@@ -126,7 +143,7 @@
         {classificationLabel}
       </span>
       {/key}
-      <span class="body" style:color="var(--text-secondary)">{evidenceLine}</span>
+      <span class="body evidence" style:color="var(--text-secondary)">{evidenceLine}{#if statusHelp && helpLabel}<InfoTip text={statusHelp} label={helpLabel} />{/if}</span>
     </div>
 
     <div class="perf-block">
@@ -139,13 +156,24 @@
           </div>
         {/if}
       {:else}
-        <span class="body" style:color="var(--text-tertiary)">{noPotentialText}</span>
+        <span class="body evidence" style:color="var(--text-tertiary)">{noPotentialText}{#if potentialHelp && helpLabel}<InfoTip text={potentialHelp} label={helpLabel} />{/if}</span>
       {/if}
     </div>
   </div>
 </div>
 
 <style>
+  .ring-help {
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+  }
+  .evidence {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
   .hero {
     container-type: inline-size;
     container-name: tw-hero;

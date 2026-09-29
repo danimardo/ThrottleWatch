@@ -20,6 +20,7 @@
    */
   import type { Snippet } from 'svelte';
   import { TONE_TOKENS, type Tone } from '../tokens/tokens';
+  import InfoTip from './InfoTip.svelte';
 
   interface Props {
     icon: Snippet;
@@ -30,9 +31,12 @@
     footnote: string;
     /** Position in the grid, for the staggered entrance (`--tw-i`). */
     enterIndex?: number;
+    /** Plain-language explanation of what this figure is; shown as an `InfoTip` with `helpLabel`. */
+    help?: string;
+    helpLabel?: string;
   }
 
-  let { icon, tone, label, value, unit, footnote, enterIndex }: Props = $props();
+  let { icon, tone, label, value, unit, footnote, enterIndex, help, helpLabel }: Props = $props();
   let token = $derived(TONE_TOKENS[tone]);
 
   // Value-change bump: a brief scale on the number whenever `value`
@@ -58,6 +62,7 @@
       {@render icon()}
     </div>
     <span class="label" style:color="var(--text-secondary)">{label}</span>
+    {#if help && helpLabel}<InfoTip text={help} label={helpLabel} />{/if}
   </div>
   <div class="value-md value-row">
     {value}{#if unit}<span class="body" style:color="var(--text-secondary)">{unit}</span>{/if}

@@ -1,6 +1,7 @@
 # ADR-0004: Lanzador elevado bajo demanda del sidecar
 
-- Estado: aceptado con condiciones (2026-09-19)
+- Estado: aceptado con condiciones (2026-09-19); enmendado el 2026-09-28 (véase «Enmienda
+  2026-09-28» al final)
 - Fecha: 2026-09-19
 - Alcance: FR-087–FR-090, T019a, T151–T158
 - Enmienda: ADR-0001, §4
@@ -165,3 +166,51 @@ interfaz vuelva a modo B/C. No detendrá ni desinstalará PawnIO, que es un cont
 - **C5:** R7 es condición de cierre de T154, no de aceptación de este ADR.
 - **C6:** T152 está hecha con resultado (b) y la tarea se configura bajo demanda, sin
   desencadenadores, sin instancias concurrentes, sin contraseña, con autor y descripción.
+
+## Enmienda 2026-09-28: lanzador persistente durante la sesión de la aplicación
+
+**Motivo:** cada reinicio del colector (un atasco transitorio, «Reparar acceso avanzado», o el
+reinicio automático interno del runtime del colector) pedía una activación nueva de la tarea
+programada y, con ella, una elevación UAC nueva. Medido en máquina real el 2026-09-28: 15-27 s por
+reinicio, muy por encima de los menos de 10 s que exige SC-019, tiempo suficiente para que el
+diagnóstico guiado pierda la cobertura del sensor de acceso avanzado y se cancele con «sensor
+perdido». Repetido de forma consistente en varias reproducciones el mismo día.
+
+**Cambio respecto a la decisión original:** el punto 5 de «La comunicación...» y el punto 4 de «El
+lanzador aplicará esta secuencia...» quedan ampliados así: el proceso lanzador, una vez conectado,
+permanece vivo con sus dos tuberías abiertas durante toda la sesión de la aplicación, no solo
+durante una sesión de colector. Acepta ciclos sucesivos de `StopSession` seguido de un nuevo
+`StartSession` sobre la misma tubería ya autenticada, en vez de morir y exigir una activación nueva
+de la tarea programada en cada reinicio del colector. Solo termina si la aplicación cierra de
+verdad la tubería (salida de la app) o si la conexión falla de forma irrecuperable — el punto 4
+("desconexión de la interfaz, EOF o ausencia de latido... detiene el sidecar y termina el
+lanzador") pasa a leerse: detiene el **sidecar** en todos los casos, pero solo termina el
+**lanzador** cuando la desconexión es el cierre real de la aplicación, no el fin de una sesión de
+colector.
+
+**Lo que no cambia:** el sidecar hijo (el único proceso con acceso real a hardware/sensores) se
+sigue matando y arrancando de cero en cada reinicio del colector, con verificación de firma contra
+el manifiesto en cada `StartSession`, igual que hoy. Solo persisten el proceso lanzador y la
+tubería — no el proceso con acceso a sensores, ni sus privilegios de lectura de hardware entre un
+`StopSession` y el siguiente `StartSession`.
+
+**Riesgo aceptado (amplía la fila «Elevación persistente innecesaria» de la tabla de amenazas):**
+un proceso con privilegios elevados vive más tiempo en segundo plano — toda la sesión de la
+aplicación — en vez de solo durante la actividad real de una sesión de colector.
+
+**Mitigaciones:** (a) sigue arrancando bajo demanda, nunca al iniciar Windows ni fuera de una
+sesión de la aplicación; (b) cada `StartSession`, incluidos los que reutilizan la tubería, repite
+la verificación completa de la firma del sidecar contra el manifiesto; (c) el nonce de sesión
+generado al abrir la tubería sigue autenticando cada mensaje, incluidos los `StartSession`
+posteriores; (d) el lanzador muere igual que hoy al cerrar la aplicación de verdad.
+
+**Alternativas descartadas:** subir el tiempo de espera de conexión (ya se hizo una vez, de 8 a
+20 s, y no basta — no ataca la causa); que el diagnóstico guiado tolere mejor el hueco de sensor
+(oculta que SC-019 sigue incumplido, no lo resuelve).
+
+**Fecha de retirada:** ninguna fija; se revisará si Task Scheduler mejora la latencia de activación
+bajo demanda de tareas interactivas con UAC, o si se identifica la causa raíz de por qué tarda
+tanto hoy (sigue sin explicarse del todo).
+
+**Revisores:** propietario (2026-09-28); pendiente de revisión independiente equivalente a la de la
+aceptación original.

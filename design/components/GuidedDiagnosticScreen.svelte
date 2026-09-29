@@ -48,6 +48,7 @@
   import ProgressBar from './ProgressBar.svelte';
   import Banner from './Banner.svelte';
   import Button from './Button.svelte';
+  import InfoTip from './InfoTip.svelte';
 
   export type DiagnosticPhase =
     | 'intro'
@@ -177,6 +178,9 @@
     onUseAsReference?: () => void;
     /** Short line under the reference button, e.g. why it is (not) recommended. */
     referenceNote?: string;
+    /** Plain-language "what does this do" for the reference button, as an `InfoTip` beside it. */
+    referenceHelp?: string;
+    helpLabel?: string;
 
     onClose?: () => void;
     closeLabel?: string;
@@ -238,6 +242,8 @@
     useAsReferenceLabel,
     onUseAsReference,
     referenceNote,
+    referenceHelp,
+    helpLabel,
     onClose,
     closeLabel,
     onRestart,
@@ -458,7 +464,10 @@
         {/if}
         {#if onUseAsReference && useAsReferenceLabel}
           <div class="reference-block">
-            <Button variant="secondary" label={useAsReferenceLabel} onclick={onUseAsReference} />
+            <span class="reference-row">
+              <Button variant="secondary" label={useAsReferenceLabel} onclick={onUseAsReference} />
+              {#if referenceHelp && helpLabel}<InfoTip text={referenceHelp} label={helpLabel} />{/if}
+            </span>
             {#if referenceNote}
               <span class="caption" style:color="var(--text-tertiary)">{referenceNote}</span>
             {/if}
@@ -483,6 +492,11 @@
 </div>
 
 <style>
+  .reference-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
   .tw-guided-diagnostic {
     background: transparent;
     padding: var(--space-6);

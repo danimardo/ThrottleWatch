@@ -45,6 +45,7 @@
   import type { Snippet } from 'svelte';
   import StatusChip from './StatusChip.svelte';
   import Banner from './Banner.svelte';
+  import InfoTip from './InfoTip.svelte';
   import CausalRail, { type CausalNode } from './CausalRail.svelte';
   import ProgressBar from './ProgressBar.svelte';
   import type { Classification } from '../lib/classification';
@@ -82,6 +83,9 @@
     reducedConfidence?: boolean;
     reducedConfidenceNoticeTitle?: string;
     reducedConfidenceNoticeDescription?: string;
+    /** Plain-language reassurance for the reduced-confidence notice, as an `InfoTip` in it. */
+    reducedConfidenceNoticeHelp?: string;
+    helpLabel?: string;
 
     observedTitle: string;
     observedText: string;
@@ -132,6 +136,8 @@
     reducedConfidence = false,
     reducedConfidenceNoticeTitle,
     reducedConfidenceNoticeDescription,
+    reducedConfidenceNoticeHelp,
+    helpLabel,
     observedTitle,
     observedText,
     causalChain,
@@ -157,6 +163,10 @@
     exportActions
   }: Props = $props();
 </script>
+
+{#snippet reducedHelpTip()}
+  <InfoTip text={reducedConfidenceNoticeHelp ?? ''} label={helpLabel ?? ''} />
+{/snippet}
 
 <div class="tw-ds tw-report-screen">
   {#if status === 'loading'}
@@ -194,7 +204,12 @@
       <Banner tone="warning" title={incompleteNoticeTitle} description={incompleteNoticeDescription} />
     {/if}
     {#if reducedConfidence && reducedConfidenceNoticeTitle}
-      <Banner tone="warning" title={reducedConfidenceNoticeTitle} description={reducedConfidenceNoticeDescription} />
+      <Banner
+        tone="warning"
+        title={reducedConfidenceNoticeTitle}
+        description={reducedConfidenceNoticeDescription}
+        action={reducedConfidenceNoticeHelp && helpLabel ? reducedHelpTip : undefined}
+      />
     {/if}
 
     <section class="block" style:--tw-i=1>

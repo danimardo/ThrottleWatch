@@ -47,6 +47,22 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
     digest.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
+/// A command for a console program that never gets a window. The application is a GUI process with
+/// no console to lend, so Windows gave every console child (`SensorAgent.exe`, `reg.exe`,
+/// `powershell.exe`, `schtasks.exe`, `sc.exe`) a new visible one: the black windows seen at start-up
+/// and flashing whenever advanced access was checked (2026-09-28/29).
+pub fn hidden_command(program: impl AsRef<std::ffi::OsStr>) -> Command {
+    #[cfg_attr(not(windows), allow(unused_mut))]
+    let mut command = Command::new(program);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
+}
+
 pub fn spawn_verified(executable: &Path, expected_sha256: &str) -> io::Result<Child> {
     let bytes = std::fs::read(executable)?;
     if !sha256_hex(&bytes).eq_ignore_ascii_case(expected_sha256) {
@@ -56,7 +72,7 @@ pub fn spawn_verified(executable: &Path, expected_sha256: &str) -> io::Result<Ch
         ));
     }
 
-    Command::new(executable)
+    hidden_command(executable)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -131,13 +147,67 @@ pub fn current_parent_process_id() -> Option<u32> {
     None
 }
 
+/// Runs the calling thread at a lower OS scheduling priority than the rest of the application, so
+/// it always yields the processor to everything else under contention. The guided diagnostic's
+/// load generator (`diagnostics::guided::ThreadedGenerator`) calls this from each of its worker
+/// threads: they deliberately saturate every logical core, and without this they can starve the
+/// collector's own reader thread long enough to blow its stall window and trigger a false restart
+/// (T187, found 2026-09-28).
+#[cfg(windows)]
+pub fn lower_current_thread_priority() {
+    use windows::Win32::System::Threading::{
+        GetCurrentThread, SetThreadPriority, THREAD_PRIORITY_BELOW_NORMAL,
+    };
+
+    // SAFETY: GetCurrentThread returns a pseudo-handle that needs no closing, and
+    // SetThreadPriority only ever affects the scheduling priority of the calling thread.
+    unsafe {
+        let _ = SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+    }
+}
+
+#[cfg(not(windows))]
+pub fn lower_current_thread_priority() {}
+
+/// Puts the calling process in `NORMAL_PRIORITY_CLASS` (T187, 2026-09-28). The elevated launcher
+/// is started by Task Scheduler, whose default task priority is below normal; its sidecar child
+/// inherits that class and, under any normal-priority CPU load, got no CPU at all — not one sample,
+/// not even a line on stderr. Raising the launcher before it spawns the sidecar fixes both.
+#[cfg(windows)]
+pub fn raise_current_process_to_normal_priority() -> std::io::Result<()> {
+    use windows::Win32::System::Threading::{
+        GetCurrentProcess, NORMAL_PRIORITY_CLASS, SetPriorityClass,
+    };
+
+    // SAFETY: GetCurrentProcess returns a pseudo-handle that needs no closing, and
+    // SetPriorityClass only changes the scheduling class of this very process.
+    unsafe { SetPriorityClass(GetCurrentProcess(), NORMAL_PRIORITY_CLASS) }
+        .map_err(|error| std::io::Error::other(error.to_string()))
+}
+
+#[cfg(not(windows))]
+pub fn raise_current_process_to_normal_priority() -> std::io::Result<()> {
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        RestartPolicy, parent_process_alive, read_line_or_eof, sha256_hex, watchdog_expired,
+        RestartPolicy, lower_current_thread_priority, parent_process_alive, read_line_or_eof,
+        sha256_hex, watchdog_expired,
     };
     use std::io::Cursor;
     use std::time::{Duration, Instant};
+
+    #[test]
+    fn lowering_the_current_thread_priority_never_panics() {
+        lower_current_thread_priority();
+    }
+
+    #[test]
+    fn a_process_can_put_itself_in_the_normal_priority_class() {
+        assert!(super::raise_current_process_to_normal_priority().is_ok());
+    }
 
     #[test]
     fn computes_a_stable_sha256_digest() {

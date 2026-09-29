@@ -43,11 +43,15 @@ internal static class Program
             return 0;
         }
 
-        using var collector = new HardwareCollector();
-        collector.Open();
-        var session = new SidecarSession(collector);
         var logger = Log.Create("sensor-agent");
         Log.AttachUnhandledExceptionHandlers(logger);
+        StageWatchdog.Start(logger);
+        using var collector = new HardwareCollector();
+        using (StageWatchdog.Enter("open"))
+        {
+            collector.Open();
+        }
+        var session = new SidecarSession(collector);
 
         // Two writers share stdout: the reader task (replies) and the sampling timer.
         using var writeGate = new SemaphoreSlim(1, 1);
@@ -86,10 +90,21 @@ internal static class Program
                         continue;
                     }
 
-                    if (now >= due && session.NextSample() is { } sample)
+                    if (now >= due)
                     {
-                        due = now + session.IntervalMs;
-                        await WriteAsync([sample]);
+                        string? sample;
+                        using (StageWatchdog.Enter("sample"))
+                        {
+                            sample = session.NextSample();
+                        }
+                        if (sample is not null)
+                        {
+                            due = now + session.IntervalMs;
+                            using (StageWatchdog.Enter("write sample"))
+                            {
+                                await WriteAsync([sample]);
+                            }
+                        }
                     }
                 }
                 catch (OperationCanceledException)
@@ -105,7 +120,12 @@ internal static class Program
 
         while (await streams.ReadLineAsync(CancellationToken.None) is { } line)
         {
-            await WriteAsync(session.Handle(line));
+            IReadOnlyList<string> replies;
+            using (StageWatchdog.Enter("handle message"))
+            {
+                replies = session.Handle(line);
+            }
+            await WriteAsync(replies);
             if (session.ShutdownRequested)
             {
                 break;

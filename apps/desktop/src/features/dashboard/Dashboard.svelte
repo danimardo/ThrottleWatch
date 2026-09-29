@@ -27,7 +27,8 @@
   import {
     COLLECTOR_LABEL_KEYS,
     confidenceLabelFor,
-    coverageReasonLabel,
+    coverageRowView,
+    type CoverageRowView,
     createDemoSnapshot,
     formatNumber,
     fromLiveSnapshot,
@@ -61,17 +62,7 @@
     )
   );
   let coverageOpen = $state(false);
-  let coverageRows = $state<
-    Array<{
-      id: string;
-      label: string;
-      available: boolean;
-      quality: 'direct' | 'derived' | 'substitute';
-      qualityLabel: string;
-      sourceLabel: string;
-      reasonLabel: string;
-    }>
-  >([]);
+  let coverageRows = $state<CoverageRowView[]>([]);
   let advancedAccess = $state<DashboardSnapshot['advancedAccess']>(
     createDemoSnapshot(t).advancedAccess
   );
@@ -176,18 +167,7 @@
     void invokeValidated('get_coverage', undefined, coverageMatrixSchema).then(
       (result) => {
         if (!result.ok) return;
-        coverageRows = result.value.rows.map((row) => ({
-          id: row.id,
-          label: row.label,
-          available: row.available,
-          quality:
-            row.quality === 'derived' || row.quality === 'substitute'
-              ? row.quality
-              : 'direct',
-          qualityLabel: row.quality_label ?? t('dashboard.unknown'),
-          sourceLabel: row.source_label ?? t('dashboard.unavailable'),
-          reasonLabel: coverageReasonLabel(t, row.reason_key)
-        }));
+        coverageRows = result.value.rows.map((row) => coverageRowView(t, row));
         advancedAccess = result.value.advanced_access;
       }
     );
@@ -200,18 +180,7 @@
       coverageMatrixSchema
     ).then((result) => {
       if (!result.ok) return;
-      coverageRows = result.value.rows.map((row) => ({
-        id: row.id,
-        label: row.label,
-        available: row.available,
-        quality:
-          row.quality === 'derived' || row.quality === 'substitute'
-            ? row.quality
-            : 'direct',
-        qualityLabel: row.quality_label ?? 'Unknown',
-        sourceLabel: row.source_label ?? 'Unavailable',
-        reasonLabel: row.reason_key ?? 'coverage.unavailable'
-      }));
+      coverageRows = result.value.rows.map((row) => coverageRowView(t, row));
       advancedAccess = result.value.advanced_access;
     });
   }
@@ -237,18 +206,7 @@
       coverageMatrixSchema
     ).then((result) => {
       if (!result.ok) return;
-      coverageRows = result.value.rows.map((row) => ({
-        id: row.id,
-        label: row.label,
-        available: row.available,
-        quality:
-          row.quality === 'derived' || row.quality === 'substitute'
-            ? row.quality
-            : 'direct',
-        qualityLabel: row.quality_label ?? 'Unknown',
-        sourceLabel: row.source_label ?? 'Unavailable',
-        reasonLabel: row.reason_key ?? 'coverage.unavailable'
-      }));
+      coverageRows = result.value.rows.map((row) => coverageRowView(t, row));
       advancedAccess = result.value.advanced_access;
     });
   }
@@ -270,7 +228,15 @@
     coverageActionLabel={t('dashboard.viewCoverage')}
     onCoverage={() => (coverageOpen = !coverageOpen)}
   />
-  <StatusHero {...hero} />
+  <StatusHero
+    {...hero}
+    ringHelp={currentSnapshot.thermalLimitC === null
+      ? t('help.ringNoLimit')
+      : t('help.ring')}
+    statusHelp={t('help.status')}
+    potentialHelp={t('help.potential')}
+    helpLabel={t('help.more')}
+  />
   <section class="stats" aria-label={t('dashboard.currentSignals')}>
     {#snippet thermometerIcon()}
       <svg
@@ -328,6 +294,10 @@
       )}
       unit={currentSnapshot.temperatureC === null ? undefined : '°C'}
       footnote={marginText(currentSnapshot, t, numberLocale)}
+      help={currentSnapshot.thermalLimitC === null
+        ? t('help.temperatureNoLimit')
+        : t('help.temperature')}
+      helpLabel={t('help.more')}
       enterIndex={0}
     />
     <StatWidget
@@ -342,6 +312,8 @@
       )}
       unit={currentSnapshot.loadPercent === null ? undefined : '%'}
       footnote={t('dashboard.activeProcessors')}
+      help={t('help.load')}
+      helpLabel={t('help.more')}
       enterIndex={1}
     />
     <StatWidget
@@ -358,6 +330,8 @@
       footnote={currentSnapshot.baseClockMhz === null
         ? t('dashboard.baseClockUnavailable')
         : `${t('dashboard.base')} ${formatNumber(currentSnapshot.baseClockMhz, 0, numberLocale, t('dashboard.unavailableShort'))} MHz`}
+      help={t('help.clock')}
+      helpLabel={t('help.more')}
       enterIndex={2}
     />
     <StatWidget
@@ -374,6 +348,8 @@
       footnote={currentSnapshot.powerLimitW === null
         ? t('dashboard.powerLimitUnavailable')
         : `${t('dashboard.limit')} ${formatNumber(currentSnapshot.powerLimitW, 0, numberLocale, t('dashboard.unavailableShort'))} W`}
+      help={t('help.power')}
+      helpLabel={t('help.more')}
       enterIndex={3}
     />
   </section>
@@ -412,7 +388,9 @@
           ? t('dashboard.advancedNotNeeded')
           : advancedAccess === 'upgradable'
             ? t('dashboard.advancedUpgradable')
-            : t('dashboard.advancedCanImprove')}
+            : advancedAccess === 'capped_by_vendor'
+              ? t('dashboard.advancedCappedByVendor')
+              : t('dashboard.advancedCanImprove')}
         requestAccessLabel={advancedAccess === 'upgradable'
           ? t('dashboard.upgradeAdvanced')
           : t('dashboard.installAdvanced')}
@@ -423,6 +401,23 @@
         onDisableAccess={disableAdvancedAccess}
         recheckLabel={t('dashboard.checkAgain')}
         onRecheck={recheckCoverage}
+        rowHelp={{
+          temperature: t('help.coverageRow.temperature'),
+          active_clock: t('help.coverageRow.active_clock'),
+          power: t('help.coverageRow.power'),
+          thermal_flag: t('help.coverageRow.thermal_flag')
+        }}
+        qualityHelp={{
+          direct: t('help.quality.direct'),
+          derived: t('help.quality.derived'),
+          substitute: t('help.quality.substitute')
+        }}
+        accessHelp={advancedAccess === 'capped_by_vendor'
+          ? t('help.access.capped')
+          : advancedAccess === 'available' || advancedAccess === 'not_needed'
+            ? t('help.access.active')
+            : t('help.access.optional')}
+        helpLabel={t('help.more')}
       />
     </section>
   {/if}

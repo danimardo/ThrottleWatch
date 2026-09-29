@@ -35,7 +35,7 @@ export function toStatusHeroView(
       : `${String(Math.round(snapshot.temperatureC))}°`;
   const ringCaption =
     snapshot.thermalLimitC === null
-      ? t('dashboard.limitUnavailable')
+      ? t('dashboard.limitUnknownShort')
       : `${locale === 'es-ES' ? 'Límite' : 'Limit'} ${String(Math.round(snapshot.thermalLimitC))}°`;
   const ringPercent =
     snapshot.temperatureC !== null && snapshot.thermalLimitC !== null

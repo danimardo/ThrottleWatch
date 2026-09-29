@@ -16,7 +16,7 @@ use crate::ipc::supervisor::{RestartPolicy, spawn_verified};
 use serde_json::{Value, json};
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
-use std::process::{Child, ChildStdin, Command, Stdio};
+use std::process::{Child, ChildStdin, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, mpsc};
 use std::thread::{self, JoinHandle};
@@ -145,6 +145,18 @@ pub enum SessionEnd {
     Reconfigured,
 }
 
+const fn session_end_reason(end: &SessionEnd) -> &'static str {
+    match end {
+        SessionEnd::Eof => "eof",
+        SessionEnd::Stalled => "stalled",
+        SessionEnd::TooManyInvalid => "too_many_invalid",
+        SessionEnd::Fatal => "fatal",
+        SessionEnd::Stopped => "stopped",
+        SessionEnd::Paused => "paused",
+        SessionEnd::Reconfigured => "reconfigured",
+    }
+}
+
 fn lock(live: &Mutex<LiveState>) -> MutexGuard<'_, LiveState> {
     live.lock().unwrap_or_else(PoisonError::into_inner)
 }
@@ -237,6 +249,15 @@ fn run_session_with_pause(
             Received::Eof => return SessionEnd::Eof,
             Received::Timeout => {
                 if last_progress.elapsed() >= limit {
+                    crate::log_debug!(
+                        component: "core",
+                        "COLLECTOR_STALL_DETECTED",
+                        format!(
+                            "no sample arrived within the stall window ({} ms elapsed, {} ms allowed)",
+                            last_progress.elapsed().as_millis(),
+                            limit.as_millis()
+                        )
+                    );
                     return SessionEnd::Stalled;
                 }
             }
@@ -337,6 +358,18 @@ fn handle_message(
             Handled::Progress
         }
         "sample" => {
+            // Diagnosis (2026-09-28): samples stop arriving within ~1.5 s of the guided load
+            // starting; this says whether they were getting slower before they stopped.
+            if let Some(duration_ms) = payload.get("duration_ms").and_then(Value::as_u64)
+                && duration_ms * 2 > config.interval().as_millis() as u64
+            {
+                crate::log_debug!(
+                    component: "core",
+                    "COLLECTOR_SAMPLE_SLOW",
+                    "the sidecar took more than half the sampling interval to build a sample",
+                    duration_ms = duration_ms
+                );
+            }
             let mut guard = lock(live);
             guard.apply_host_clock((config.host_clock)());
             if guard.apply_sample(payload, epoch_ms()).is_err() {
@@ -447,6 +480,12 @@ fn run_forever_with_pause(
                 return;
             }
         };
+        crate::log_info!(
+            component: "core",
+            "COLLECTOR_SESSION_ENDED",
+            "the collector session ended",
+            reason = session_end_reason(&end)
+        );
         if end == SessionEnd::Stopped || stop.load(Ordering::SeqCst) {
             break;
         }
@@ -690,7 +729,7 @@ pub struct CommandLauncher {
 
 impl CollectorLauncher for CommandLauncher {
     fn launch(&mut self) -> io::Result<Box<dyn CollectorLink>> {
-        let child = Command::new(&self.program)
+        let child = crate::ipc::supervisor::hidden_command(&self.program)
             .args(&self.args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -936,9 +975,17 @@ mod tests {
         inbound.push(Received::Timeout);
         let mut link = Scripted::new(inbound, || Received::Timeout);
 
-        let (end, _live, _observer) = run(&mut link, &AtomicBool::new(false));
+        let mut end = None;
+        let events = crate::logging::capture_events(|| {
+            end = Some(run(&mut link, &AtomicBool::new(false)).0);
+        });
 
-        assert_eq!(end, SessionEnd::Stalled);
+        assert_eq!(end, Some(SessionEnd::Stalled));
+        let stall = events
+            .iter()
+            .find(|event| event.code == "COLLECTOR_STALL_DETECTED")
+            .unwrap_or_else(|| panic!("expected a COLLECTOR_STALL_DETECTED event"));
+        assert!(stall.msg.contains("ms elapsed") && stall.msg.contains("ms allowed"));
     }
 
     #[test]
@@ -1172,6 +1219,22 @@ mod tests {
             .filter(|change| **change == Change::Collector)
             .count();
         assert!(restarting >= 5);
+    }
+
+    #[test]
+    fn every_session_end_is_readable_from_the_log_with_its_reason() {
+        let mut launcher = Launcher { links: (0..10).map(|_| dying_link()).collect(), launched: 0 };
+
+        let events = crate::logging::capture_events(|| {
+            drive(&mut launcher);
+        });
+
+        let ended: Vec<&str> = events
+            .iter()
+            .filter(|event| event.code == "COLLECTOR_SESSION_ENDED")
+            .map(|event| event.fields["reason"].as_str().unwrap_or_default())
+            .collect();
+        assert_eq!(ended, vec!["eof", "eof", "eof"]);
     }
 
     #[test]

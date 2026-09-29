@@ -336,6 +336,8 @@
     : undefined}
   onUseAsReference={() => void markAsReference()}
   referenceNote={finished?.is_reference ? t('guided.referenceSet') : undefined}
+  referenceHelp={t('help.reference')}
+  helpLabel={t('help.more')}
   closeLabel={currentPhase === 'result' && finishedSessionId !== null
     ? t('guided.viewReport')
     : t('guided.close')}

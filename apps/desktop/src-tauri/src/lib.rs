@@ -29,6 +29,12 @@ use tauri::{Emitter, Manager};
 /// Keeps the collector runtime alive for the life of the application; stopped on exit.
 pub(crate) struct CollectorHandle(pub(crate) Mutex<telemetry::runtime::CollectorRuntime>);
 
+/// The elevated launcher connection kept alive across collector restarts within this application
+/// session (ADR-0004 amendment, 2026-09-28) — deliberately a *separate* managed state from
+/// [`CollectorHandle`], so `restart_collector` tearing down and rebuilding the `CollectorRuntime`
+/// never touches it. `None` until the first elevated launch of this run.
+pub(crate) struct ElevatedConnectionHandle(pub(crate) telemetry::launch::SharedElevatedConnection);
+
 /// Port Playwright's CDP client attaches to in the `e2e` build (T-PLAY-002). `tauri.conf.json`
 /// marks the main window `"create": false` so it is only ever built here, where wry lets us pass
 /// `additional_browser_args`; setting `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` instead has no effect
@@ -339,8 +345,13 @@ pub fn run() {
                 enabled = advanced_access_enabled,
                 elevated = telemetry::launch::should_launch_elevated(advanced_access_enabled)
             );
+            let elevated_connection: telemetry::launch::SharedElevatedConnection =
+                std::sync::Arc::new(Mutex::new(None));
             let runtime = telemetry::runtime::CollectorRuntime::start(
-                telemetry::launch::collector_launcher(advanced_access_enabled),
+                telemetry::launch::collector_launcher(
+                    advanced_access_enabled,
+                    elevated_connection.clone(),
+                ),
                 live.0,
                 observer,
                 config,
@@ -349,6 +360,7 @@ pub fn run() {
                 runtime.set_battery_paused(true);
             }
             app.manage(CollectorHandle(Mutex::new(runtime)));
+            app.manage(ElevatedConnectionHandle(elevated_connection));
             sampling_control::spawn_power_watch(app.handle().clone());
             let glass_thresholds = appearance::GlassThresholds::from_ruleset(&rules)
                 .ok_or_else(|| std::io::Error::other("ruleset lacks the glass parameters"))?;
@@ -423,6 +435,15 @@ pub(crate) fn shutdown_services(app: &tauri::AppHandle) {
     let Ok(mut runtime) = collector.0.lock() else { return };
     runtime.stop();
     drop(runtime);
+    // Closes the elevated launcher's master pipe handles for real (ADR-0004 amendment,
+    // 2026-09-28): this is the one case that is supposed to end the launcher process, not just a
+    // collector session — dropped explicitly here rather than left to whenever the managed state
+    // itself drops, so the launcher's own shutdown is not at the mercy of Tauri's teardown order.
+    if let Some(elevated) = app.try_state::<ElevatedConnectionHandle>()
+        && let Ok(mut connection) = elevated.0.lock()
+    {
+        *connection = None;
+    }
     if let Some(recorder) = app.try_state::<commands::RecorderHandle>() {
         recorder.flush(app);
     }

@@ -136,8 +136,8 @@
       />
 
       <div class="stat-grid">
-        <StatWidget enterIndex={0} icon={flameIcon} tone="thermal" label="Temperatura" value="98" unit="°C" footnote="Margen −4 °C · directo" />
-        <StatWidget enterIndex={1} icon={loadIcon} tone="accent" label="Carga" value="92" unit="%" footnote="P 95 % · E 88 %" />
+        <StatWidget enterIndex={0} icon={flameIcon} tone="thermal" label="Temperatura" value="98" unit="°C" footnote="Margen −4 °C · directo" helpLabel="Más información" help="La temperatura actual del procesador. Es normal que suba cuando trabaja mucho." />
+        <StatWidget enterIndex={1} icon={loadIcon} tone="accent" label="Carga" value="92" unit="%" footnote="P 95 % · E 88 %" helpLabel="Más información" help="Qué parte de la capacidad de tu procesador se está usando ahora. Al 100 % trabaja a tope." />
         <StatWidget enterIndex={2} icon={clockIcon} tone="warm" label="Frecuencia activa" value="2.1" unit="GHz" footnote="Base 2,6 GHz · P 2,1 · E 1,8" />
         <StatWidget enterIndex={3} icon={boltIcon} tone="accent" label="Potencia" value="142" unit="W" footnote="Sin límite eléctrico activo" />
       </div>

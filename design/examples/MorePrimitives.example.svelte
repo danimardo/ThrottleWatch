@@ -8,7 +8,7 @@
    * download) and indeterminate (a diagnóstico guiado step still
    * gathering its first reading), and Banner + EmptyState.
    */
-  import { OptionRow, Select, Tooltip, ProgressBar, Banner, EmptyState, NavIcon, Button } from '../components';
+  import { OptionRow, Select, Tooltip, InfoTip, ProgressBar, Banner, EmptyState, NavIcon, Button } from '../components';
 
   const cores = [
     { id: 'P0', temp: 87, load: 74, clock: 4.4, throttle: 0 },
@@ -35,6 +35,14 @@
           {/snippet}
         </Tooltip>
       {/each}
+    </div>
+    <h3 class="label" style:color="var(--text-tertiary)">INFOTIP</h3>
+    <div class="core-row">
+      <span class="body-strong">Frecuencia activa</span>
+      <InfoTip
+        label="Más información"
+        text="Es la velocidad a la que trabaja tu procesador ahora mismo. Cuanto más alta, más rápido va."
+      />
     </div>
   </section>
 

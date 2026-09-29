@@ -10,7 +10,8 @@ export type AdvancedAccess =
   | 'installable'
   | 'upgradable'
   | 'denied'
-  | 'error';
+  | 'error'
+  | 'capped_by_vendor';
 export type Translate = (key: string) => string;
 
 /**
@@ -190,5 +191,62 @@ export function fromLiveSnapshot(value: LiveSnapshot): DashboardSnapshot {
           method: value.cooling_potential.method
         }
       : undefined
+  };
+}
+
+const COVERAGE_ROW_IDS = ['temperature', 'active_clock', 'power', 'thermal_flag'];
+const COVERAGE_SOURCES: Readonly<Record<string, string>> = {
+  'CPU package': 'cpu_package',
+  LibreHardwareMonitor: 'librehardwaremonitor',
+  'MSR/SMU': 'msr_smu',
+  PDH: 'pdh'
+};
+
+export interface CoverageRowView {
+  id: string;
+  label: string;
+  available: boolean;
+  quality: 'direct' | 'derived' | 'substitute';
+  qualityLabel: string;
+  sourceLabel: string;
+  reasonLabel: string;
+}
+
+/**
+ * One row of the coverage table, in the person's words. The backend sends identifiers (`active_clock`)
+ * and, for quality, a Spanish word; both used to reach the screen as they were — in the wrong
+ * language, and after "Comprobar de nuevo" with the raw reason key too.
+ */
+export function coverageRowView(
+  t: Translate,
+  row: {
+    id: string;
+    available: boolean;
+    quality?: string;
+    source_label?: string | null;
+    reason_key?: string | null;
+  }
+): CoverageRowView {
+  const quality =
+    row.quality === 'derived' || row.quality === 'substitute'
+      ? row.quality
+      : 'direct';
+  const source = row.source_label ?? undefined;
+  const sourceKey = source === undefined ? undefined : COVERAGE_SOURCES[source];
+  return {
+    id: row.id,
+    label: t(
+      `dashboard.coverageRow.${COVERAGE_ROW_IDS.includes(row.id) ? row.id : 'unknown'}`
+    ),
+    available: row.available,
+    quality,
+    qualityLabel: t(`dashboard.coverageQuality.${quality}`),
+    sourceLabel:
+      source === undefined
+        ? t('dashboard.unavailable')
+        : sourceKey === undefined
+          ? source
+          : t(`dashboard.coverageSource.${sourceKey}`),
+    reasonLabel: coverageReasonLabel(t, row.reason_key)
   };
 }

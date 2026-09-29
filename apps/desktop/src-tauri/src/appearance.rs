@@ -7,11 +7,15 @@
 //!    API has no dedicated change event for this specific property, and claiming a push
 //!    subscription that may never fire would be worse than an honest poll (docs/spikes,
 //!    ADR discipline: never promise a signal that was not verified to arrive).
-//! 3. An automatic performance ceiling with hysteresis (`glass.*` in ruleset-v1), driven by the
-//!    frame rate the frontend reports in short windows and this process's own WebView2 CPU cost,
-//!    sampled the same way T019c's spike measured it (`docs/spikes/glass-cost.md`): summed
-//!    `GetProcessTimes` of every `msedgewebview2.exe` descending from this process, as a percent
-//!    of the whole machine.
+//! 3. An automatic performance ceiling with hysteresis (`glass.*` in ruleset-v1), driven only by
+//!    the frame rate the frontend reports in short windows — a real, visible stutter. It is no
+//!    longer driven by this process's own idle WebView2 CPU cost (removed 2026-09-28, product
+//!    decision, FR-043b amended): at `glass.degrade_idle_cpu_pct` = 1 %, routine live-dashboard
+//!    repaints alone crossed it on an idle machine, degrading and partially recovering on a cycle
+//!    close to `restore_window_s` with nothing actually wrong — and, separately, any CPU load
+//!    elsewhere on the machine (the guided test's own generator included) held it degraded for as
+//!    long as that load ran, which the person explicitly does not want: the glass effect should
+//!    look the same whether the CPU is idle or pinned at 100 % by something else entirely.
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
 use crate::diagnostics::Ruleset;
@@ -79,8 +83,6 @@ pub fn resolve_base_level(preference: &str, system_advanced_effects: Option<bool
 pub struct GlassThresholds {
     pub degrade_fps: f64,
     pub degrade_window: Duration,
-    pub degrade_idle_cpu_pct: f64,
-    pub degrade_idle_window: Duration,
     pub restore_fps: f64,
     pub restore_window: Duration,
 }
@@ -90,10 +92,6 @@ impl GlassThresholds {
         Some(Self {
             degrade_fps: rules.parameter("glass.degrade_fps")?,
             degrade_window: Duration::from_secs_f64(rules.parameter("glass.degrade_window_s")?),
-            degrade_idle_cpu_pct: rules.parameter("glass.degrade_idle_cpu_pct")?,
-            degrade_idle_window: Duration::from_secs_f64(
-                rules.parameter("glass.degrade_idle_window_s")?,
-            ),
             restore_fps: rules.parameter("glass.restore_fps")?,
             restore_window: Duration::from_secs_f64(rules.parameter("glass.restore_window_s")?),
         })
@@ -129,13 +127,12 @@ impl RollingWindow {
     }
 }
 
-/// Pure hysteresis state machine: feed it fps and idle-CPU-percent samples, ask it to `tick`, get
-/// back the performance ceiling. Never depends on real time passing or real hardware — every
-/// method takes `now` explicitly, so tests drive it with synthetic instants (constitution XIII).
+/// Pure hysteresis state machine: feed it fps samples, ask it to `tick`, get back the performance
+/// ceiling. Never depends on real time passing or real hardware — every method takes `now`
+/// explicitly, so tests drive it with synthetic instants (constitution XIII).
 pub struct GlassDegradation {
     thresholds: GlassThresholds,
     fps: RollingWindow,
-    idle_cpu: RollingWindow,
     ceiling: GlassLevel,
     degraded_at: Option<Instant>,
 }
@@ -145,7 +142,6 @@ impl GlassDegradation {
         Self {
             thresholds,
             fps: RollingWindow::default(),
-            idle_cpu: RollingWindow::default(),
             ceiling: GlassLevel::Full,
             degraded_at: None,
         }
@@ -153,10 +149,6 @@ impl GlassDegradation {
 
     pub fn record_fps(&mut self, now: Instant, fps: f64) {
         self.fps.push(now, fps);
-    }
-
-    pub fn record_idle_cpu_pct(&mut self, now: Instant, pct: f64) {
-        self.idle_cpu.push(now, pct);
     }
 
     pub fn ceiling(&self) -> GlassLevel {
@@ -171,24 +163,20 @@ impl GlassDegradation {
 
     /// Re-evaluates the ceiling from whatever samples are on record and returns it. Call this
     /// periodically (the monitor loop) and after every new sample, so a degrade or a restore is
-    /// never more than one tick late.
+    /// never more than one tick late. Driven only by frame rate (2026-09-28): a real, visible
+    /// stutter, never this process's own background CPU cost — see the module doc comment.
     pub fn tick(&mut self, now: Instant) -> GlassLevel {
         let fps_bad = self
             .fps
             .mean_over(now, self.thresholds.degrade_window)
             .is_some_and(|mean| mean < self.thresholds.degrade_fps);
-        let cpu_bad = self
-            .idle_cpu
-            .mean_over(now, self.thresholds.degrade_idle_window)
-            .is_some_and(|mean| mean > self.thresholds.degrade_idle_cpu_pct);
 
-        if (fps_bad || cpu_bad) && self.ceiling != GlassLevel::Off {
+        if fps_bad && self.ceiling != GlassLevel::Off {
             self.ceiling = self.ceiling.step_down();
             self.degraded_at = Some(now);
             // A confirmed problem must not immediately count as resolved by its own evidence: the
             // next step down (or the eventual restore) needs fresh samples, not this same window.
             self.fps = RollingWindow::default();
-            self.idle_cpu = RollingWindow::default();
             return self.ceiling;
         }
 
@@ -196,29 +184,18 @@ impl GlassDegradation {
             return self.ceiling;
         }
 
-        // No separate "restore" idle-CPU threshold exists in ruleset-v1: restoring reuses the
-        // same degrade_idle_cpu_pct, held clear for the longer restore_window instead of the
-        // shorter degrade_idle_window — the asymmetry is in the timing, not the level, matching
-        // how `restore_fps` (55) is itself already a looser bound than `degrade_fps` (50). A
-        // signal with no samples yet is "not disproven", not "bad" — it does not block a restore
-        // driven by the other signal.
         let fps_ok = self
             .fps
             .mean_over(now, self.thresholds.restore_window)
             .is_none_or(|mean| mean >= self.thresholds.restore_fps);
-        let cpu_ok = self
-            .idle_cpu
-            .mean_over(now, self.thresholds.restore_window)
-            .is_none_or(|mean| mean <= self.thresholds.degrade_idle_cpu_pct);
         let held_long_enough = self
             .degraded_at
             .is_none_or(|at| now.duration_since(at) >= self.thresholds.restore_window);
 
-        if fps_ok && cpu_ok && held_long_enough {
+        if fps_ok && held_long_enough {
             self.ceiling = self.ceiling.step_up();
             self.degraded_at = None;
             self.fps = RollingWindow::default();
-            self.idle_cpu = RollingWindow::default();
         }
 
         self.ceiling
@@ -247,128 +224,8 @@ pub fn advanced_effects_enabled() -> Option<bool> {
     None
 }
 
-/// Every `msedgewebview2.exe` descending from `current_pid`, walking parent links from the same
-/// snapshot `ipc::supervisor::current_parent_process_id` already uses for the guided watchdog.
-#[cfg(windows)]
-fn webview2_process_ids(current_pid: u32) -> Vec<u32> {
-    use std::collections::HashMap;
-    use std::mem::size_of;
-    use windows::Win32::Foundation::CloseHandle;
-    use windows::Win32::System::Diagnostics::ToolHelp::{
-        CreateToolhelp32Snapshot, PROCESSENTRY32, Process32First, Process32Next, TH32CS_SNAPPROCESS,
-    };
-
-    let Ok(snapshot) = (unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) }) else {
-        return Vec::new();
-    };
-    let mut entry =
-        PROCESSENTRY32 { dwSize: size_of::<PROCESSENTRY32>() as u32, ..Default::default() };
-    let mut rows: Vec<(u32, u32, String)> = Vec::new();
-    // SAFETY: `entry` is valid and sized per the documented struct; `snapshot` came from
-    // CreateToolhelp32Snapshot above and is closed once, on every path out of this function.
-    let mut found = unsafe { Process32First(snapshot, &mut entry).is_ok() };
-    while found {
-        let name: String = entry
-            .szExeFile
-            .iter()
-            .take_while(|&&b| b != 0)
-            .map(|&b| b as u8 as char)
-            .collect::<String>()
-            .to_lowercase();
-        rows.push((entry.th32ProcessID, entry.th32ParentProcessID, name));
-        // SAFETY: same valid snapshot/entry, the documented enumeration pattern.
-        found = unsafe { Process32Next(snapshot, &mut entry).is_ok() };
-    }
-    // SAFETY: closes the handle `CreateToolhelp32Snapshot` returned above, exactly once.
-    let _ = unsafe { CloseHandle(snapshot) };
-
-    let parent_of: HashMap<u32, u32> =
-        rows.iter().map(|(pid, parent, _)| (*pid, *parent)).collect();
-    let descends_from_current = |pid: u32| -> bool {
-        let mut cursor = pid;
-        // Bounded walk: browser -> GPU/renderer/utility is a handful of hops at most, never
-        // unbounded even if a cycle existed in a corrupted snapshot.
-        for _ in 0..8 {
-            if cursor == current_pid {
-                return true;
-            }
-            match parent_of.get(&cursor) {
-                Some(&parent) if parent != 0 && parent != cursor => cursor = parent,
-                _ => return false,
-            }
-        }
-        false
-    };
-    rows.into_iter()
-        .filter(|(pid, _, name)| name == "msedgewebview2.exe" && descends_from_current(*pid))
-        .map(|(pid, _, _)| pid)
-        .collect()
-}
-
-#[cfg(windows)]
-fn process_cpu_time_100ns(pid: u32) -> Option<u64> {
-    use windows::Win32::Foundation::{CloseHandle, FILETIME};
-    use windows::Win32::System::Threading::{
-        GetProcessTimes, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
-    };
-
-    // SAFETY: opens a handle with only the access right GetProcessTimes needs; closed below.
-    let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) }.ok()?;
-    let mut creation = FILETIME::default();
-    let mut exit = FILETIME::default();
-    let mut kernel = FILETIME::default();
-    let mut user = FILETIME::default();
-    // SAFETY: `handle` is the process handle just opened above; the four out-parameters point at
-    // local `FILETIME` values the API is documented to fill in place.
-    let ok = unsafe { GetProcessTimes(handle, &mut creation, &mut exit, &mut kernel, &mut user) }
-        .is_ok();
-    // SAFETY: closes the handle opened by `OpenProcess` above, exactly once.
-    let _ = unsafe { CloseHandle(handle) };
-    if !ok {
-        return None;
-    }
-    let as_100ns =
-        |ft: FILETIME| (u64::from(ft.dwHighDateTime) << 32) | u64::from(ft.dwLowDateTime);
-    Some(as_100ns(kernel) + as_100ns(user))
-}
-
-/// Cumulative (lifetime, not a delta) kernel+user CPU time of every WebView2 process this
-/// application owns, in milliseconds. `None` when there is no WebView2 process yet (too early in
-/// startup) or the platform is not Windows — the monitor loop treats that as "no sample", never
-/// as zero CPU.
-#[cfg(windows)]
-pub fn own_webview_cpu_time_ms() -> Option<u64> {
-    use windows::Win32::System::Threading::GetCurrentProcessId;
-
-    // SAFETY: takes no arguments and only reads the calling process's own id.
-    let current_pid = unsafe { GetCurrentProcessId() };
-    let pids = webview2_process_ids(current_pid);
-    if pids.is_empty() {
-        return None;
-    }
-    let total_100ns: u64 = pids.iter().filter_map(|&pid| process_cpu_time_100ns(pid)).sum();
-    Some(total_100ns / 10_000)
-}
-
-#[cfg(not(windows))]
-pub fn own_webview_cpu_time_ms() -> Option<u64> {
-    None
-}
-
-/// `cpu_ms` is a CPU-time delta over `elapsed` (never the cumulative total `own_webview_cpu_time_ms`
-/// returns); matches T019c's own formula (`docs/spikes/glass-cost.md`): time spent divided by
-/// wall-clock time available across every logical processor.
-pub fn cpu_percent_of_machine(cpu_ms: u64, elapsed: Duration, logical_processors: usize) -> f64 {
-    if elapsed.is_zero() || logical_processors == 0 {
-        return 0.0;
-    }
-    let elapsed_ms = elapsed.as_secs_f64() * 1000.0;
-    (cpu_ms as f64) / (elapsed_ms * logical_processors as f64) * 100.0
-}
-
-/// How often the monitor thread rechecks the OS transparency setting and this process's own
-/// WebView2 CPU cost. Short enough to track `glass.degrade_window_s` (3 s by default) without a
-/// large delay, long enough not to matter as its own CPU cost.
+/// How often the monitor thread rechecks the OS transparency setting. Short enough to notice a
+/// preference/system change quickly, long enough not to matter as its own CPU cost.
 const GLASS_POLL: Duration = Duration::from_secs(3);
 const GLASS_EFFECTIVE_EVENT: &str = "appearance:glass-effective";
 
@@ -378,7 +235,6 @@ const GLASS_EFFECTIVE_EVENT: &str = "appearance:glass-effective";
 pub struct GlassMonitorState {
     degradation: std::sync::Mutex<GlassDegradation>,
     last_emitted: std::sync::Mutex<Option<GlassLevel>>,
-    previous_cpu_ms: std::sync::Mutex<Option<u64>>,
 }
 
 impl GlassMonitorState {
@@ -386,7 +242,6 @@ impl GlassMonitorState {
         Self {
             degradation: std::sync::Mutex::new(GlassDegradation::new(thresholds)),
             last_emitted: std::sync::Mutex::new(None),
-            previous_cpu_ms: std::sync::Mutex::new(None),
         }
     }
 }
@@ -433,46 +288,25 @@ fn recompute_and_emit(app: &tauri::AppHandle, state: &GlassMonitorState, now: In
     }
 }
 
-/// Runs for the life of the process: every [`GLASS_POLL`], samples this process's own WebView2 CPU
-/// cost as a percent of the machine (T019c's own formula) and re-resolves the effective level —
-/// this is what lets `appearance.glass = 'system'` react to the OS setting changing while the app
-/// is running, and what drives the automatic performance ceiling even when the frontend never
-/// reports an fps sample (a hidden/minimized window still costs real CPU).
+/// Runs for the life of the process: every [`GLASS_POLL`], re-resolves the effective level — this
+/// is what lets `appearance.glass = 'system'` react to the OS transparency setting changing while
+/// the app is running, and what lets a degraded ceiling restore itself even when the frontend
+/// never reports another fps sample (a hidden/minimized window stops sampling fps at all).
 pub fn spawn_glass_monitor(app: tauri::AppHandle, state: std::sync::Arc<GlassMonitorState>) {
-    let logical_processors = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
-    // Resolves the preference/system level once immediately, before the first CPU sample is even
-    // possible (it needs two points GLASS_POLL apart) — otherwise the frontend would sit on its
-    // own local placeholder for a few seconds after every launch.
+    // Resolves the preference/system level once immediately — otherwise the frontend would sit on
+    // its own local placeholder for a few seconds after every launch.
     recompute_and_emit(&app, &state, Instant::now());
     let spawned = std::thread::Builder::new().name("glass-monitor".to_owned()).spawn(move || {
-        let mut previous_tick = Instant::now();
         loop {
             std::thread::sleep(GLASS_POLL);
-            let now = Instant::now();
-            let elapsed = now.duration_since(previous_tick);
-            previous_tick = now;
-
-            if let Some(total_ms) = own_webview_cpu_time_ms() {
-                let mut previous =
-                    state.previous_cpu_ms.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-                if let Some(before) = *previous {
-                    let delta_ms = total_ms.saturating_sub(before);
-                    let pct = cpu_percent_of_machine(delta_ms, elapsed, logical_processors);
-                    if let Ok(mut degradation) = state.degradation.lock() {
-                        degradation.record_idle_cpu_pct(now, pct);
-                    }
-                }
-                *previous = Some(total_ms);
-            }
-
-            recompute_and_emit(&app, &state, now);
+            recompute_and_emit(&app, &state, Instant::now());
         }
     });
     if let Err(error) = spawned {
         crate::log_error!(
             "GLASS_MONITOR_SPAWN_FAILED",
             format!(
-                "the glass monitor could not start; glass will not degrade under load: {error}"
+                "the glass monitor could not start; a degraded ceiling will not restore itself and the system transparency setting will not be picked up while the app runs: {error}"
             )
         );
     }
@@ -537,8 +371,6 @@ mod tests {
         GlassThresholds {
             degrade_fps: 50.0,
             degrade_window: Duration::from_secs(3),
-            degrade_idle_cpu_pct: 1.0,
-            degrade_idle_window: Duration::from_secs(30),
             restore_fps: 55.0,
             restore_window: Duration::from_secs(60),
         }
@@ -578,12 +410,17 @@ mod tests {
         assert_eq!(degradation.tick(t1 + Duration::from_millis(10)), GlassLevel::Off);
     }
 
+    /// Found 2026-09-28: this process's own idle CPU cost, at any level, must never degrade the
+    /// glass effect — including a full logical processor pinned at 100 % by something else
+    /// entirely (the guided test's own load generator, in the real report that led here).
+    /// `GlassDegradation` no longer has an idle-CPU input to record at all; a sustained low fps is
+    /// the only thing that can still degrade it, exercised by the sibling test below.
     #[test]
-    fn sustained_high_idle_cpu_also_degrades() {
+    fn nothing_but_fps_can_degrade_the_ceiling() {
         let mut degradation = GlassDegradation::new(thresholds());
-        let t0 = Instant::now();
-        degradation.record_idle_cpu_pct(t0, 5.0);
-        assert_eq!(degradation.tick(t0), GlassLevel::Reduced);
+        let now = Instant::now();
+        assert_eq!(degradation.tick(now), GlassLevel::Full);
+        assert_eq!(degradation.tick(now + Duration::from_secs(120)), GlassLevel::Full);
     }
 
     #[test]
@@ -595,7 +432,6 @@ mod tests {
 
         let t1 = t0 + Duration::from_secs(5);
         degradation.record_fps(t1, 60.0);
-        degradation.record_idle_cpu_pct(t1, 0.1);
         assert_eq!(degradation.tick(t1), GlassLevel::Reduced);
     }
 
@@ -608,7 +444,6 @@ mod tests {
 
         let t1 = t0 + Duration::from_secs(61);
         degradation.record_fps(t1, 60.0);
-        degradation.record_idle_cpu_pct(t1, 0.1);
         assert_eq!(degradation.tick(t1), GlassLevel::Full);
     }
 
@@ -640,12 +475,5 @@ mod tests {
         // is broken on this build, which the rest of the module treats as "unknown, fail open",
         // but a passing CI/dev machine should never actually hit that path.
         assert!(super::advanced_effects_enabled().is_some());
-    }
-
-    #[test]
-    fn cpu_percent_of_machine_matches_t019c_formula() {
-        // 1000 ms of CPU time over a 10 s window on a 22-logical-processor machine.
-        let pct = super::cpu_percent_of_machine(1000, Duration::from_secs(10), 22);
-        assert!((pct - (1000.0 / (10_000.0 * 22.0) * 100.0)).abs() < 1e-9);
     }
 }

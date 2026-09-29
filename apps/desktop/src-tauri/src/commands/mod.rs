@@ -388,7 +388,7 @@ fn finish_guided_session(
 ) {
     let (phase, reason, elapsed_ms) = match machine.lock() {
         Ok(guard) => match guard.as_ref() {
-            Some(current) => (current.phase, current.reason, current.elapsed_ms),
+            Some(current) => (current.phase, current.reason, current.total_elapsed_ms),
             None => (GuidedPhase::Error, None, 0),
         },
         Err(_) => (GuidedPhase::Error, None, 0),
@@ -525,6 +525,11 @@ fn guided_loop_body(
         current.tick(1_000);
         log_guided_phase_change(phase_before, current.phase);
 
+        // The generator follows the phase alone and keeps running while the collector restarts
+        // (2026-09-28, measured): an elevated sidecar already running when the load *starts*
+        // stops delivering samples, but one started while the load is already running works for
+        // the rest of it. Pausing the load during a restart made every restarted sidecar meet a
+        // fresh load onset again, until the restart budget ran out.
         let loads = matches!(current.phase, GuidedPhase::Warming | GuidedPhase::SteadyLoad);
         match (loads, generator.is_some()) {
             (true, false) => {
@@ -648,6 +653,11 @@ pub enum AdvancedAccessDto {
     Upgradable,
     Denied,
     Error,
+    /// Installed and working; this processor's vendor has no documented limitation-reason
+    /// registry yet (`spec.md` §421), so tier A is not a possible outcome here — not a fault to
+    /// repair (found 2026-09-28: on AMD this used to read as `Error` forever, and repairing it
+    /// never changed anything because there was nothing broken).
+    CappedByVendor,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1191,6 +1201,8 @@ pub fn stop_guided(
 /// nothing; a deliberate zoom into a narrower, previously-seen range always does overlap and is
 /// kept exactly as asked. `None` bounds (nothing recorded yet) keeps the request as-is — there is
 /// nothing to fall back to, and the caller ends up with an honest empty result either way.
+/// A request wider than the session (the screen's first one is "everything") is trimmed to the
+/// session's range: the resolution is spread over the frames that exist, not over the request.
 fn effective_analysis_window(
     requested: (i64, i64),
     session_bounds: Option<(i64, i64)>,
@@ -1202,7 +1214,12 @@ fn effective_analysis_window(
         {
             (session_start_ms, session_end_ms.max(session_start_ms + 1))
         }
-        _ => (requested_start_ms, requested_end_ms),
+        Some((session_start_ms, session_end_ms)) => {
+            let start_ms = requested_start_ms.max(session_start_ms);
+            let end_ms = requested_end_ms.min(session_end_ms);
+            (start_ms, end_ms.max(start_ms + 1))
+        }
+        None => (requested_start_ms, requested_end_ms),
     }
 }
 
@@ -2235,7 +2252,24 @@ fn restart_collector(app: &AppHandle) -> Result<(), CommandError> {
     // trace at all for 40+ seconds before the app had to be killed — this names which of these
     // steps a future stall is actually stuck in.
     crate::log_debug!("COLLECTOR_RESTART_BUILDING_LAUNCHER", "restart: choosing a launcher");
-    let launcher = crate::telemetry::launch::collector_launcher(advanced_access_enabled);
+    // The same `Arc` every restart of this app session (ADR-0004 amendment, 2026-09-28): reuses
+    // an already-elevated launcher connection instead of tearing it down and asking Windows for a
+    // fresh Task Scheduler activation and UAC elevation on every "Reparar acceso avanzado" too.
+    let elevated_connection = app.state::<crate::ElevatedConnectionHandle>().0.clone();
+    if !advanced_access_enabled
+        && let Ok(mut connection) = elevated_connection.lock()
+        && connection.take().is_some()
+    {
+        // Disabling advanced access must actually end the elevated launcher, not just stop using
+        // it: dropping the connection here closes its master pipe handles for good, which the
+        // launcher reads as a real disconnect and exits on (`LAUNCHER_EXITED`, normal).
+        crate::log_info!(
+            "COLLECTOR_ELEVATED_CONNECTION_CLOSED",
+            "advanced access disabled: closing the persistent elevated connection"
+        );
+    }
+    let launcher =
+        crate::telemetry::launch::collector_launcher(advanced_access_enabled, elevated_connection);
     crate::log_debug!("COLLECTOR_RESTART_LOCKING", "restart: about to lock the runtime handle");
     let runtime_state = app.state::<crate::CollectorHandle>();
     let mut guard = runtime_state.0.lock().map_err(|_| CommandError::operation_failed())?;
@@ -2794,6 +2828,7 @@ mod tests {
         assert_eq!(changes[0].fields["to"], serde_json::json!("warming"));
         assert!(events.iter().all(|event| event.component == "guided"));
     }
+
     use crate::storage::{Storage, StoredSampleValue};
     use std::sync::Arc;
     use std::sync::atomic::Ordering;
@@ -2850,6 +2885,22 @@ mod tests {
         assert_eq!(
             effective_analysis_window((0, 60_000), Some((200_000_000, 200_000_000))),
             (200_000_000, 200_000_001)
+        );
+    }
+
+    #[test]
+    fn a_request_wider_than_the_session_is_trimmed_to_it_so_the_chart_is_not_one_bucket() {
+        // The screen's first request is "everything" (0 .. MAX_SAFE_INTEGER). Kept as asked,
+        // 3000 buckets over 9e15 ms put every frame of a minutes-long session into the first one,
+        // and the chart showed a single point.
+        assert_eq!(
+            effective_analysis_window((0, 9_007_199_254_740_991), Some((5_000, 65_000))),
+            (5_000, 65_000)
+        );
+        assert_eq!(
+            effective_analysis_window((0, 30_000), Some((5_000, 65_000))),
+            (5_000, 30_000),
+            "a zoom that overlaps only part of the session keeps its own end"
         );
     }
 

@@ -5,6 +5,7 @@ export { default as Select } from './Select.svelte';
 export { default as Dialog } from './Dialog.svelte';
 export { default as OptionRow } from './OptionRow.svelte';
 export { default as Tooltip } from './Tooltip.svelte';
+export { default as InfoTip } from './InfoTip.svelte';
 export { default as ProgressBar } from './ProgressBar.svelte';
 export { default as Banner } from './Banner.svelte';
 export { default as EmptyState } from './EmptyState.svelte';

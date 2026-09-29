@@ -9,10 +9,19 @@
 use super::runtime::{
     CollectorLauncher, CollectorLink, CommandLauncher, PipeLink, SidecarLauncher,
 };
+use crate::ipc::elevated::PersistentElevatedConnection;
 use crate::ipc::supervisor::spawn_verified;
 use crate::release_manifest::{ManifestError, ReleaseManifest, trusted_public_key};
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, PoisonError};
+
+/// Shared across every `ElevatedSidecarLauncher` built during one application run, so a collector
+/// restart reuses an already-open, already-elevated connection instead of asking Windows for a
+/// fresh Task Scheduler activation and UAC elevation every time (ADR-0004 amendment, 2026-09-28).
+/// `None` until the first elevated launch of this app session; cleared again if reusing it ever
+/// fails, so the next attempt falls back to a cold start instead of getting stuck on a dead one.
+pub type SharedElevatedConnection = Arc<Mutex<Option<PersistentElevatedConnection>>>;
 
 pub const SIDECAR_FILE: &str = "SensorAgent.exe";
 const MANIFEST_FILE: &str = "release-manifest.json";
@@ -104,15 +113,34 @@ impl CollectorLauncher for Unavailable {
 pub struct ElevatedSidecarLauncher {
     pub executable: PathBuf,
     pub expected_sha256: String,
+    pub connection: SharedElevatedConnection,
 }
 
 impl CollectorLauncher for ElevatedSidecarLauncher {
     fn launch(&mut self) -> io::Result<Box<dyn CollectorLink>> {
-        match crate::ipc::elevated::start_registered_sidecar(
-            &self.executable,
-            &self.expected_sha256,
-        ) {
-            Ok((to_launcher, from_launcher)) => {
+        let mut guard = self.connection.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(connection) = guard.as_mut() {
+            match connection.start_new_session(&self.executable, &self.expected_sha256) {
+                Ok((to_launcher, from_launcher)) => {
+                    return Ok(Box::new(PipeLink::connect(to_launcher, from_launcher)?));
+                }
+                Err(error) => {
+                    // The persistent connection is stale (the launcher died, the pipe broke, …):
+                    // drop it and fall through to a cold start below, same as a first launch this
+                    // session. A reused connection failing must self-heal, not get stuck forever.
+                    crate::log_warn!(
+                        "COLLECTOR_ELEVATED_REUSE_FAILED",
+                        format!(
+                            "the persistent elevated connection could not start a new session, opening a fresh one: {error}"
+                        )
+                    );
+                    *guard = None;
+                }
+            }
+        }
+        match PersistentElevatedConnection::cold_start(&self.executable, &self.expected_sha256) {
+            Ok((connection, to_launcher, from_launcher)) => {
+                *guard = Some(connection);
                 Ok(Box::new(PipeLink::connect(to_launcher, from_launcher)?))
             }
             Err(error) => {
@@ -142,7 +170,10 @@ pub fn should_launch_elevated(advanced_access_enabled: bool) -> bool {
             })
 }
 
-pub fn collector_launcher(advanced_access_enabled: bool) -> Box<dyn CollectorLauncher> {
+pub fn collector_launcher(
+    advanced_access_enabled: bool,
+    elevated_connection: SharedElevatedConnection,
+) -> Box<dyn CollectorLauncher> {
     // T181: a debug/`e2e` build may be told to run a stand-in collector (`TW_DEV_COLLECTOR_CMD`), so
     // an E2E run has live telemetry without a signed manifest. It replaces the launcher and skips
     // the check below rather than weakening it; `dev_faults` answers `None` in a release build, so
@@ -163,6 +194,7 @@ pub fn collector_launcher(advanced_access_enabled: bool) -> Box<dyn CollectorLau
                 return Box::new(ElevatedSidecarLauncher {
                     executable: launcher.executable,
                     expected_sha256: launcher.expected_sha256,
+                    connection: elevated_connection,
                 });
             }
             Ok(launcher) => return Box::new(launcher),

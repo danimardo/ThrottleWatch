@@ -1,27 +1,15 @@
 use serde::{Deserialize, Serialize};
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command};
+use std::process::Child;
 use std::thread;
 use std::time::Duration;
 
 pub const ELEVATED_TASK_NAME: &str = "ThrottleWatch\\SidecarElevated";
 pub const ELEVATED_PIPE_PREFIX: &str = r"\\.\pipe\ThrottleWatch.ElevatedSidecar.";
 const FILE_FLAG_FIRST_PIPE_INSTANCE: u32 = 0x0008_0000;
-/// `CREATE_NO_WINDOW` (2026-09-28): `schtasks.exe`/`sc.exe` are console tools with no window of
-/// their own to inherit from this GUI app, so Windows allocated them a brand new, visible console
-/// — the black window a person saw pop up over "Reparar acceso avanzado", showing `schtasks`'s own
-/// "CORRECTO: ..." line after the command had already finished.
 #[cfg(windows)]
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-
-#[cfg(windows)]
-fn hidden_command(program: &str) -> Command {
-    use std::os::windows::process::CommandExt;
-    let mut command = Command::new(program);
-    command.creation_flags(CREATE_NO_WINDOW);
-    command
-}
+use super::supervisor::hidden_command;
 const RELEASE_MANIFEST_NAME: &str = "release-manifest.json";
 const RELEASE_SIGNATURE_NAME: &str = "release-manifest.json.minisig";
 
@@ -228,10 +216,50 @@ fn connect_with_timeout(
     }
 }
 
+fn elevated_start_envelope(
+    nonce: &str,
+    sequence: u64,
+    sidecar_path: &Path,
+    sidecar_sha256: &str,
+) -> serde_json::Value {
+    serde_json::json!({
+        "protocol_version": crate::ipc::protocol::PROTOCOL_VERSION,
+        "session_nonce": nonce,
+        "sequence": sequence,
+        "timestamp_utc": format!("{:?}", std::time::SystemTime::now()),
+        "type": "elevated_start",
+        "payload": {
+            "sidecar_path": sidecar_path,
+            "sidecar_sha256": sidecar_sha256
+        }
+    })
+}
+
+fn elevated_stop_session_envelope(nonce: &str, sequence: u64) -> serde_json::Value {
+    serde_json::json!({
+        "protocol_version": crate::ipc::protocol::PROTOCOL_VERSION,
+        "session_nonce": nonce,
+        "sequence": sequence,
+        "timestamp_utc": format!("{:?}", std::time::SystemTime::now()),
+        "type": "elevated_stop_session",
+        "payload": {}
+    })
+}
+
+fn write_line(pipe: &mut std::fs::File, value: &serde_json::Value) -> io::Result<()> {
+    serde_json::to_writer(&mut *pipe, value).map_err(io::Error::other)?;
+    pipe.write_all(b"\n")?;
+    pipe.flush()
+}
+
+/// Opens the registered task's pipes, starts it, and sends the very first `elevated_start` —
+/// exactly what a one-shot elevated launch has always done. Returns the nonce alongside the pipes
+/// (2026-09-28) so a caller that wants to keep the connection open ([`PersistentElevatedConnection`])
+/// can authenticate further messages on it without generating a second, disagreeing nonce.
 pub fn start_registered_sidecar(
     sidecar_path: &Path,
     sidecar_sha256: &str,
-) -> io::Result<(std::fs::File, std::fs::File)> {
+) -> io::Result<(std::fs::File, std::fs::File, String)> {
     #[cfg(windows)]
     {
         let base = random_pipe_name()?;
@@ -249,35 +277,74 @@ pub fn start_registered_sidecar(
         let mut to_launcher = connect_with_timeout(in_handle, CONNECT_TIMEOUT)?;
         let from_launcher = connect_with_timeout(out_handle, CONNECT_TIMEOUT)?;
         let nonce = session_nonce()?;
-        let request = serde_json::json!({
-            "protocol_version": crate::ipc::protocol::PROTOCOL_VERSION,
-            "session_nonce": nonce,
-            "sequence": 1,
-            "timestamp_utc": format!("{:?}", std::time::SystemTime::now()),
-            "type": "elevated_start",
-            "payload": {
-                "sidecar_path": sidecar_path,
-                "sidecar_sha256": sidecar_sha256
-            }
-        });
         let hello = serde_json::json!({
             "protocol_version": crate::ipc::protocol::PROTOCOL_VERSION,
             "session_nonce": nonce,
             "type": "hello"
         });
-        serde_json::to_writer(&mut to_launcher, &hello).map_err(io::Error::other)?;
-        to_launcher.write_all(b"\n").and_then(|_| {
-            serde_json::to_writer(&mut to_launcher, &request).map_err(io::Error::other)
-        })?;
-        to_launcher.write_all(b"\n")?;
-        to_launcher.flush()?;
-        Ok((to_launcher, from_launcher))
+        write_line(&mut to_launcher, &hello)?;
+        write_line(
+            &mut to_launcher,
+            &elevated_start_envelope(&nonce, 1, sidecar_path, sidecar_sha256),
+        )?;
+        Ok((to_launcher, from_launcher, nonce))
     }
 
     #[cfg(not(windows))]
     {
         let _ = (sidecar_path, sidecar_sha256);
         Err(io::Error::new(io::ErrorKind::Unsupported, "named pipes are Windows-only"))
+    }
+}
+
+/// Keeps one elevated launcher connection alive across collector restarts within the application's
+/// own session (ADR-0004 amendment, 2026-09-28) instead of tearing it down and asking Windows for a
+/// fresh Task Scheduler activation — and a fresh UAC elevation — every time. Only the two pipe
+/// handles and the authentication state (nonce, sequence) persist here; the sidecar child itself is
+/// still killed and re-verified from its signed manifest on every single session, cold start or not.
+pub struct PersistentElevatedConnection {
+    to_launcher: std::fs::File,
+    from_launcher: std::fs::File,
+    nonce: String,
+    sequence: u64,
+}
+
+impl PersistentElevatedConnection {
+    /// The one-shot path: registers the task, opens fresh pipes, sends the first `elevated_start`.
+    /// Same as calling [`start_registered_sidecar`] directly, wrapped so the connection can be kept
+    /// — returns clones of the same two handles for the caller's immediate [`super::runtime::PipeLink`],
+    /// exactly as [`Self::start_new_session`] does for every later session on this connection.
+    pub fn cold_start(
+        sidecar_path: &Path,
+        sidecar_sha256: &str,
+    ) -> io::Result<(Self, std::fs::File, std::fs::File)> {
+        let (to_launcher, from_launcher, nonce) =
+            start_registered_sidecar(sidecar_path, sidecar_sha256)?;
+        let clones = (to_launcher.try_clone()?, from_launcher.try_clone()?);
+        Ok((Self { to_launcher, from_launcher, nonce, sequence: 1 }, clones.0, clones.1))
+    }
+
+    /// Ends whatever session is running on this connection (`elevated_stop_session`) and starts a
+    /// new one (`elevated_start`) on the same already-elevated, already-open pipes — no scheduled
+    /// task, no UAC. Returns clones of the pipe handles for the caller's [`super::runtime::PipeLink`];
+    /// this connection's own master handles are never touched, so a `PipeLink` built from the clones
+    /// ending a session later never closes the connection out from under the next one.
+    pub fn start_new_session(
+        &mut self,
+        sidecar_path: &Path,
+        sidecar_sha256: &str,
+    ) -> io::Result<(std::fs::File, std::fs::File)> {
+        self.sequence += 1;
+        write_line(
+            &mut self.to_launcher,
+            &elevated_stop_session_envelope(&self.nonce, self.sequence),
+        )?;
+        self.sequence += 1;
+        write_line(
+            &mut self.to_launcher,
+            &elevated_start_envelope(&self.nonce, self.sequence, sidecar_path, sidecar_sha256),
+        )?;
+        Ok((self.to_launcher.try_clone()?, self.from_launcher.try_clone()?))
     }
 }
 
@@ -302,7 +369,7 @@ pub fn launcher_log_directory() -> Option<PathBuf> {
 pub fn run_elevated_launcher() -> io::Result<()> {
     #[cfg(windows)]
     {
-        launcher_main(open_session_pipes)
+        launcher_main(open_session_pipes, ensure_pawnio_service_running)
     }
 
     #[cfg(not(windows))]
@@ -316,9 +383,17 @@ pub fn run_elevated_launcher() -> io::Result<()> {
 #[cfg(windows)]
 fn launcher_main(
     open_pipes: impl FnOnce() -> io::Result<(std::fs::File, std::fs::File)>,
+    pawnio_check: impl Fn() -> io::Result<()>,
 ) -> io::Result<()> {
     crate::log_info!("LAUNCHER_STARTED", "elevated launcher started");
-    let result = launcher_steps(open_pipes);
+    // Before anything is spawned, so the sidecar inherits the normal class (T187).
+    if let Err(error) = super::supervisor::raise_current_process_to_normal_priority() {
+        crate::log_warn!(
+            "LAUNCHER_PRIORITY_NOT_RAISED",
+            format!("the launcher stays at Task Scheduler's below-normal priority: {error}")
+        );
+    }
+    let result = launcher_steps(open_pipes, pawnio_check);
     match &result {
         Ok(()) => crate::log_info!("LAUNCHER_EXITED", "elevated launcher exited normally"),
         Err(error) => {
@@ -328,38 +403,73 @@ fn launcher_main(
     result
 }
 
+/// What ended a session's [`proxy_child_over_pipe`] call.
+///
+/// Enmienda 2026-09-28 a ADR-0004: a session ending is no longer automatically the whole
+/// launcher's shutdown signal. `StopSessionRequested` (an authenticated `elevated_stop_session`
+/// on the control channel) keeps the pipes and the launcher process alive for a following
+/// `elevated_start` — the collector can restart without a fresh Task Scheduler activation and a
+/// fresh UAC elevation every time. `CallerDisconnected` (EOF, or any framing/validation failure on
+/// the control channel) is still the real end: [`launcher_steps`] returns and the launcher exits,
+/// exactly as it always has.
+#[cfg(windows)]
+enum ChildEnd {
+    StopSessionRequested,
+    CallerDisconnected,
+}
+
 #[cfg(windows)]
 fn launcher_steps(
     open_pipes: impl FnOnce() -> io::Result<(std::fs::File, std::fs::File)>,
+    pawnio_check: impl Fn() -> io::Result<()>,
 ) -> io::Result<()> {
-    {
-        let (to_launcher, from_launcher) = match open_pipes() {
-            Ok(pipes) => {
-                crate::log_info!("LAUNCHER_PIPES_OPENED", "connected to the application's pipes");
-                pipes
-            }
-            Err(error) => {
-                crate::log_error!(
-                    "LAUNCHER_PIPE_CONNECT_FAILED",
-                    format!("could not connect to the application's pipes: {error}")
-                );
-                return Err(error);
-            }
-        };
-        let mut reader = BufReader::new(to_launcher);
-        let mut hello_line = String::new();
-        reader.read_line(&mut hello_line)?;
-        let hello: serde_json::Value = serde_json::from_str(&hello_line)
-            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid launcher hello"))?;
-        let nonce = hello
-            .get("session_nonce")
-            .and_then(serde_json::Value::as_str)
-            .filter(|value| !value.is_empty())
-            .ok_or_else(|| {
-                io::Error::new(io::ErrorKind::PermissionDenied, "missing launcher nonce")
-            })?;
+    let (to_launcher, from_launcher) = match open_pipes() {
+        Ok(pipes) => {
+            crate::log_info!("LAUNCHER_PIPES_OPENED", "connected to the application's pipes");
+            pipes
+        }
+        Err(error) => {
+            crate::log_error!(
+                "LAUNCHER_PIPE_CONNECT_FAILED",
+                format!("could not connect to the application's pipes: {error}")
+            );
+            return Err(error);
+        }
+    };
+    let mut reader = BufReader::new(to_launcher);
+    let mut hello_line = String::new();
+    reader.read_line(&mut hello_line)?;
+    let hello: serde_json::Value = serde_json::from_str(&hello_line)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid launcher hello"))?;
+    let nonce = hello
+        .get("session_nonce")
+        .and_then(serde_json::Value::as_str)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| io::Error::new(io::ErrorKind::PermissionDenied, "missing launcher nonce"))?
+        .to_owned();
+    // One monotonic sequence for every elevated-control message on this connection — the first
+    // `elevated_start`, every `elevated_stop_session`, and every `elevated_start` that follows it —
+    // not just the single handshake ADR-0004 originally described (see its 2026-09-28 amendment).
+    let mut previous_sequence: Option<u64> = None;
+    // Checked (and, if needed, started) only once per launcher process, not once per session
+    // (found 2026-09-28): the retry loop of `ensure_pawnio_service_running_with` can legitimately
+    // take many seconds when the driver is genuinely restarting, and on this connection's second
+    // and later sessions the driver is already running — the previous child, whose handle to it
+    // just closed cleanly a moment ago, proves that. Repeating the full check on every reused
+    // session blocked this function's only thread from reading the pipe at all for the whole
+    // retry window, which is indistinguishable from the launcher hanging to the application side:
+    // its own handshake timeout (10 s) fired three times before this function ever got back to
+    // `read_line`, exhausting the collector's restart budget and cancelling the guided test.
+    let mut pawnio_checked = false;
+
+    loop {
         let mut request_line = String::new();
-        reader.read_line(&mut request_line)?;
+        // EOF here — not mid-session, but while *waiting for the next session* — is the
+        // application really closing the pipe (app shutdown), the one case that still ends the
+        // launcher itself.
+        if reader.read_line(&mut request_line)? == 0 {
+            return Ok(());
+        }
         let value: serde_json::Value = serde_json::from_str(&request_line)
             .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid launcher request"))?;
         let payload = value.get("payload").ok_or_else(|| {
@@ -387,6 +497,9 @@ fn launcher_steps(
                 "sidecar is outside the installed directory",
             ));
         }
+        // Re-verified on every session, including a reused connection's second, third, ... session
+        // (ADR-0004 amendment, mitigation (b)): a persistent launcher must never let an update
+        // replace the sidecar underneath an already-open connection without checking it again.
         let signed_sha256 = match verify_signed_sidecar(sidecar_dir, &payload.sidecar_path) {
             Ok(digest) => {
                 crate::log_info!(
@@ -403,15 +516,19 @@ fn launcher_steps(
                 return Err(error);
             }
         };
-        let _validated = validate_launch_request(
+        let validated = validate_launch_request(
             request_line.as_bytes(),
-            nonce,
-            None,
+            &nonce,
+            previous_sequence,
             &payload.sidecar_path,
             &signed_sha256,
         )
         .map_err(|error| io::Error::new(io::ErrorKind::PermissionDenied, error))?;
-        ensure_pawnio_service_running()?;
+        previous_sequence = Some(validated.sequence);
+        if !pawnio_checked {
+            pawnio_check()?;
+            pawnio_checked = true;
+        }
         let child = match super::supervisor::spawn_verified(&payload.sidecar_path, &signed_sha256) {
             Ok(child) => {
                 crate::log_info!("LAUNCHER_CHILD_SPAWNED", "the elevated sidecar is running");
@@ -425,21 +542,39 @@ fn launcher_steps(
                 return Err(error);
             }
         };
-        proxy_child_over_pipe(child, reader, from_launcher)
+        match proxy_child_over_pipe(
+            child,
+            &mut reader,
+            &from_launcher,
+            &nonce,
+            &mut previous_sequence,
+        )? {
+            ChildEnd::CallerDisconnected => return Ok(()),
+            ChildEnd::StopSessionRequested => continue,
+        }
     }
 }
 
 /// Pumps the sidecar's own NDJSON protocol both ways over the already-authenticated control pipe
-/// (the caller's [`super::runtime::PipeLink`] is the other end) until the caller closes its side,
-/// then kills `child`. Split out of [`run_elevated_launcher`] so the proxying itself — the part
-/// that actually matters for FR-088/SC-019 (advanced access must not need a daily elevation) — is
-/// testable against a plain stand-in child instead of a real scheduled task and signed sidecar.
+/// (the caller's [`super::runtime::PipeLink`] is the other end) until the caller ends this session
+/// or disconnects for good, then kills `child`. Split out of [`run_elevated_launcher`] so the
+/// proxying itself — the part that actually matters for FR-088/SC-019 (advanced access must not
+/// need a daily elevation) — is testable against a plain stand-in child instead of a real
+/// scheduled task and signed sidecar.
+///
+/// `in_reader`/`out_pipe` are borrowed, not owned (ADR-0004 amendment, 2026-09-28): the caller
+/// ([`launcher_steps`]) keeps them across sessions instead of a fresh pair per collector restart,
+/// so this function must never close them itself — that is exactly what used to make the launcher
+/// exit on every restart. `out_pipe` is written from a clone (`try_clone`); the original handle the
+/// caller holds is never touched, so a session ending here never closes the caller's side of it.
 #[cfg(windows)]
 fn proxy_child_over_pipe(
     mut child: Child,
-    mut in_reader: BufReader<std::fs::File>,
-    out_pipe: std::fs::File,
-) -> io::Result<()> {
+    in_reader: &mut BufReader<std::fs::File>,
+    out_pipe: &std::fs::File,
+    nonce: &str,
+    previous_sequence: &mut Option<u64>,
+) -> io::Result<ChildEnd> {
     let mut child_stdin = child
         .stdin
         .take()
@@ -454,6 +589,7 @@ fn proxy_child_over_pipe(
     // `child_stdout`/`child_stderr` are two independent OS objects, so two threads may block-read
     // them concurrently with no conflict, but funneling both into ONE thread to actually write
     // `out_pipe` is what keeps that pipe's handle single-threaded (see the type's doc comment).
+    let out_pipe_for_writer = out_pipe.try_clone()?;
     let (lines_out, lines_in) = std::sync::mpsc::channel::<String>();
     let stdout_thread = {
         let lines_out = lines_out.clone();
@@ -472,7 +608,7 @@ fn proxy_child_over_pipe(
     drop(lines_out);
     let writer_thread =
         thread::Builder::new().name("elevated-collector-writer".to_owned()).spawn(move || {
-            let mut out_pipe = out_pipe;
+            let mut out_pipe = out_pipe_for_writer;
             for line in lines_in {
                 if out_pipe.write_all(line.as_bytes()).is_err() {
                     break;
@@ -480,21 +616,47 @@ fn proxy_child_over_pipe(
             }
         })?;
 
-    // The caller closing every handle on its side (dropping `PipeLink`) is the shutdown signal,
-    // exactly as dropping a local `ProcessLink` kills its child: this blocking read then returns
-    // EOF. Nothing else ever touches `in_reader`'s handle, so there is no read/write conflict.
-    loop {
+    // Every incoming line is checked for the elevated control channel before being forwarded: an
+    // authenticated `elevated_stop_session` ends this child without ending the launcher (the
+    // caller closing every handle on its side — real app shutdown — is still the only thing that
+    // makes this a plain EOF). Anything else, `elevated_stop_session` itself included, is never
+    // forwarded to the child; every other `type` is the collector's own protocol and passes through
+    // untouched, exactly as before.
+    let outcome = loop {
         let mut line = String::new();
         match in_reader.by_ref().take(MAX_LINE_BYTES + 1).read_line(&mut line) {
-            Ok(0) | Err(_) => break,
-            Ok(_) if line.len() as u64 > MAX_LINE_BYTES => break,
+            Ok(0) | Err(_) => break ChildEnd::CallerDisconnected,
+            Ok(_) if line.len() as u64 > MAX_LINE_BYTES => break ChildEnd::CallerDisconnected,
             Ok(_) => {
+                let is_stop_session = serde_json::from_str::<serde_json::Value>(&line)
+                    .ok()
+                    .and_then(|value| value.get("type").and_then(|t| t.as_str().map(str::to_owned)))
+                    .is_some_and(|message_type| message_type == "elevated_stop_session");
+                if is_stop_session {
+                    match crate::ipc::protocol::validate_message(
+                        line.as_bytes(),
+                        nonce,
+                        *previous_sequence,
+                    ) {
+                        Ok(envelope) => {
+                            *previous_sequence = Some(envelope.sequence);
+                            crate::log_info!(
+                                "LAUNCHER_SESSION_STOPPED",
+                                "elevated session stopped, launcher stays up for the next one"
+                            );
+                            break ChildEnd::StopSessionRequested;
+                        }
+                        // An unauthenticated or out-of-sequence stop request is not trusted enough
+                        // to keep this connection open on: treat it the same as a real disconnect.
+                        Err(_) => break ChildEnd::CallerDisconnected,
+                    }
+                }
                 if child_stdin.write_all(line.as_bytes()).is_err() {
-                    break;
+                    break ChildEnd::CallerDisconnected;
                 }
             }
         }
-    }
+    };
     drop(child_stdin);
     let _ = child.kill();
     let _ = child.wait();
@@ -505,7 +667,7 @@ fn proxy_child_over_pipe(
         let _ = stderr_thread.join();
     }
     let _ = writer_thread.join();
-    Ok(())
+    Ok(outcome)
 }
 
 /// Reads newline-delimited lines from `source` and sends each, optionally prefixed with `marker`,
@@ -809,12 +971,15 @@ mod tests {
             "launcher",
         )?;
         let result = tracing::subscriber::with_default(subscriber, || {
-            super::launcher_main(|| {
-                Err(std::io::Error::new(
-                    std::io::ErrorKind::TimedOut,
-                    "elevated launcher pipes did not open",
-                ))
-            })
+            super::launcher_main(
+                || {
+                    Err(std::io::Error::new(
+                        std::io::ErrorKind::TimedOut,
+                        "elevated launcher pipes did not open",
+                    ))
+                },
+                || Ok(()),
+            )
         });
         assert!(result.is_err());
         drop(guard);
@@ -1021,10 +1186,35 @@ mod tests {
     }
 
     #[cfg(windows)]
+    fn spawn_test_echo() -> std::process::Child {
+        use std::process::Stdio;
+        let echo_path = test_echo_path();
+        std::process::Command::new(&echo_path)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap_or_else(|error| panic!("spawn {}: {error}", echo_path.display()))
+    }
+
+    #[cfg(windows)]
+    fn control_envelope(nonce: &str, sequence: u64, message_type: &str) -> String {
+        serde_json::json!({
+            "protocol_version": crate::ipc::protocol::PROTOCOL_VERSION,
+            "session_nonce": nonce,
+            "sequence": sequence,
+            "timestamp_utc": "2026-09-28T00:00:00Z",
+            "type": message_type,
+            "payload": {}
+        })
+        .to_string()
+    }
+
+    #[cfg(windows)]
     #[test]
     fn proxies_a_real_child_both_ways_over_two_pipes_and_stops_it_when_the_caller_disconnects() {
         use crate::telemetry::runtime::{CollectorLink, Received};
-        use std::process::{Command, Stdio};
+        use std::process::Command;
         use std::time::Duration;
 
         // Two pipes, not one duplex pipe — see `proxy_child_over_pipe`'s doc comment for why a
@@ -1039,16 +1229,18 @@ mod tests {
 
         // A stand-in for the real sidecar's own stdin/stdout: reads a line, writes it straight
         // back, flushing every time — without needing the signed manifest or PawnIO at all.
-        let echo_path = test_echo_path();
-        let child = Command::new(&echo_path)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .unwrap_or_else(|error| panic!("spawn {}: {error}", echo_path.display()));
+        let child = spawn_test_echo();
         let child_id = child.id();
         let proxy = std::thread::spawn(move || {
-            super::proxy_child_over_pipe(child, std::io::BufReader::new(launcher_in), launcher_out)
+            let mut reader = std::io::BufReader::new(launcher_in);
+            let mut previous_sequence = None;
+            super::proxy_child_over_pipe(
+                child,
+                &mut reader,
+                &launcher_out,
+                "test-nonce",
+                &mut previous_sequence,
+            )
         });
 
         let mut link = crate::telemetry::runtime::PipeLink::connect(caller_out, caller_in)
@@ -1063,7 +1255,10 @@ mod tests {
 
         drop(link); // the shutdown signal: closes the caller's side of the "in" pipe
         match proxy.join() {
-            Ok(Ok(())) => {}
+            Ok(Ok(super::ChildEnd::CallerDisconnected)) => {}
+            Ok(Ok(super::ChildEnd::StopSessionRequested)) => {
+                panic!("dropping the link should read as a disconnect, not a stop-session request")
+            }
             Ok(Err(error)) => panic!("proxy should exit cleanly: {error}"),
             Err(_) => panic!("proxy thread should not panic"),
         }
@@ -1076,5 +1271,120 @@ mod tests {
                     !String::from_utf8_lossy(&output.stdout).contains(&child_id.to_string())
                 })
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn start_new_session_writes_an_authenticated_stop_then_start_with_increasing_sequence() {
+        use std::io::BufRead;
+
+        let (caller_out, launcher_in) = connected_test_pipe_pair("reuse-in")
+            .unwrap_or_else(|error| panic!("in pipe pair: {error}"));
+        let (caller_in, _launcher_out) = connected_test_pipe_pair("reuse-out")
+            .unwrap_or_else(|error| panic!("out pipe pair: {error}"));
+        let nonce = "reuse-nonce".to_owned();
+        // Sequence 1 stands in for a cold `start_registered_sidecar` call's own initial
+        // `elevated_start` having already happened on this connection, as `cold_start` leaves it.
+        let mut connection = super::PersistentElevatedConnection {
+            to_launcher: caller_out,
+            from_launcher: caller_in,
+            nonce: nonce.clone(),
+            sequence: 1,
+        };
+
+        let sidecar_path = Path::new("C:\\ThrottleWatch\\agent.exe");
+        let sidecar_sha256 = "a".repeat(64);
+        let (_to_clone, _from_clone) = connection
+            .start_new_session(sidecar_path, &sidecar_sha256)
+            .unwrap_or_else(|error| panic!("start_new_session: {error}"));
+
+        let mut reader = std::io::BufReader::new(launcher_in);
+        let mut stop_line = String::new();
+        reader.read_line(&mut stop_line).unwrap_or_else(|error| panic!("read stop: {error}"));
+        let stop = crate::ipc::protocol::validate_message(stop_line.as_bytes(), &nonce, Some(1))
+            .unwrap_or_else(|error| panic!("stop envelope: {error}"));
+        assert_eq!((stop.message_type.as_str(), stop.sequence), ("elevated_stop_session", 2));
+
+        let mut start_line = String::new();
+        reader.read_line(&mut start_line).unwrap_or_else(|error| panic!("read start: {error}"));
+        let start = crate::ipc::protocol::validate_message(start_line.as_bytes(), &nonce, Some(2))
+            .unwrap_or_else(|error| panic!("start envelope: {error}"));
+        assert_eq!((start.message_type.as_str(), start.sequence), ("elevated_start", 3));
+    }
+
+    /// ADR-0004 amendment (2026-09-28): an authenticated `elevated_stop_session` must end the
+    /// current child without ending the launcher's own pipes — the whole point of the persistence
+    /// fix. Runs two sessions back to back over the very same pipe pair and `PipeLink`, exactly as
+    /// `launcher_steps`'s loop and `ElevatedSidecarLauncher` (`telemetry::launch`) do in production.
+    #[cfg(windows)]
+    #[test]
+    fn a_stop_session_ends_the_child_but_keeps_the_pipes_open_for_a_second_session() {
+        use crate::telemetry::runtime::{CollectorLink, Received};
+        use std::time::Duration;
+
+        let (caller_out, launcher_in) = connected_test_pipe_pair("persist-in")
+            .unwrap_or_else(|error| panic!("in pipe pair: {error}"));
+        let (caller_in, launcher_out) = connected_test_pipe_pair("persist-out")
+            .unwrap_or_else(|error| panic!("out pipe pair: {error}"));
+        let nonce = "test-persistent-nonce";
+
+        let proxy = std::thread::spawn(move || -> std::io::Result<super::ChildEnd> {
+            let mut reader = std::io::BufReader::new(launcher_in);
+            let mut previous_sequence = None;
+            let first = super::proxy_child_over_pipe(
+                spawn_test_echo(),
+                &mut reader,
+                &launcher_out,
+                nonce,
+                &mut previous_sequence,
+            )?;
+            assert!(
+                matches!(first, super::ChildEnd::StopSessionRequested),
+                "the first session should end on the authenticated stop request, not a disconnect"
+            );
+            super::proxy_child_over_pipe(
+                spawn_test_echo(),
+                &mut reader,
+                &launcher_out,
+                nonce,
+                &mut previous_sequence,
+            )
+        });
+
+        let mut link = crate::telemetry::runtime::PipeLink::connect(caller_out, caller_in)
+            .unwrap_or_else(|error| panic!("PipeLink::connect: {error}"));
+        if let Err(error) = link.send("first session") {
+            panic!("send: {error}");
+        }
+        match link.receive(Duration::from_secs(5)) {
+            Received::Line(line) => assert_eq!(line, "first session"),
+            other => panic!("expected the first session to echo, got {other:?}"),
+        }
+
+        if let Err(error) = link.send(&control_envelope(nonce, 1, "elevated_stop_session")) {
+            panic!("send stop_session: {error}");
+        }
+
+        // The same link, never dropped, still works against the second child: the pipes and the
+        // launcher process never noticed a disconnect.
+        if let Err(error) = link.send("second session, same pipes") {
+            panic!("send: {error}");
+        }
+        match link.receive(Duration::from_secs(5)) {
+            Received::Line(line) => assert_eq!(line, "second session, same pipes"),
+            other => {
+                panic!("expected the second session to echo over the same link, got {other:?}")
+            }
+        }
+
+        drop(link);
+        match proxy.join() {
+            Ok(Ok(super::ChildEnd::CallerDisconnected)) => {}
+            Ok(Ok(super::ChildEnd::StopSessionRequested)) => {
+                panic!("the final drop should read as a real disconnect")
+            }
+            Ok(Err(error)) => panic!("proxy should exit cleanly: {error}"),
+            Err(_) => panic!("proxy thread should not panic"),
+        }
     }
 }

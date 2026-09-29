@@ -42,6 +42,7 @@ components/
   Dialog.svelte           modal confirmation (native <dialog>-based)
   OptionRow.svelte        label + description + trailing control, for Ajustes
   Tooltip.svelte          keyboard + hover accessible tooltip
+  InfoTip.svelte          the small "?" that explains a figure in plain words (wraps Tooltip)
   ProgressBar.svelte      determinate/indeterminate linear progress track
   Banner.svelte           persistent in-page notice (info/warning/critical)
   EmptyState.svelte       centered "nothing here yet" placeholder

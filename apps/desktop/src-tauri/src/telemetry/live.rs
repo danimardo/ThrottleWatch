@@ -339,13 +339,22 @@ impl LiveState {
     /// (`TjMax − TCC offset` on Intel, the family limit on AMD, FR-076). Absent until the collector
     /// knows it; a value outside a physically plausible range is discarded, never trusted.
     pub fn thermal_limit_c(&self) -> Option<f64> {
-        let limit = self
-            .descriptor("temperature", "package")?
-            .metadata
-            .as_ref()?
-            .get("thermal_limit_c")?
-            .as_f64()?;
-        (40.0..=125.0).contains(&limit).then_some(limit)
+        let plausible = |limit: f64| (40.0..=125.0).contains(&limit).then_some(limit);
+        let published = self
+            .descriptor("temperature", "package")
+            .and_then(|descriptor| descriptor.metadata.as_ref())
+            .and_then(|metadata| metadata.get("thermal_limit_c"))
+            .and_then(Value::as_f64)
+            .and_then(plausible);
+        // AMD has no register to read it from: without one from the collector, the versioned table
+        // of the model AMD lists (FR-076). A collector's own figure always wins.
+        published.or_else(|| {
+            let cpu = self.cpu()?;
+            (cpu.vendor == "amd")
+                .then(|| super::amd_limits::tjmax_c(&cpu.display_name))
+                .flatten()
+                .and_then(plausible)
+        })
     }
 
     /// Latest package-level values, or `None` when no sample has arrived yet.
@@ -669,6 +678,43 @@ mod tests {
                 .apply_capabilities(&capabilities(vec![temperature_descriptor_with(bogus)]))
                 .unwrap_or_else(|error| panic!("capabilities: {error:?}"));
             assert_eq!(other.thermal_limit_c(), None);
+        }
+    }
+
+    fn state_for_cpu(vendor: &str, display_name: &str, metadata: Value) -> LiveState {
+        let mut state = LiveState::new();
+        let mut caps = capabilities(vec![temperature_descriptor_with(metadata)]);
+        caps["cpu"] = json!({"vendor": vendor, "display_name": display_name,
+            "logical_processors": 12, "hybrid": false});
+        state.apply_capabilities(&caps).unwrap_or_else(|error| panic!("capabilities: {error:?}"));
+        state
+    }
+
+    #[test]
+    fn an_amd_model_the_table_knows_gets_its_limit_when_the_collector_publishes_none() {
+        let state = state_for_cpu("amd", "AMD Ryzen 5 2600X Six-Core Processor", json!({}));
+        assert_eq!(state.thermal_limit_c(), Some(95.0));
+    }
+
+    #[test]
+    fn the_collectors_own_limit_wins_over_the_amd_table() {
+        let state = state_for_cpu(
+            "amd",
+            "AMD Ryzen 5 2600X Six-Core Processor",
+            json!({"thermal_limit_c": 90.0}),
+        );
+        assert_eq!(state.thermal_limit_c(), Some(90.0));
+    }
+
+    #[test]
+    fn a_model_outside_the_table_and_any_intel_cpu_get_no_table_limit() {
+        for (vendor, name) in [
+            ("amd", "AMD Ryzen 7 2700X Eight-Core Processor"),
+            ("intel", "AMD Ryzen 5 2600X Six-Core Processor"),
+            ("intel", "Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz"),
+        ] {
+            let state = state_for_cpu(vendor, name, json!({}));
+            assert_eq!(state.thermal_limit_c(), None, "{vendor} {name}");
         }
     }
 

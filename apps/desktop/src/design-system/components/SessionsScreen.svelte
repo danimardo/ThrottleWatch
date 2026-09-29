@@ -28,6 +28,8 @@
     statusLabel?: string;
     classification?: Classification;
     classificationLabel?: string;
+    classificationHelp?: string;
+    helpLabel?: string;
     importedLabel?: string;
     isReference?: boolean;
     referenceLabel?: string;
@@ -65,6 +67,15 @@
     deleteDialogDescription: string;
     deleteDialogCancelLabel: string;
     deleteDialogConfirmLabel: string;
+    /**
+     * How many sessions one page shows. Omitted = the whole list, as before. The pager only
+     * appears when there is more than one page and its three labels are given.
+     */
+    pageSize?: number;
+    previousPageLabel?: string;
+    nextPageLabel?: string;
+    /** Already-translated "Page 2 of 5". */
+    pageLabel?: (page: number, pageCount: number) => string;
   }
 
   let {
@@ -87,8 +98,29 @@
     deleteDialogTitle,
     deleteDialogDescription,
     deleteDialogCancelLabel,
-    deleteDialogConfirmLabel
+    deleteDialogConfirmLabel,
+    pageSize,
+    previousPageLabel,
+    nextPageLabel,
+    pageLabel
   }: Props = $props();
+
+  let page = $state(0);
+  let pageCount = $derived(
+    pageSize !== undefined && pageSize > 0
+      ? Math.max(1, Math.ceil(sessions.length / pageSize))
+      : 1
+  );
+  // Deleting the last card of the last page leaves `page` past the end; clamp instead of showing nothing.
+  let currentPage = $derived(Math.min(page, pageCount - 1));
+  let visibleSessions = $derived(
+    pageSize !== undefined && pageSize > 0
+      ? sessions.slice(currentPage * pageSize, (currentPage + 1) * pageSize)
+      : sessions
+  );
+  let showPager = $derived(
+    pageCount > 1 && !!previousPageLabel && !!nextPageLabel && !!pageLabel
+  );
 
   let pendingDeleteId: string | null = $state(null);
   let deleteDialogOpen = $derived(pendingDeleteId !== null);
@@ -131,7 +163,7 @@
     <EmptyState icon={emptyIcon} title={emptyTitle} description={emptyDescription} action={emptyAction} />
   {:else}
     <div class="list" role="list">
-      {#each sessions as session, i (session.id)}
+      {#each visibleSessions as session, i (session.id)}
         <SessionCard
           enterIndex={i}
           status={session.status}
@@ -141,6 +173,8 @@
           statusLabel={session.statusLabel}
           classification={session.classification}
           classificationLabel={session.classificationLabel}
+          classificationHelp={session.classificationHelp}
+          helpLabel={session.helpLabel}
           importedLabel={session.importedLabel}
           isReference={session.isReference}
           referenceLabel={session.referenceLabel}
@@ -158,6 +192,25 @@
         />
       {/each}
     </div>
+    {#if showPager && pageLabel}
+      <nav class="pager" aria-label={pageLabel(currentPage + 1, pageCount)}>
+        <Button
+          variant="secondary"
+          label={previousPageLabel ?? ''}
+          disabled={currentPage === 0}
+          onclick={() => (page = currentPage - 1)}
+        />
+        <span class="caption" style:color="var(--text-secondary)" aria-live="polite">
+          {pageLabel(currentPage + 1, pageCount)}
+        </span>
+        <Button
+          variant="secondary"
+          label={nextPageLabel ?? ''}
+          disabled={currentPage >= pageCount - 1}
+          onclick={() => (page = currentPage + 1)}
+        />
+      </nav>
+    {/if}
   {/if}
 </div>
 
@@ -184,6 +237,13 @@
   }
   .screen-head h2 {
     margin: 0;
+  }
+  .pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
   }
   .tw-sessions-screen {
     background: transparent;

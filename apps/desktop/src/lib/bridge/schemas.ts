@@ -173,7 +173,8 @@ export const coverageSnapshotSchema = z.object({
     'installable',
     'upgradable',
     'denied',
-    'error'
+    'error',
+    'capped_by_vendor'
   ])
 });
 
@@ -201,7 +202,8 @@ export const coverageMatrixSchema = z.object({
     'installable',
     'upgradable',
     'denied',
-    'error'
+    'error',
+    'capped_by_vendor'
   ]),
   rows: z.array(coverageRowSchema),
   conclusion_key: z.string().min(1),

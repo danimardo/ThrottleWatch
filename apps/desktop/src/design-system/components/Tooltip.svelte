@@ -30,6 +30,11 @@
    *
    * For anything richer than one line, pass `body` instead of `label`
    * (same override pattern as Dialog's `body`/`description`).
+   *
+   * The panel is a manual `popover`, so it is drawn in the browser's top layer: a glass card
+   * (`backdrop-filter` makes its own stacking context) around the trigger can no longer paint over
+   * it or clip it (found 2026-09-29: the tips of the "Ahora" tiles went under the next tile). Its
+   * position is computed from the trigger's rectangle and kept inside the viewport.
    */
   import type { Snippet } from 'svelte';
 
@@ -49,6 +54,44 @@
   const id = `tw-tooltip-${Math.random().toString(36).slice(2, 9)}`;
   let open = $state(false);
   let hideTimer: ReturnType<typeof setTimeout> | undefined;
+  let anchorEl: HTMLSpanElement | undefined = $state();
+  let panelEl: HTMLSpanElement | undefined = $state();
+
+  const GAP = 6;
+  const MARGIN = 8;
+
+  function position() {
+    if (!anchorEl || !panelEl) return;
+    const a = anchorEl.getBoundingClientRect();
+    const p = panelEl.getBoundingClientRect();
+    let top = a.top - p.height - GAP;
+    let left = a.left + a.width / 2 - p.width / 2;
+    if (placement === 'bottom') top = a.bottom + GAP;
+    if (placement === 'left' || placement === 'right') {
+      top = a.top + a.height / 2 - p.height / 2;
+      left = placement === 'left' ? a.left - p.width - GAP : a.right + GAP;
+    }
+    // Not enough room on the requested side: flip to the other one before clamping.
+    if (placement === 'top' && top < MARGIN) top = a.bottom + GAP;
+    if (placement === 'bottom' && top + p.height > window.innerHeight - MARGIN) top = a.top - p.height - GAP;
+    top = Math.max(MARGIN, Math.min(top, window.innerHeight - p.height - MARGIN));
+    left = Math.max(MARGIN, Math.min(left, window.innerWidth - p.width - MARGIN));
+    panelEl.style.top = `${top}px`;
+    panelEl.style.left = `${left}px`;
+  }
+
+  $effect(() => {
+    if (!open || !panelEl) return;
+    panelEl.showPopover?.();
+    position();
+    const close = () => (open = false);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  });
 
   function show() {
     clearTimeout(hideTimer);
@@ -73,10 +116,10 @@
 -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<span class="tw-tooltip-anchor" onpointerenter={show} onpointerleave={scheduleHide} onfocusin={show} onfocusout={scheduleHide} onkeydown={onKeydown}>
+<span class="tw-tooltip-anchor" bind:this={anchorEl} onpointerenter={show} onpointerleave={scheduleHide} onfocusin={show} onfocusout={scheduleHide} onkeydown={onKeydown}>
   {@render children({ describedBy: open ? id : undefined })}
   {#if open}
-    <span class="tw-tooltip {placement}" role="tooltip" {id} onpointerenter={show} onpointerleave={scheduleHide}>
+    <span class="tw-tooltip" popover="manual" bind:this={panelEl} role="tooltip" {id} onpointerenter={show} onpointerleave={scheduleHide}>
       {#if body}
         {@render body()}
       {:else if label}
@@ -92,8 +135,10 @@
     display: inline-flex;
   }
   .tw-tooltip {
-    position: absolute;
-    z-index: 30;
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    overflow: visible;
     max-width: 240px;
     width: max-content;
     background-color: var(--glass-bg-strong);
@@ -112,25 +157,5 @@
     font-weight: 650;
     letter-spacing: 0.01em;
     pointer-events: auto;
-  }
-  .tw-tooltip.top {
-    bottom: calc(100% + 6px);
-    left: 50%;
-    transform: translateX(-50%);
-  }
-  .tw-tooltip.bottom {
-    top: calc(100% + 6px);
-    left: 50%;
-    transform: translateX(-50%);
-  }
-  .tw-tooltip.left {
-    right: calc(100% + 6px);
-    top: 50%;
-    transform: translateY(-50%);
-  }
-  .tw-tooltip.right {
-    left: calc(100% + 6px);
-    top: 50%;
-    transform: translateY(-50%);
   }
 </style>

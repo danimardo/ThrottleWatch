@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using LibreHardwareMonitor.Hardware;
 using Microsoft.Extensions.Logging;
 using ThrottleWatch.SensorAgent.Logging;
@@ -80,6 +81,7 @@ public sealed class HardwareCollector : ISensorSource, IDisposable
     private readonly IHardwareSource source;
     private readonly ILogger logger;
     private readonly HashSet<string> failedUpdates = [];
+    private readonly Dictionary<string, (Task<bool> Task, long StartedAt)> pendingUpdates = new(StringComparer.Ordinal);
     private readonly Func<bool> isVirtualized;
     private readonly Func<string> detectVendor;
     private bool opened;
@@ -211,11 +213,16 @@ public sealed class HardwareCollector : ISensorSource, IDisposable
             // A host without readable sensors (virtualized CI runner, no low-level access)
             // makes the library throw from inside Update(); the sidecar must keep running
             // and report the readings as missing instead of dying (T-INT-005).
-            var updated = TryUpdate(hardware);
+            var updated = UpdateWithinDeadline(hardware);
             foreach (var sensor in hardware.Sensors.Where(sensor => !IsHiddenOnThisHost(sensor.SensorType)))
             {
                 var id = SensorId(sensor);
-                if (!updated)
+                if (updated is null)
+                {
+                    readings.Add(new SensorReading(id, null, "stale"));
+                    continue;
+                }
+                if (updated == false)
                 {
                     readings.Add(new SensorReading(id, null, "missing"));
                     continue;
@@ -229,7 +236,10 @@ public sealed class HardwareCollector : ISensorSource, IDisposable
 
         if (vendor == "intel")
         {
-            readings.AddRange(IntelLimitCatalog.ReadSample(intelMsrAccessConfirmed, logger: logger));
+            using (StageWatchdog.Enter("intel limit MSRs"))
+            {
+                readings.AddRange(IntelLimitCatalog.ReadSample(intelMsrAccessConfirmed, logger: logger));
+            }
         }
 
         return readings;
@@ -277,18 +287,68 @@ public sealed class HardwareCollector : ISensorSource, IDisposable
         };
     }
 
+    /// <summary>
+    /// How long a sample waits for one hardware update before reporting that hardware's sensors
+    /// stale and moving on (T187). Below the fastest sampling interval (500 ms), so a stuck read
+    /// never costs the sample itself.
+    /// </summary>
+    public const int UpdateDeadlineMs = 400;
+
+    /// <summary>
+    /// Updates <paramref name="hardware"/> off the sampling thread and waits at most
+    /// <see cref="UpdateDeadlineMs"/>: true when updated, false when the library failed, null when
+    /// the update is still running — its sensor values must not be read while it runs, so they are
+    /// reported stale. A still-running update is never stacked with another; the next sample picks
+    /// up its result once it finishes.
+    /// </summary>
+    private bool? UpdateWithinDeadline(IHardware hardware)
+    {
+        var key = hardware.Identifier.ToString();
+        if (pendingUpdates.TryGetValue(key, out var pending))
+        {
+            if (!pending.Task.IsCompleted)
+            {
+                return null;
+            }
+            pendingUpdates.Remove(key);
+            logger.HardwareUpdateFinishedLate(
+                "SENSOR_UPDATE_FINISHED_LATE",
+                key,
+                (long)Stopwatch.GetElapsedTime(pending.StartedAt).TotalMilliseconds);
+            return pending.Task.Result;
+        }
+
+        var startedAt = Stopwatch.GetTimestamp();
+        var update = Task.Run(() => TryUpdate(hardware));
+        if (update.Wait(UpdateDeadlineMs))
+        {
+            return update.Result;
+        }
+        pendingUpdates[key] = (update, startedAt);
+        logger.HardwareUpdatePending("SENSOR_UPDATE_PENDING", key, UpdateDeadlineMs);
+        return null;
+    }
+
     private bool TryUpdate(IHardware hardware)
     {
         try
         {
             hardware.Update();
-            failedUpdates.Remove(hardware.Identifier.ToString());
+            lock (failedUpdates)
+            {
+                failedUpdates.Remove(hardware.Identifier.ToString());
+            }
             return true;
         }
         catch (Exception exception) when (exception is not OutOfMemoryException)
         {
             // Logged once per hardware: the failure repeats on every sample.
-            if (failedUpdates.Add(hardware.Identifier.ToString()))
+            bool first;
+            lock (failedUpdates)
+            {
+                first = failedUpdates.Add(hardware.Identifier.ToString());
+            }
+            if (first)
             {
                 logger.HardwareUpdateFailed("SENSOR_UPDATE_FAILED", hardware.Identifier.ToString(), exception.GetType().Name, exception);
             }

@@ -7,8 +7,6 @@ use std::path::{Path, PathBuf};
 
 #[cfg(windows)]
 use std::ffi::OsStr;
-#[cfg(windows)]
-use std::process::Command;
 
 const MANIFEST_JSON: &str = include_str!("../resources/pawnio-manifest.json");
 
@@ -123,7 +121,7 @@ fn compare_versions(left: &str, right: &str) -> std::cmp::Ordering {
 
 #[cfg(windows)]
 fn registry_display_version() -> io::Result<Option<String>> {
-    let output = Command::new(r"C:\Windows\System32\reg.exe")
+    let output = crate::ipc::supervisor::hidden_command(r"C:\Windows\System32\reg.exe")
         .args([
             "query",
             r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\PawnIO",
@@ -212,7 +210,12 @@ pub fn launch_installer_and_register_task(
             // could tell), and the caller then waits out `CONNECT_TIMEOUT` for a launcher that was
             // never going to start. Each run already authenticates with its own random pipe names
             // and session nonce, so two overlapping instances do not need to be mutually exclusive.
-            "$user=[System.Security.Principal.WindowsIdentity]::GetCurrent().Name; $launcherXml=[System.Security.SecurityElement]::Escape('{launcher}'); $xml='<Task version=\"1.4\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\"><RegistrationInfo><Author>ThrottleWatch</Author><Description>Lanzador elevado bajo demanda del sidecar de ThrottleWatch</Description></RegistrationInfo><Triggers /><Principals><Principal id=\"Author\"><UserId>'+ $user +'</UserId><LogonType>InteractiveToken</LogonType><RunLevel>HighestAvailable</RunLevel></Principal></Principals><Settings><MultipleInstancesPolicy>Parallel</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>false</StopIfGoingOnBatteries><AllowHardTerminate>true</AllowHardTerminate><StartWhenAvailable>true</StartWhenAvailable><ExecutionTimeLimit>PT0S</ExecutionTimeLimit></Settings><Actions Context=\"Author\"><Exec><Command>'+ $launcherXml +'</Command><Arguments>--elevated-launcher</Arguments></Exec></Actions></Task>'; Register-ScheduledTask -TaskName '{task_name}' -Xml $xml -Force | Out-Null; if ($?) {{ exit 0 }}; exit 1"
+            // `<Priority>4</Priority>` (normal, 2026-09-28): without it Task Scheduler uses its
+            // default of 7, BELOW_NORMAL_PRIORITY_CLASS, which the elevated sidecar inherits — any
+            // CPU load at normal priority, the guided test's own generator included, then starves
+            // it completely (T187). The launcher also raises itself at startup, so this matters
+            // only as the belt to that brace for tasks registered before this fix.
+            "$user=[System.Security.Principal.WindowsIdentity]::GetCurrent().Name; $launcherXml=[System.Security.SecurityElement]::Escape('{launcher}'); $xml='<Task version=\"1.4\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\"><RegistrationInfo><Author>ThrottleWatch</Author><Description>Lanzador elevado bajo demanda del sidecar de ThrottleWatch</Description></RegistrationInfo><Triggers /><Principals><Principal id=\"Author\"><UserId>'+ $user +'</UserId><LogonType>InteractiveToken</LogonType><RunLevel>HighestAvailable</RunLevel></Principal></Principals><Settings><MultipleInstancesPolicy>Parallel</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>false</StopIfGoingOnBatteries><AllowHardTerminate>true</AllowHardTerminate><StartWhenAvailable>true</StartWhenAvailable><ExecutionTimeLimit>PT0S</ExecutionTimeLimit><Priority>4</Priority></Settings><Actions Context=\"Author\"><Exec><Command>'+ $launcherXml +'</Command><Arguments>--elevated-launcher</Arguments></Exec></Actions></Task>'; Register-ScheduledTask -TaskName '{task_name}' -Xml $xml -Force | Out-Null; if ($?) {{ exit 0 }}; exit 1"
         );
         let diagnostic = std::env::temp_dir().join("ThrottleWatch-pawnio-bootstrap.log");
         let diagnostic = powershell_literal(&diagnostic.display().to_string());
@@ -222,9 +225,9 @@ pub fn launch_installer_and_register_task(
         let encoded_script = encode_utf16_base64(&script);
         let powershell = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe";
         let elevated_arguments = format!(
-            "$args=@('-NoProfile','-NonInteractive','-EncodedCommand','{encoded_script}'); $p=Start-Process -FilePath '{powershell}' -Verb RunAs -ArgumentList $args -Wait -PassThru; exit $p.ExitCode"
+            "$args=@('-NoProfile','-NonInteractive','-EncodedCommand','{encoded_script}'); $p=Start-Process -FilePath '{powershell}' -Verb RunAs -WindowStyle Hidden -ArgumentList $args -Wait -PassThru; exit $p.ExitCode"
         );
-        let status = Command::new(powershell)
+        let status = crate::ipc::supervisor::hidden_command(powershell)
             .args(["-NoProfile", "-NonInteractive", "-Command", &elevated_arguments])
             .status()?;
         if !status.success() {
@@ -319,7 +322,7 @@ fn verify_authenticode(path: &Path, expected_subject: &str) -> io::Result<()> {
             );
             let powershell =
                 Path::new(r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe");
-            let checked = Command::new(powershell)
+            let checked = crate::ipc::supervisor::hidden_command(powershell)
                 .args(["-NoProfile", "-NonInteractive", "-Command", &script])
                 .status()?;
             if checked.success() {

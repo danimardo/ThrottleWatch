@@ -40,6 +40,12 @@ pub fn default_values() -> PreferenceMap {
         ("privacy.anonymize_exports".to_owned(), json!(true)),
         ("updates.enabled".to_owned(), json!(false)),
         ("logging.detailed_until".to_owned(), Value::Null),
+        // "Ahora no" on the startup advanced-access prompt (2026-09-28): stops it insisting on
+        // every launch. The frontend only shows the prompt at all when advanced access is not
+        // yet installed, so this stays sticky — once dismissed, only actually installing it
+        // (from Ajustes) makes the prompt's own condition false again; there is no separate
+        // "un-dismiss" action, the same way `onboarding.status` has none.
+        ("access.startup_prompt_dismissed".to_owned(), json!(false)),
     ])
 }
 
@@ -122,7 +128,8 @@ fn normalise_value(key: &str, value: Value, _now: &str) -> Result<Value, Prefere
         | "guided.require_ac"
         | "guided.notify_on_finish"
         | "privacy.anonymize_exports"
-        | "updates.enabled" => value.is_boolean(),
+        | "updates.enabled"
+        | "access.startup_prompt_dismissed" => value.is_boolean(),
         "notifications.quiet_period" => quiet_period(&value),
         "logging.detailed_until" => {
             if value == Value::Bool(true) {
@@ -167,7 +174,7 @@ mod tests {
 
     #[test]
     fn defaults_cover_every_known_preference() {
-        assert_eq!(default_values().len(), 20);
+        assert_eq!(default_values().len(), 21);
         assert_eq!(default_values()["privacy.anonymize_exports"], json!(true));
     }
 
@@ -181,6 +188,21 @@ mod tests {
             assert!(result.is_ok(), "{choice} must stay a valid theme");
         }
         assert!(update(&default_values(), "appearance.theme", json!("sepia"), "now").is_err());
+    }
+
+    #[test]
+    fn the_startup_access_prompt_dismissal_defaults_off_and_only_takes_a_boolean() {
+        assert_eq!(default_values()["access.startup_prompt_dismissed"], json!(false));
+        let dismissed =
+            update(&default_values(), "access.startup_prompt_dismissed", json!(true), "now");
+        assert_eq!(
+            dismissed.map(|(next, _)| next["access.startup_prompt_dismissed"].clone()),
+            Ok(json!(true))
+        );
+        assert_eq!(
+            update(&default_values(), "access.startup_prompt_dismissed", json!("yes"), "now").err(),
+            Some(PreferenceError::InvalidValue)
+        );
     }
 
     #[test]

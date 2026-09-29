@@ -113,7 +113,17 @@ export function impactText(t: Translate, report: Report): string | undefined {
 
 /** Why there is no figure: for a pure power limit the spec says cooling barely matters. */
 export function noImpactReason(t: Translate, report: Report): string {
-  return report?.classification === 'power_limited'
-    ? t('sessions.reportNoImpactPower')
+  if (report?.classification === 'power_limited') {
+    return t('sessions.reportNoImpactPower');
+  }
+  return report?.classification === 'normal'
+    ? t('sessions.reportNoImpactNormal')
     : t('sessions.reportNoImpactReason');
+}
+
+/** A test with no limitation has nothing to quantify: say so rather than "no figure available". */
+export function noImpactTitle(t: Translate, report: Report): string {
+  return report?.classification === 'normal'
+    ? t('sessions.reportNoImpactNormalTitle')
+    : t('sessions.reportNoImpact');
 }

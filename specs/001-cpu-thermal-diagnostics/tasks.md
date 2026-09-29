@@ -676,7 +676,287 @@ Origen: el principio XVII estaba completo en papel y el código no lo cumplía (
   colector al entrar en «Calentamiento» en primer lugar. Sin el reenvío de eventos del colector
   (`component: "agent"`, nunca visto en el log — T-LOG-011/T-LOG-014) no hay forma de saberlo desde
   los registros todavía.
-- [ ] T188 [US1] «Reparar acceso avanzado» dejó la aplicación sin responder (hallazgo 2026-09-28,
+
+  **Sigue reproduciéndose el 2026-09-28 por la tarde** (perfil estándar, `guided-1790608057690592500`,
+  15:07-15:09 UTC): fase `rest`→`warming` a las 15:08:38,083; `COLLECTOR_STATE_CHANGED` a
+  `restarting` a las 15:08:39,453 (el primer reinicio del colector en toda la sesión de la app, no
+  hubo ninguno antes); `COLLECTOR_ELEVATED_LAUNCH_FAILED` a las 15:08:59,986 («the elevated launcher
+  never connected to the pipe», mismo mensaje que T187 pese al `CONNECT_TIMEOUT` de 20 s); caída a
+  sin elevar a las 15:09:01,776; `sensor_lost` a las 15:09:04,827; sesión guiada abortada a las
+  15:09:05,856. El lanzador elevado no arrancó hasta las 15:09:06,055 en su propio log —
+  `throttlewatch-launcher.log` — casi 27 s después del reinicio pedido, con un nuevo mensaje de
+  error no visto antes: `LAUNCHER_EXITED` «invalid launcher hello» (4 veces hoy en total), porque
+  al llegar tarde la app ya había dejado de esperarlo.
+
+  **Corrección a la nota anterior:** el reenvío de `component: "agent"` **ya está cableado**, en los
+  dos transportes (`ProcessLink::from_child` y `PipeLink::connect`, `telemetry/runtime.rs`), no
+  «pendiente de T-LOG-011». Cero apariciones de `component: "agent"` en todo el registro de hoy no
+  es una brecha de instrumentación: es que el sidecar no escribe nada en su stderr en ningún
+  reinicio de hoy (tampoco `COLLECTOR_STDERR_INVALID`, así que no es una línea corrupta que se
+  descarte). Eso apunta a que la sesión no termina por un error que el propio sidecar sepa
+  reportar, sino por algo que el lado Rust decide (probablemente `SessionEnd::Stalled`, sin
+  confirmar todavía — `run_forever_with_pause` nunca registraba qué variante de `SessionEnd`
+  causaba el reinicio).
+
+  **Hipótesis nueva, sin confirmar:** al entrar en `Warming`/`SteadyLoad`, `guided_loop_body`
+  arranca `ThreadedGenerator::start(threads)` con `threads = std::thread::available_parallelism()`
+  (`commands/mod.rs:465`, `530-531`) — un hilo por núcleo lógico de la máquina, cada uno en un bucle
+  de cómputo sin ceder el turno ni prioridad reducida (`diagnostics/guided.rs:194-238`). Satura el
+  100 % de todos los núcleos de golpe, justo el momento en que el colector se declara reiniciando
+  (~1,4 s después). Podría estar dejando sin CPU al hilo que lee la tubería del colector el tiempo
+  suficiente para perder la ventana de `collector.stall_intervals` (3 × 1000 ms).
+
+  **Instrumentación añadida hoy para confirmarlo o descartarlo la próxima vez** (sin cambiar
+  comportamiento): `COLLECTOR_SESSION_ENDED` en `run_forever_with_pause` registra la razón exacta
+  de cada fin de sesión (`eof`/`stalled`/`too_many_invalid`/`fatal`/…); `COLLECTOR_STALL_DETECTED`
+  en `run_session_with_pause` registra, cuando la razón es `stalled`, los milisegundos transcurridos
+  frente a los permitidos. Pruebas nuevas `every_session_end_is_readable_from_the_log_with_its_reason`
+  y la ampliación de `a_silent_collector_is_declared_stalled_after_the_stall_window` (377/377 en
+  verde, `cargo clippy -D warnings` limpio, `check-logging-gates` OK).
+
+  **Confirmada la causa del reinicio el 2026-09-28, reproducción con la instrumentación activa**
+  (`guided-1790612765824518800`, 16:25-16:27 UTC): fase `rest`→`warming` a las 16:27:06,281;
+  `COLLECTOR_STALL_DETECTED` a las 16:27:07,789 — *«no sample arrived within the stall window (1670
+  ms elapsed, 1500 ms allowed)»* — y `COLLECTOR_SESSION_ENDED reason: "stalled"` en el mismo
+  instante. La ventana de 1500 ms = `collector.stall_intervals` (3) × el intervalo vigente (500 ms,
+  el perfil «diagnostic» que usa el guiado) — se perdió por solo 170 ms. Confirma la hipótesis del
+  generador de carga: `ThreadedGenerator::start(threads)` arranca exactamente al entrar en
+  `Warming`/`SteadyLoad`, con un hilo sin ceder turno por cada núcleo lógico de la máquina, y basta
+  con un hueco de scheduling de ~170 ms para agotar un presupuesto ya ajustado (3 muestras a 500 ms).
+  Cadena completa, ahora con evidencia en cada eslabón: generador arranca → satura núcleos →
+  atasco de 170 ms sobre 1500 ms → `Stalled` → reinicio del colector → como el acceso avanzado está
+  activo, el reinicio pide el lanzador elevado → sigue tardando (T187, sin resolver del todo, hoy
+  ~22 s de nuevo) → `CONNECT_TIMEOUT` agota → cae a sin elevar → pierde el sensor crítico →
+  `sensor_lost` → sesión guiada abortada. Dos causas independientes, ambas necesarias para el fallo
+  visible: (1) el presupuesto de atasco es demasiado ajustado frente a la carga que el propio
+  guiado genera — no cablea ningún margen ni prioridad reducida para sus hilos de carga — y (2) el
+  lanzador elevado sigue sin conectar dentro del `CONNECT_TIMEOUT` de 20 s. Arreglar (1) evitaría
+  el reinicio en este escenario concreto sin tocar (2); (2) sigue siendo un problema real para
+  cualquier reinicio legítimo del colector con acceso avanzado activo.
+
+  **Corrección de (1) aplicada el 2026-09-28:** `generator_worker` (`diagnostics/guided.rs`) llama
+  ahora a `ipc::supervisor::lower_current_thread_priority()` nada más arrancar, que baja la
+  prioridad OS del hilo a `THREAD_PRIORITY_BELOW_NORMAL` (`windows::Win32::System::Threading`, ya
+  era dependencia — sin añadir ninguna nueva). Vive en `ipc/supervisor.rs`, no en `guided.rs`
+  (`#![forbid(unsafe_code)]` de ese fichero prueba FR-018 y no se toca); `guided.rs` solo llama a
+  una función segura. Con esto, cada hilo del generador sigue saturando su núcleo cuando nada más
+  lo necesita (mismo rendimiento medido), pero cede el turno en cuanto el hilo lector del colector
+  sí lo necesita. Prueba `lowering_the_current_thread_priority_never_panics` (humo — el
+  comportamiento de planificación del SO no es observable de forma determinista desde un test
+  unitario, mismo criterio ya aplicado a `parent_process_alive`/`current_parent_process_id` en el
+  mismo fichero, que tampoco tienen prueba de comportamiento). 378/378 en verde, `cargo clippy -D
+  warnings` limpio, `check-logging-gates` OK. Pendiente: reproducir el diagnóstico guiado una vez
+  más para confirmar en caliente que ya no se dispara `COLLECTOR_STALL_DETECTED` al entrar en
+  «Calentamiento». (2) sigue abierto y sin tocar.
+
+  **La corrección de (1) no bastó, confirmado el 2026-09-28 con una reproducción más:**
+  `COLLECTOR_STALL_DETECTED` volvió a dispararse (1640 ms elapsed, 1500 ms allowed — prácticamente
+  idéntico a los 1670 ms de antes de bajar la prioridad), así que la causa de fondo del atasco
+  sigue sin explicarse del todo; bajar la prioridad del generador no lo evita. Con esto, se decide
+  atacar (2) en su lugar: si el reinicio del colector no puede evitarse del todo, que al menos no
+  dependa de una elevación UAC nueva cada vez.
+
+  **(2) investigado y enmendado el 2026-09-28:** mantener vivo el lanzador elevado entre reinicios
+  contradecía a propósito una decisión de seguridad ya tomada en
+  `docs/adr/0004-lanzador-elevado-del-sidecar.md` (rechaza explícitamente un «servicio privilegiado
+  permanente»). Con autorización expresa de la persona propietaria, se enmienda el ADR (sección
+  «Enmienda 2026-09-28» al final del documento: motivo, alternativa, riesgo aceptado, mitigaciones,
+  fecha de retirada) y se implementa un lanzador persistente durante la sesión de la aplicación:
+
+  - `ipc/elevated.rs`: `proxy_child_over_pipe` ahora mira el `type` de cada línea antes de
+    reenviarla — un `elevated_stop_session` autenticado (nonce + secuencia) termina el hijo actual
+    sin cerrar la tubería (`ChildEnd::StopSessionRequested`); `launcher_steps` pasa a un bucle que,
+    tras cada `StopSession`, espera un `elevated_start` nuevo sobre la misma tubería en vez de
+    terminar el proceso lanzador. Solo un EOF real (la app cierra la tubería de verdad) sigue
+    terminando el lanzador. Cada `elevated_start`, incluidos los que reutilizan la tubería, repite
+    la verificación completa de la firma del sidecar.
+  - Nuevo `PersistentElevatedConnection` (mismo fichero): guarda los dos `File` maestros de la
+    tubería y el nonce/secuencia de la sesión; `start_new_session` envía `elevated_stop_session` +
+    `elevated_start` sobre el maestro y devuelve clones (`File::try_clone`) para el `PipeLink` de
+    turno — el maestro nunca se cierra, así que el `PipeLink` de una sesión al hacerse `drop` no
+    apaga el lanzador.
+  - `telemetry/launch.rs`: `ElevatedSidecarLauncher` guarda un
+    `Arc<Mutex<Option<PersistentElevatedConnection>>>` compartido (`SharedElevatedConnection`);
+    reutiliza la conexión si existe, y si reutilizarla falla se autocura cayendo a un arranque en
+    frío (mismo camino de siempre) en vez de quedarse atascado.
+  - `lib.rs`: nuevo estado gestionado `ElevatedConnectionHandle`, separado de `CollectorHandle` a
+    propósito — así `restart_collector` no lo destruye al reconstruir el `CollectorRuntime`. Se
+    cierra explícitamente en `shutdown_services` (cierre real de la app) y también cuando se
+    desactiva el acceso avanzado (`commands/mod.rs::restart_collector`), para que «Desactivar
+    acceso avanzado» siga terminando el lanzador de verdad y no lo deje elevado en segundo plano
+    sin usarlo.
+  - Pruebas nuevas en `ipc/elevated.rs`: `a_stop_session_ends_the_child_but_keeps_the_pipes_open_for_a_second_session`
+    (dos sesiones reales seguidas sobre el mismo par de tuberías y el mismo `PipeLink`, sin
+    reabrir nada) y `start_new_session_writes_an_authenticated_stop_then_start_with_increasing_sequence`.
+    380/380 en verde, `cargo clippy --lib --bin elevated-integration --bin test-echo -D warnings`
+    limpio, `check-logging-gates` OK. (El binario principal no se pudo relanzar en Clippy por
+    tenerlo la persona propietaria abierto en ese momento; la librería cubre todo el código nuevo.)
+  - Pendiente de verificar en caliente: reproducir el diagnóstico guiado dos veces seguidas sin
+    cerrar la app entre medias y confirmar en `throttlewatch-launcher.log` que el segundo reinicio
+    del colector NO añade un `LAUNCHER_STARTED` nuevo (solo el primero de la sesión de la app).
+
+  **Reproducción real el 2026-09-28: el lanzador persistente funcionó, pero destapó un problema
+  nuevo.** `throttlewatch-launcher.log` confirma un único `LAUNCHER_STARTED` en toda la sesión de
+  la app — el reinicio del colector reutilizó el lanzador sin pedir UAC, y el primer sidecar nuevo
+  arrancó en 0,5 s (frente a los 15-27 s de antes). Pero ese sidecar nunca llegó a completar su
+  saludo inicial: la app esperó 10 s (el tiempo de espera del saludo, `handshake_timeout`), lo
+  reintentó, esperó 10 s más, lo reintentó una tercera vez, esperó 10 s más y agotó el límite de
+  reintentos (`collector.max_restarts` = 3) — el colector quedó en `failed` y el guiado se canceló
+  (`GUIDED_SESSION_ENDED reason: guided.sensor_lost, phase: Cancelled`).
+
+  Causa encontrada por el hueco exacto en `throttlewatch-launcher.log`: entre `LAUNCHER_SIDECAR_
+  VERIFIED` y `LAUNCHER_CHILD_SPAWNED` de la segunda sesión hay **31,4 s** — justo donde el código
+  llama a `ensure_pawnio_service_running()`. Las tres peticiones que la app mandó durante esos 31 s
+  se procesaron todas de golpe, en menos de 200 ms, en cuanto esa llamada por fin volvió — prueba
+  de que el único hilo del lanzador estuvo bloqueado ahí todo ese tiempo, sin poder ni leer la
+  tubería. Antes de la enmienda esto no se veía porque cada reinicio pasaba por una elevación UAC
+  nueva de 15-27 s de por sí, y la comprobación del servicio solo corría una vez (el primer
+  arranque); al reutilizar el lanzador, `launcher_steps` la repetía en cada sesión — y reiniciar el
+  controlador PawnIO justo después de matar de golpe al sidecar que lo tenía abierto es, según
+  esto, lento.
+
+  **Corregido el 2026-09-28:** `launcher_steps` ahora solo llama a `pawnio_check` (inyectado —
+  `ensure_pawnio_service_running` en producción, vía `launcher_main`/`run_elevated_launcher`) en la
+  primera sesión de cada proceso lanzador; las sesiones siguientes sobre la misma conexión no la
+  repiten, ya que el controlador ya estaba en marcha para el sidecar que se acaba de cerrar
+  limpiamente. Sin prueba de comportamiento de extremo a extremo para esto en concreto: probarlo de
+  verdad exige firmar un manifiesto para un sidecar real, y la clave secreta de desarrollo vive
+  fuera del repositorio a propósito — la misma frontera que ya tenían el resto de comprobaciones de
+  `launcher_steps` (directorio de instalación, verificación de firma), cubiertas solo por
+  `elevated-integration.rs` (manual, con tarea programada y UAC reales, no en `cargo test`). 380/380
+  en verde, `cargo clippy --all-targets --features custom-protocol -D warnings` limpio,
+  `check-logging-gates` OK. Pendiente de verificar en caliente: repetir el diagnóstico guiado y
+  comprobar que el segundo sidecar arranca sin el hueco de 31 s.
+
+  **Sigue fallando el 2026-09-28, patrón nuevo:** el hueco de 31 s por PawnIO ya no aparece, pero
+  cada intento de reinicio sucesivo tarda *más* que el anterior (0,26 s → 2,0 s → 5,4 s → ~10 s
+  entre «sesión detenida» y «sidecar arrancado»), hasta agotar los 3 reintentos permitidos sin que
+  ninguno complete el saludo inicial (`handshake_timeout` = 10 s) — el guiado se cancela igual
+  (`Cancelled`/`guided.sensor_lost`, vía el aviso `collector.restart_limit`, no por el camino rápido
+  de sensor perdido). El componente `agent` (el propio sidecar) sigue sin registrar nada en ningún
+  intento. El patrón creciente apunta a que el generador de carga del guiado — que nunca deja de
+  exigir CPU, ni siquiera mientras el colector intenta recuperarse — compite cada vez peor por el
+  procesador contra el propio trabajo de recuperación (verificar la firma, arrancar el proceso),
+  empeorando con cada intento.
+
+  **Corregido el 2026-09-28:** nueva función pura `should_generate_load(phase, collector_state)`
+  (`commands/mod.rs`) — el generador de carga solo corre mientras la fase carga la CPU
+  (`Warming`/`SteadyLoad`) **y** el colector está conectado (`Running`/`Degraded`); se pausa solo
+  con `Starting`/`Restarting`/`Stopped`/`Failed` y se reanuda en cuanto vuelve a conectar. Antes el
+  generador dependía solo de la fase, así que seguía saturando todos los núcleos durante todo el
+  reinicio, compitiendo por CPU contra su propia recuperación. Se cierra con
+  `GUIDED_GENERATOR_PAUSED`/`GUIDED_GENERATOR_RESUMED` (debug) para verlo en el registro. La
+  comprobación del sensor perdido de FR-085 (contador de muestras ausentes) no se toca — sigue
+  funcionando igual de rápido para un sensor realmente perdido con el colector conectado; esto solo
+  afecta al generador mientras el colector está desconectado. Prueba nueva
+  `the_load_generator_only_runs_while_loading_and_connected` (tabla completa fase × estado).
+  381/381 en verde, `cargo clippy --all-targets --features custom-protocol -D warnings` limpio,
+  `check-logging-gates` OK. Pendiente de verificar en caliente.
+
+  **Causa del atasco confirmada el 2026-09-28 por experimento controlado** (reproducción con la
+  pausa del generador activa): la recuperación ya es rápida (sidecar nuevo en ~0,2 s, colector
+  `running` en ~1 s), pero el ciclo se repitió tres veces idéntico — generador reanudado → a los
+  ~1,5 s `COLLECTOR_STALL_DETECTED` → pausa → el colector se recupera → reanudado → atasco otra
+  vez — hasta agotar los reintentos. Corrección a la lectura anterior: «1634 ms frente a 1500
+  permitidos» no era un fallo por poco, sino que las muestras **dejan de llegar del todo** (el
+  bucle solo comprueba cada 200 ms). Por eso bajar la prioridad de los hilos no sirvió.
+
+  **Corregido el 2026-09-28:** nueva función pura `generator_threads` (`commands/mod.rs`): el
+  generador usa un hilo por procesador lógico **menos uno** (nunca menos de uno), que queda libre
+  para el colector. La especificación no fija el número de hilos (FR-083 solo exige medir el trabajo
+  por hilo y segundo). Nota: `generator_version` (`diagnostics/guided.rs`, comparación antes/después)
+  no se persiste en ningún sitio en producción todavía, así que no hay versión que subir; cuando se
+  persista, las sesiones anteriores a este cambio no deberían compararse con las posteriores. Prueba
+  `the_load_generator_leaves_one_logical_processor_free`. 382/382 en verde, Clippy limpio,
+  `check-logging-gates` OK. Pendiente de verificar en caliente.
+
+  **No bastó (2026-09-28).** Patrón idéntico. Se añade `COLLECTOR_SAMPLE_SLOW` (`runtime.rs`, debug:
+  muestra con `duration_ms` > medio intervalo) — nunca salta: las muestras no se hacen lentas, se
+  cortan.
+
+  **Bloqueo mutuo encontrado y corregido (causa de T188):** `request_low_level_access` y
+  `disable_advanced_access` son comandos síncronos, y Tauri los ejecuta en el hilo principal;
+  `restart_collector` hace `join` del hilo del colector desde ahí. Si ese hilo estaba dentro de
+  `tray::refresh`, cuyos `set_text`/`set_icon` esperan al hilo principal, cada uno esperaba al otro
+  (reproducido con la versión `e2e`: el registro se paró en `COLLECTOR_RESTART_STOPPING_OLD`).
+  `tray::refresh` ahora envía esas llamadas con `app.run_on_main_thread` sin esperar respuesta.
+  Verificado: el reinicio completo baja a ~5 ms.
+
+  **Experimentos automatizados con Playwright** (build `e2e` en `target/debug`, porque el lanzador
+  elevado rechaza sidecars de otra carpeta; datos aislados con `TW_DEV_DATA_DIR`; scripts en el
+  scratchpad de la sesión):
+  - Sin acceso avanzado, el guiado no puede empezar en este equipo: el preflight no ve la
+    temperatura.
+  - Monitorización pasiva con carga externa (proceso aparte, prioridad `BelowNormal`, N−1 hilos):
+    con acceso avanzado, el sidecar en marcha se corta en ~3 s al empezar la carga; el sidecar
+    reiniciado *con la carga ya en marcha* funciona el resto de la prueba. Sin acceso avanzado, ni
+    un corte.
+  - Guiado sin pausa del generador: el primer corte al empezar la carga es igual, pero los
+    sidecars reiniciados con el generador del propio proceso en marcha no completan el saludo en
+    10 s — al contrario que con la carga externa.
+  - Conclusión: hay dos problemas. (A) Al empezar cualquier carga, se corta el sidecar elevado ya
+    en marcha. (B) Con el generador *de la app* en marcha, un sidecar elevado nuevo no llega a
+    arrancar. Pausar el generador evita B pero vuelve a provocar A al reanudar; no pausarlo cae en
+    B. **Se revierte la pausa** (`should_generate_load`), que no arregla nada. Siguiente paso
+    propuesto: un vigilante dentro del sidecar que registre qué `hardware.Update()` sigue en curso
+    tras 1 s (requiere recompilar y volver a firmar el manifiesto de desarrollo).
+
+  **Vigilante del sidecar añadido y causa localizada (2026-09-28).** `StageWatchdog`
+  (`apps/sensor-agent/Collector/StageWatchdog.cs`): hilo propio (no el grupo de hilos) que registra
+  por stderr (`component: agent`) toda etapa en curso tras 1 s (`AGENT_STAGE_STUCK`), y cuánto tardó
+  al terminar (`AGENT_STAGE_FINISHED_LATE`). Etapas: `open`, `read catalog`, `build capabilities`,
+  `sample`, `update <hardware>`, `intel limit MSRs`, `write sample`, `handle message`. Tests del
+  sidecar 113/113 (sin test propio del vigilante: es instrumentación). Publicado y firmado con
+  `scripts/prepare-collector-bundle.mjs` (clave de desarrollo). Reproducción automatizada del guiado
+  con acceso avanzado:
+  `AGENT_STAGE_STUCK update /amdcpu/0 still running after 1039 ms` al empezar la carga →
+  `COLLECTOR_STALL_DETECTED`; en los reinicios con carga, `AGENT_STAGE_STUCK open ...` y una vez
+  `open finished after 3043 ms`. La máquina es **AMD**: la lectura `Amd17Cpu.Update()` de
+  LibreHardwareMonitor (MSR/SMU por PawnIO, solo con acceso avanzado) se atasca al empezar la carga,
+  y abrir el `Computer` bajo carga tarda de 3 s en adelante. Mientras tanto no sale ninguna muestra,
+  porque toda la muestra espera a esa lectura. Arreglo propuesto, pendiente de aprobación: que una
+  lectura de hardware lenta no bloquee la muestra. Se publica a su hora con los sensores de ese
+  hardware como `stale`, y la lectura sigue en segundo plano hasta que acabe.
+
+  **Lectura con plazo implementada (2026-09-28):** `HardwareCollector.UpdateWithinDeadline`
+  (`UpdateDeadlineMs` = 400): cada `hardware.Update()` corre fuera del hilo de muestreo. Si no
+  termina a tiempo, los sensores de ese hardware salen como `stale` y la actualización no se
+  apila; la siguiente muestra usa su resultado cuando termina (`SENSOR_UPDATE_PENDING` /
+  `SENSOR_UPDATE_FINISHED_LATE`). TDD: `HardwareCollectorSlowUpdateTests` (2 pruebas), 115/115.
+  **No era esto:** en la siguiente reproducción no apareció ni el aviso de 400 ms ni el vigilante
+  (hilo propio, prioridad alta). Si ni ese hilo escribe, es que **el proceso entero del sidecar
+  no recibe CPU**. Se mantiene igualmente como robustez legítima.
+
+  **CAUSA RAÍZ DE T187 (2026-09-28), confirmada con `Get-Process`:** la app tiene prioridad base
+  8; el lanzador elevado y el sidecar que lanza tienen **6**. La tarea programada no fija
+  `<Priority>`, así que Task Scheduler usa su valor por defecto, 7 (`BELOW_NORMAL_PRIORITY_CLASS`),
+  y el sidecar lo hereda. Los hilos del generador (clase normal, hilo por debajo de lo normal) van a
+  7 y dejan **completamente** sin CPU al sidecar elevado. Esto explica todo lo observado:
+  - sin acceso avanzado, el sidecar es hijo de la app (8) y nunca falla;
+  - la carga externa (clase `BelowNormal`, 6) empataba con él y lo ralentizaba sin pararlo;
+  - bajar la prioridad del generador no bastaba, porque el sidecar estaba aún más abajo;
+  - «dejar un núcleo libre» tampoco servía.
+
+  **Corrección:**
+  - `ipc::supervisor::raise_current_process_to_normal_priority()` (`SetPriorityClass` normal),
+    llamada por `launcher_main` antes de lanzar nada, de modo que el sidecar hereda la clase normal
+    (`LAUNCHER_PRIORITY_NOT_RAISED` si falla).
+  - `<Priority>4</Priority>` en el XML de registro de la tarea (`access.rs`), para las tareas que se
+    registren a partir de ahora. Las ya registradas no necesitan repararse: el lanzador se sube la
+    prioridad solo.
+  - Prueba `a_process_can_put_itself_in_the_normal_priority_class`.
+  - Se **revierte** «un núcleo libre» (`generator_threads`): se basaba en una hipótesis equivocada,
+    y el generador vuelve a usar todos los procesadores lógicos, sin cambiar lo que mide. Se
+    conserva la prioridad reducida de los hilos del generador (inofensiva).
+  - 381/381, `cargo fmt --check`, `cargo clippy --all-targets --features custom-protocol -D
+    warnings` y `check-logging-gates` en verde.
+
+  **Verificado de extremo a extremo con Playwright** (build `e2e` en `target/debug`, datos
+  aislados, acceso avanzado, perfil corto sin reposo): calentamiento → carga sostenida →
+  recuperación → **resultado**, sin un solo corte ni reinicio del colector y con un único
+  `LAUNCHER_STARTED`. Es la primera ejecución completa del diagnóstico guiado en esta máquina
+  (AMD). Queda en `target/debug` la build normal.
+- [x] T188 [US1] «Reparar acceso avanzado» dejó la aplicación sin responder (hallazgo 2026-09-28,
   máquina real, tuvo que matarse el proceso — no queda `APP_SHUTTING_DOWN` en el log, así que no
   fue un cierre normal). Secuencia exacta: `ACCESS_INSTALL_COMPLETED` (6,5 s tras pulsar, UAC
   incluido) → `SESSION_ENDED` casi inmediato (`restart_collector` para el colector viejo,
@@ -706,4 +986,90 @@ Origen: el principio XVII estaba completo en papel y el código no lo cumplía (
   proceso de Windows real; el test de temporización existente pasa su propio valor, no toca esta
   constante). Pendiente de confirmar con la app reconstruida que esto basta para que un reinicio
   a mitad de sesión —incluido durante la prueba guiada— consiga elevarse.
+  **Causa del bloqueo de la ventana, encontrada y corregida el 2026-09-28** (ver T187, «Bloqueo
+  mutuo encontrado y corregido»): los comandos síncronos de Tauri corren en el hilo principal y
+  `restart_collector` hace `join` del hilo del colector, que podía estar esperando al hilo
+  principal dentro de `tray::refresh`. Ahora `tray::refresh` envía los cambios con
+  `run_on_main_thread` sin esperar. Reproducido y verificado con la build `e2e`: antes el registro
+  se detenía en `COLLECTOR_RESTART_STOPPING_OLD`; ahora el reinicio completo tarda ~5 ms.
+- [x] T189 [US1] El degradado de cristal (`GlassDegradation`, `appearance.rs`) parpadeaba on/off en
+  reposo (hallazgo 2026-09-28, lista de cinco puntos de la persona propietaria). Causa: además de
+  la señal de FPS, había una segunda señal de CPU inactiva (`glass.degrade_idle_cpu_pct` = 1 %,
+  ventana de 30 s) que cualquier carga externa —incluida la del propio generador de la prueba
+  guiada— mantenía activada de forma casi permanente, y que oscilaba con el ruido normal del
+  sistema en reposo. Decisión de la persona propietaria, más estricta que la propuesta inicial:
+  «que exista siempre, que no se vaya por mucho que la CPU esté en uso, incluso al 100 %». Se
+  **elimina** la señal de CPU por completo (no se ajusta el umbral): `GlassThresholds` deja de leer
+  `degrade_idle_cpu_pct`/`degrade_idle_window` de `ruleset-v1.json` (valores no leídos, se
+  conservan en el fichero); `GlassDegradation` pierde el campo `idle_cpu`/`record_idle_cpu_pct`;
+  `tick()` solo mira `fps_bad`/`fps_ok`; se retira todo el muestreo de CPU del proceso
+  (`webview2_process_ids`, `process_cpu_time_100ns`, `own_webview_cpu_time_ms`,
+  `cpu_percent_of_machine`), código ahora muerto de verdad. `spec.md` FR-043b enmendada
+  (2026-09-28) para reflejar que el degradado depende solo de los fotogramas por segundo.
+  Prueba nueva `nothing_but_fps_can_degrade_the_ceiling`; retiradas
+  `sustained_high_idle_cpu_also_degrades` y `cpu_percent_of_machine_matches_t019c_formula`.
+  380/380, `cargo clippy --all-targets --features custom-protocol -D warnings` (0),
+  `check-logging-gates` (0). Pendiente de que la persona propietaria confirme en la máquina real
+  que el parpadeo ha desaparecido.
+- [x] T190 [US2] «Reparar acceso avanzado» entraba en bucle mostrando «dejó de responder» en un
+  AMD de consumo aunque el acceso ya estaba reparado (hallazgo 2026-09-28, mismo lote de cinco
+  puntos). Causa: en este procesador, sin un registro documentado de razones de limitación fuera
+  de la lista de versiones SMU permitida, el techo real es el nivel B (`spec.md` §421) — no es un
+  fallo, es el límite conocido de la implementación actual. El backend lo reportaba como
+  `AdvancedAccessDto::Error` en cuanto el acceso estaba instalado pero el sidecar seguía sin
+  cubrir sensores de nivel A, lo que la interfaz interpretaba como «reparar» y reintentaba sin
+  parar. Requisito explícito de la persona propietaria, aplicado a la vez: «la gente no va a saber
+  qué significa A y qué significa B… mensajes emergentes o mensajes claros de todo ello», por ser
+  aplicación para personal no técnico. Corrección: nueva variante `AdvancedAccessDto::CappedByVendor`
+  (`commands/mod.rs`), calculada en `resolve_advanced_access` (`commands/live.rs`) cuando la
+  instalación está vigente y el fabricante es `amd`; se propaga por el tipo canónico
+  `design/lib/access.ts`, los tres componentes de `design/` (`CoverageMatrix`, `SettingsScreen`,
+  `OnboardingFlow`) y sus ejemplos, `design-system.json`, los esquemas Zod de la interfaz
+  (`lib/bridge/schemas.ts`) y una tercera copia local del enum hallada en
+  `features/dashboard/model.ts`/`Dashboard.svelte` vía `svelte-check`. Texto llano añadido en
+  `es.json`/`en.json` (`settings.accessNote.cappedByVendor`, `dashboard.advancedCappedByVendor`)
+  explicando qué es el nivel B y por qué no hace falta reparar nada. `report-narrative.ts` deja de
+  recomendar instalar acceso avanzado cuando el estado en vivo ya es `capped_by_vendor` (o
+  `available`), con prueba nueva. 14/14 en `commands::live::`, 383/383 en `cargo test --lib`,
+  `pnpm run check` 0 errores/0 avisos, `cargo clippy -D warnings` y `check-logging-gates` en
+  verde. Pendiente de confirmar en la máquina AMD real que el aviso sustituye al bucle.
+- [x] T191 [US2] El acceso avanzado solo se ofrecía si la persona entraba a Ajustes por su cuenta
+  (hallazgo 2026-09-28, mismo lote). Requisito de la persona propietaria: «Debería preguntarlo
+  siempre… tener un mensaje de ahora no. O alguna forma de que deje de insistir». Añadido diálogo
+  de arranque (`AppShell.svelte`, componente genérico `Dialog` de `design/`): al terminar el
+  arranque (fuera del flujo de incorporación), `checkStartupAccessPrompt()` consulta
+  `access.startup_prompt_dismissed` (nueva preferencia, por defecto `false`,
+  `preferences.rs`) y, si no se ha descartado y `get_coverage` devuelve `installable`, abre el
+  diálogo con dos acciones: activar ahora (`request_low_level_access`) o «Ahora no»
+  (`set_preference` deja `access.startup_prompt_dismissed = true`, descarte permanente salvo que
+  se instale el acceso de verdad). Prueba
+  `the_startup_access_prompt_dismissal_defaults_off_and_only_takes_a_boolean`; recuento de
+  valores por defecto actualizado a 21. Pendiente de confirmar en la máquina real que el diálogo
+  aparece cuando corresponde y que «Ahora no» no vuelve a insistir.
+- [x] T192 [US4] Texto de la prueba guiada (introducción y descripciones de fase) demasiado
+  técnico para personal no técnico (hallazgo 2026-09-28, mismo lote): «evitar tecnicismos.
+  Explicarlo con lenguaje llano de la calle». Reescritos en `es.json`/`en.json`:
+  `guided.introBody`, `guided.fixedLoop`, `guided.standardProfile`, `guided.shortProfile`,
+  `guided.longProfile`, `guided.phasesSummary`, `guided.restDescription`,
+  `guided.warmingDescription`, `guided.loadDescription`, `guided.recoveryDescription`. Borrador
+  mostrado y aprobado explícitamente por la persona propietaria antes de aplicarlo («me encantan
+  los textos… sí, me gusta»). Pendiente de verificación visual en la aplicación real.
+- [x] T193 [US1] Ventana de consola negra visible al arrancar con `arrancar.ps1` (hallazgo
+  2026-09-28, mismo lote). Confirmado: es comportamiento normal de una build de depuración de
+  Windows sin `#![windows_subsystem = "windows"]` incondicional; ya corregido antes en esta misma
+  sesión (`main.rs:6`, atributo sin condicionar a `not(debug_assertions)`) — reconfirmado presente
+  tras la recompilación del 2026-09-28. No hay ventana adicional que ocultar en este punto (la de
+  `schtasks.exe`/`sc.exe` ya se resolvió en T188).
+- [x] T194 [US4] «Duración: 0 s» en el resultado del guiado (hallazgo 2026-09-29, captura de la persona propietaria). Causa: `finish_guided_session` guardaba `GuidedMachine::elapsed_ms`, que se pone a 0 en cada cambio de fase (y en `Result`), así que toda prueba completada quedaba con duración 0 en la base de datos. Nuevo `total_elapsed_ms` (todas las fases, se detiene al llegar a `Result`, conserva lo corrido si se cancela); pruebas `the_total_duration_spans_every_phase_and_stops_at_the_result` y `a_cancelled_test_keeps_the_time_it_actually_ran`. La sesión ya guardada con 0 no se puede reconstruir.
+- [x] T195 Ventanas de consola negras al arrancar y de forma intermitente (hallazgo 2026-09-29). Causa: la aplicación es de ventana (sin consola que prestar) y Windows daba una consola visible nueva a cada hijo de consola: `SensorAgent.exe` (título de la ventana fija), `reg.exe` y `powershell.exe` (comprobación de PawnIO y de firma), además de `schtasks`/`sc.exe` ya tratados en T188. `hidden_command` (con `CREATE_NO_WINDOW`) pasa a `ipc::supervisor` y lo usan todos los lanzamientos, incluido `spawn_verified`; el PowerShell elevado lleva `-WindowStyle Hidden`. Pendiente de confirmar en la máquina real.
+- [x] T196 [US1] Pantalla Análisis con un gráfico vacío (hallazgo 2026-09-29). Causa: la primera petición es «todo» (`0 … MAX_SAFE_INTEGER`) y, al *contener* a la sesión, `effective_analysis_window` la respetaba; 3000 cubos sobre 9·10¹⁵ ms metían todas las muestras en el primero y cada serie era un solo punto. Ahora toda petición se recorta al rango real de la sesión (un zoom interior no cambia). Prueba `a_request_wider_than_the_session_is_trimmed_to_it_so_the_chart_is_not_one_bucket`. Pendiente de confirmar con la app.
+- [x] T197 [US1] «Impacto estimado: Sin cifra disponible» en un informe sin limitación (hallazgo 2026-09-29): no era un fallo, pero el texto («la sesión no contiene entradas suficientes») era engañoso. Con clasificación `normal` ahora dice «Sin pérdida que medir» / «No se detectó ninguna limitación, así que no hay pérdida de rendimiento que calcular» (`noImpactTitle`, `noImpactReason`, con pruebas).
+- [x] T198 [US1] Tabla «Cobertura del equipo» con claves internas y texto sin traducir (hallazgo 2026-09-29): `temperature`/`active_clock`/`thermal_flag`, calidad en español fijo desde Rust y, tras «Comprobar de nuevo» o desactivar el acceso, `coverage.advanced_access_required` y «Unknown» (tres copias del mapeo, dos incompletas). Una sola función probada `coverageRowView` (`features/dashboard/model.ts`) traduce nombre, calidad y origen desde los catálogos.
+- [x] T199 [US2] Sesiones con paginación de 8 en 8 (petición 2026-09-29). `SessionsScreen` (`design/`) gana `pageSize`, `previousPageLabel`, `nextPageLabel` y `pageLabel` (el paginador solo aparece con más de una página y las tres etiquetas; la página se ajusta al borrar la última). Documentado en `design/AGENTS.md` y con ejemplo; harness y mockup `check`+`build` a 0/0.
+- [x] T200 [US1] Pantalla CPU (hallazgo 2026-09-29): las lecturas se pedían una sola vez al abrir y nunca se refrescaban; ahora cada 2 s. Cuando ningún núcleo tiene temperatura pero sí frecuencia/carga (el Ryzen 5 2600X solo da la temperatura del conjunto, Tctl) un aviso informativo lo explica en vez de una rejilla de guiones.
+- [x] T201 [US1] Tooltips didácticos en lenguaje llano (petición 2026-09-29, textos aprobados por la persona propietaria antes de implementarlos). Componente `InfoTip` (icono «?», abre con ratón y teclado) en `design/` con ejemplo en `MorePrimitives`, documentado en `design/AGENTS.md`, `README.md` y `design-system.json`; props opcionales de ayuda en `StatWidget`, `StatusHero`, `CoverageMatrix`, `GuidedDiagnosticScreen`, `ReportScreen`, `SessionCard`/`SessionsScreen` y `CpuScreen`/`CpuAdvancedTable`. Textos en el bloque `help` de `es.json`/`en.json`: anillo, estado, potencial, las cuatro tarjetas de Ahora, filas y calidad de la tabla de cobertura, nota de acceso avanzado (según estado), «Usar como referencia», aviso de cobertura del informe, «Datos insuficientes», núcleos rayados, temperatura por núcleo y «Limitación». Harness y mockup `check`+`build` a 0/0, `pnpm check`, `pnpm lint` y 132 pruebas en verde; comprobado a la vista en el harness. Pendiente de ver en la aplicación real.
+- [x] T203 Los tooltips quedaban por debajo de las tarjetas vecinas (hallazgo 2026-09-29, captura de la persona propietaria). Causa: cada tarjeta de vidrio (`backdrop-filter`) crea su propio contexto de apilado y el panel vivía dentro; ninguna `z-index` lo sacaba de ahí. `Tooltip` (y por tanto `InfoTip` y los núcleos de CPU) dibuja ahora su panel como `popover` manual en la capa superior del navegador, colocado desde el rectángulo del disparador, dentro de la ventana, con vuelta al otro lado si no cabe; se cierra al desplazar o redimensionar. Comprobado a la vista en el harness.
+- [x] T204 [US1] Pantalla CPU: la columna Temperatura mostraba «—» en todos los núcleos pese a que el procesador sí da una temperatura general (petición 2026-09-29). `coreTemperatureView` (`features/cpu/model.ts`, con pruebas) repite la del conjunto en cada núcleo marcada «(general)» para que no se lea como propia; se refresca con la pantalla cada 2 s. Aviso y tooltip de la columna actualizados.
+- [x] T205 [US1] «Límite no disponible» sin explicación en Ahora (petición 2026-09-29: implementar FR-076 para AMD). El colector solo publica el límite en Intel; para AMD no hay registro que leer, así que se añade la tabla versionada de FR-076: `resources/amd-thermal-limits.json` (v1, 2026-09-29) + `telemetry/amd_limits.rs`, usada por `LiveState::thermal_limit_c` solo si el colector no publica ninguno (el del colector manda) y solo con fabricante `amd`. Tabla v3 (2026-09-29): 99 modelos de sobremesa Ryzen 1000–9000 sin desfase Tctl/Tdie, procedentes de un informe de investigación externo que cita la ficha de AMD de cada uno (una v1 propia con 32 modelos se había reducido a 5 al no poder abrir las fichas de AMD). No pude abrir las fichas de AMD, pero contrasté 8 modelos con Technical City (2600, 2600X, 3600XT, 3800XT, 5600X, 5800X, 7800X3D, 7950X3D) y coincidieron todos. Se descartaron los de fuente secundaria (3900, 3500X, 3500, 3200GE), los sin dato (2700E, 2600E, 2500X, 3300X, 3100, 4500, 4100, 5900, 5800, 5100) y el 1600 y el 1200 (dos versiones de silicio con el mismo nombre). Quedan **fuera a propósito** los modelos con desfase (Ryzen 5 1600X, 7 1700X/1800X/2700X y Threadripper, según la tabla de Linux `k10temp`), los móviles (U/H/HS) y todo lo que no esté en la lista: para esos el límite sigue sin conocerse y la interfaz lo explica en lenguaje llano («Tu procesador no informa de su límite», «Sin límite conocido» y un «?» con la explicación completa). Para añadir un modelo, comprobar antes su ficha de AMD. Pruebas: 3 en `amd_limits`, 3 en `live` (392/392). Efecto: con el límite conocido, el margen y el anillo de Ahora funcionan y el motor puede detectar la meseta de temperatura en el límite (FR-078).
+- [ ] T202 [US1] Investigar utilidades libres para leer lo que este procesador no da (petición 2026-09-29). Hallazgos: LibreHardwareMonitor (MPL-2.0) ya es la fuente; RyzenAdj (LGPL-3.0) solo soporta APU móviles (Raven … Rembrandt) y el Zen+ de escritorio no figura; sin utilidad libre conocida que dé el motivo de limitación en AMD de consumo (coherente con `spec.md` §421). Pendiente de decidir con la persona propietaria.
 - [ ] CHK-L22 Checkpoint: `pnpm check` (incluido `check-logging-gates`), `cargo clippy -D warnings` y las suites afectadas en verde; ningún `tracing::*!` fuera de `src/logging/`; escenarios de diagnóstico de T-LOG-005 a T-LOG-010 en verde; revisión de `revisor-constitucion` sobre XVII.

@@ -61,8 +61,15 @@ internal sealed class FakeHardware(string identifier, bool throwOnUpdate = false
     public void Accept(IVisitor visitor) { }
     public string GetReport() => string.Empty;
     public void Traverse(IVisitor visitor) { }
+    /// <summary>When set, <see cref="Update"/> blocks until it is signalled — a library read stuck in the driver.</summary>
+    public System.Threading.ManualResetEventSlim? BlockUpdate { get; set; }
+    public int UpdateCount => updateCount;
+    private int updateCount;
+
     public void Update()
     {
+        System.Threading.Interlocked.Increment(ref updateCount);
+        BlockUpdate?.Wait();
         if (ThrowOnUpdate)
         {
             throw new InvalidOperationException("simulated library failure");

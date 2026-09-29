@@ -952,12 +952,15 @@
               ? sensorsAccessRetryAction
               : undefined}
           />
-        {:else if sensors.advancedAccess === 'available' && sensors.onDisableAdvancedAccess}
-          {@render sensorsDisableAccessAction()}
+        {:else if sensors.advancedAccess === 'capped_by_vendor'}
+          <Banner tone="info" title={sensors.advancedAccessNote ?? ''} />
         {:else if sensors.advancedAccessNote}
           <span class="caption" style:color="var(--text-tertiary)"
             >{sensors.advancedAccessNote}</span
           >
+        {/if}
+        {#if (sensors.advancedAccess === 'available' || sensors.advancedAccess === 'capped_by_vendor') && sensors.onDisableAdvancedAccess}
+          {@render sensorsDisableAccessAction()}
         {/if}
       {/if}
     </div>

@@ -185,6 +185,13 @@ const GENERATOR_WORK_CHUNK: u64 = 20_000;
 /// operations in an atomic counter so the throughput reported to the interface is measured, not
 /// estimated. The work itself is deterministic floating-point arithmetic with no side effects —
 /// `#![forbid(unsafe_code)]` above proves it never reaches a hardware write surface (FR-018).
+///
+/// Each worker runs at a lower OS priority (`ipc::supervisor::lower_current_thread_priority`, the
+/// only reason this saturates every core through a *safe* call): found 2026-09-28, saturating every
+/// core at normal priority starved the collector's own reader thread enough to blow its stall
+/// window and trigger a false restart mid-test (T187). Lowering it keeps the same measured
+/// throughput whenever nothing else needs the CPU, while yielding to the rest of the app when it
+/// does.
 pub struct ThreadedGenerator {
     running: Arc<AtomicBool>,
     counters: Vec<Arc<AtomicU64>>,
@@ -227,6 +234,7 @@ impl Drop for ThreadedGenerator {
 }
 
 fn generator_worker(running: &AtomicBool, counter: &AtomicU64) {
+    crate::ipc::supervisor::lower_current_thread_priority();
     let mut value: f64 = 1.0;
     while running.load(Ordering::Acquire) {
         for _ in 0..GENERATOR_WORK_CHUNK {
@@ -320,7 +328,10 @@ impl GuidedConfig {
 pub struct GuidedMachine {
     pub phase: GuidedPhase,
     pub profile: GuidedProfile,
+    /// Time spent in the current phase only; it restarts at every phase change.
     pub elapsed_ms: u64,
+    /// Time the test ran, all phases together: what the session stores as its duration.
+    pub total_elapsed_ms: u64,
     pub reason: Option<GuidedStopReason>,
     config: GuidedConfig,
     rest_skipped: bool,
@@ -332,6 +343,7 @@ impl GuidedMachine {
             phase: GuidedPhase::Preflight,
             profile,
             elapsed_ms: 0,
+            total_elapsed_ms: 0,
             reason: None,
             config,
             rest_skipped: false,
@@ -376,10 +388,18 @@ impl GuidedMachine {
         if self.phase == GuidedPhase::Cancelling {
             self.phase = GuidedPhase::Cancelled;
             self.elapsed_ms = self.elapsed_ms.saturating_add(elapsed_ms);
+            self.total_elapsed_ms = self.total_elapsed_ms.saturating_add(elapsed_ms);
             return;
         }
         let mut remaining = elapsed_ms;
         while remaining > 0 {
+            let running = matches!(
+                self.phase,
+                GuidedPhase::Rest
+                    | GuidedPhase::Warming
+                    | GuidedPhase::SteadyLoad
+                    | GuidedPhase::Recovery
+            );
             let phase_duration = match self.phase {
                 GuidedPhase::Rest if !self.rest_skipped => self.config.rest_ms,
                 GuidedPhase::Warming => self.config.warmup_ms,
@@ -389,9 +409,14 @@ impl GuidedMachine {
             };
             if phase_duration == 0 || self.elapsed_ms.saturating_add(remaining) < phase_duration {
                 self.elapsed_ms = self.elapsed_ms.saturating_add(remaining);
+                if running {
+                    self.total_elapsed_ms = self.total_elapsed_ms.saturating_add(remaining);
+                }
                 break;
             }
-            remaining = remaining.saturating_sub(phase_duration.saturating_sub(self.elapsed_ms));
+            let consumed = phase_duration.saturating_sub(self.elapsed_ms);
+            self.total_elapsed_ms = self.total_elapsed_ms.saturating_add(consumed);
+            remaining = remaining.saturating_sub(consumed);
             self.elapsed_ms = 0;
             self.phase = match self.phase {
                 GuidedPhase::Rest => GuidedPhase::Warming,
@@ -613,6 +638,34 @@ mod tests {
         assert_eq!(m.phase, GuidedPhase::Recovery);
         m.tick(120_000);
         assert_eq!(m.phase, GuidedPhase::Result);
+    }
+    #[test]
+    fn the_total_duration_spans_every_phase_and_stops_at_the_result() {
+        let mut m = GuidedMachine::new(GuidedProfile::Standard, config());
+        assert!(m.complete_preflight(&checks()));
+        assert!(m.begin());
+        m.tick(60_000);
+        m.tick(90_000);
+        m.tick(100_000);
+        assert_eq!(m.phase, GuidedPhase::SteadyLoad);
+        assert_eq!(m.total_elapsed_ms, 250_000);
+        m.tick(80_000 + 120_000 + 5_000);
+        assert_eq!(m.phase, GuidedPhase::Result);
+        assert_eq!(m.total_elapsed_ms, 450_000, "time after the result is not the test's");
+        m.tick(30_000);
+        assert_eq!(m.total_elapsed_ms, 450_000);
+    }
+    #[test]
+    fn a_cancelled_test_keeps_the_time_it_actually_ran() {
+        let mut m = GuidedMachine::new(GuidedProfile::Standard, config());
+        assert!(m.complete_preflight(&checks()));
+        assert!(m.begin());
+        m.skip_rest();
+        m.tick(90_000 + 20_000);
+        assert!(m.request_cancel(GuidedStopReason::UserRequested));
+        m.tick(1_000);
+        assert_eq!(m.phase, GuidedPhase::Cancelled);
+        assert_eq!(m.total_elapsed_ms, 111_000);
     }
     #[test]
     fn preflight_blocks_battery_when_ac_is_required() {

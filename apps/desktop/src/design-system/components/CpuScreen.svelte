@@ -9,6 +9,7 @@
   import CpuTopologyMap, { type CoreGroup } from './CpuTopologyMap.svelte';
   import CpuAdvancedTable, { type CoreTableRow, type CoreTableColumnLabels } from './CpuAdvancedTable.svelte';
   import type { CoreReading, CoreMetricMode } from './CoreCell.svelte';
+  import InfoTip from './InfoTip.svelte';
 
   interface Props {
     title: string;
@@ -29,6 +30,14 @@
     tableFilterLabel: string;
     tableFilterPlaceholder?: string;
     tableEmptyFilterMessage: string;
+    /**
+     * Plain-language explanations, already translated, shown as `InfoTip`s (with `helpLabel`): what
+     * the hatched tiles are, and what the temperature and limitation columns mean.
+     */
+    topologyHelp?: string;
+    temperatureHelp?: string;
+    throttlingHelp?: string;
+    helpLabel?: string;
   }
 
   let {
@@ -49,7 +58,11 @@
     tableColumnLabels,
     tableFilterLabel,
     tableFilterPlaceholder,
-    tableEmptyFilterMessage
+    tableEmptyFilterMessage,
+    topologyHelp,
+    temperatureHelp,
+    throttlingHelp,
+    helpLabel
   }: Props = $props();
 
   let metricMode: CoreMetricMode = $state('temperature');
@@ -59,7 +72,7 @@
   <h2 class="value-md" style:color="var(--text-primary)">{title}</h2>
 
   <section>
-    <h3 class="label section-title" style:color="var(--text-secondary)">{topologyLabel}</h3>
+    <h3 class="label section-title with-help" style:color="var(--text-secondary)">{topologyLabel}{#if topologyHelp && helpLabel}<InfoTip text={topologyHelp} label={helpLabel} />{/if}</h3>
     <CpuTopologyMap
       {groups}
       {metricMode}
@@ -84,6 +97,9 @@
       filterLabel={tableFilterLabel}
       filterPlaceholder={tableFilterPlaceholder}
       emptyFilterMessage={tableEmptyFilterMessage}
+      {temperatureHelp}
+      {throttlingHelp}
+      {helpLabel}
     />
   </section>
 </div>
@@ -109,5 +125,10 @@
   }
   .section-title {
     margin: 0;
+  }
+  .with-help {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 </style>

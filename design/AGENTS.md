@@ -621,6 +621,22 @@ whenever the spec requires a keyboard-reachable tooltip that survives
 the pointer moving onto it (the CPU core tiles' temp/carga/reloj/
 throttling tooltip is the motivating case).
 
+### InfoTip
+| prop | type | required | notes |
+|---|---|---|---|
+| `text` | `string` | yes | the plain-language explanation, already translated (max ~240 px wide) |
+| `label` | `string` | yes | accessible name of the "?" trigger, e.g. "Más información" |
+| `placement` | `'top' \| 'bottom' \| 'left' \| 'right'` | no (`'bottom'`) | |
+
+A 16 px round "?" button wrapping `Tooltip`, added 2026-09-29 so people who are not technical can
+learn what a figure or a label means. The "?" is a glyph, not copy; all words come from the host.
+It opens on hover and on keyboard focus. The components that show one take the explanation as an
+optional prop and render the `InfoTip` only when it (and the host's `helpLabel`) is given:
+`StatWidget.help`, `StatusHero.ringHelp/statusHelp/potentialHelp`,
+`CoverageMatrix.rowHelp/qualityHelp/accessHelp`, `GuidedDiagnosticScreen.referenceHelp`,
+`ReportScreen.reducedConfidenceNoticeHelp`, `SessionsScreenSession.classificationHelp`,
+`CpuScreen.topologyHelp/temperatureHelp/throttlingHelp`.
+
 ### ProgressBar
 | prop | type | required | notes |
 |---|---|---|---|
@@ -790,6 +806,8 @@ it does not scroll itself.
 | `errorTitle` / `errorDescription` | `string` | yes / no | shown via `Banner tone="critical"` |
 | `retryLabel` / `onRetry` | `string` / `() => void` | yes | the error `Banner`'s action |
 | `deleteDialogTitle` / `deleteDialogDescription` / `deleteDialogCancelLabel` / `deleteDialogConfirmLabel` | `string` | yes | the one shared confirm `Dialog`'s copy |
+| `pageSize` | `number` | no | sessions per page; omitted = the whole list. Added 2026-09-29 (the history grows without bound) |
+| `previousPageLabel` / `nextPageLabel` / `pageLabel` | `string` / `string` / `(page, pageCount) => string` | no | the pager (Anterior / Siguiente / "Página 2 de 5") appears only with more than one page **and** all three given; the current page is clamped when a delete empties the last page |
 
 Reflows at its own container width (`@container tw-sessions`, 599px) —
 `SessionCard`'s result row wraps to a new line below that width.

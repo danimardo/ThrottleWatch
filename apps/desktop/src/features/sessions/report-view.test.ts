@@ -4,7 +4,8 @@ import {
   eventLines,
   evidenceLines,
   impactText,
-  noImpactReason
+  noImpactReason,
+  noImpactTitle
 } from './report-view';
 
 const t = (key: string): string => `«${key}»`;
@@ -102,5 +103,18 @@ describe('report view', () => {
       '«sessions.reportNoImpactReason»'
     );
     expect(noImpactReason(t, null)).toBe('«sessions.reportNoImpactReason»');
+  });
+
+  it('says there is nothing to measure, not that data is missing, when no limit was found', () => {
+    expect(noImpactReason(t, { classification: 'normal' })).toBe(
+      '«sessions.reportNoImpactNormal»'
+    );
+    expect(noImpactTitle(t, { classification: 'normal' })).toBe(
+      '«sessions.reportNoImpactNormalTitle»'
+    );
+    expect(noImpactTitle(t, { classification: 'power_limited' })).toBe(
+      '«sessions.reportNoImpact»'
+    );
+    expect(noImpactTitle(t, null)).toBe('«sessions.reportNoImpact»');
   });
 });

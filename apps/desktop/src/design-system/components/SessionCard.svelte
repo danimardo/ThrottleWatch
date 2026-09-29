@@ -18,6 +18,7 @@
    * destructive.
    */
   import StatusChip from './StatusChip.svelte';
+  import InfoTip from './InfoTip.svelte';
   import type { Classification } from '../lib/classification';
 
   export type SessionStatus = 'active' | 'completed' | 'cancelled' | 'incomplete' | 'imported';
@@ -32,6 +33,9 @@
     /** Only for 'completed' / 'imported' sessions that have a result. */
     classification?: Classification;
     classificationLabel?: string;
+    /** Plain-language explanation of the classification chip, as an `InfoTip` beside it. */
+    classificationHelp?: string;
+    helpLabel?: string;
     /** 'imported' sessions get a small secondary tag next to the classification chip (or alone, if there's no classification yet). */
     importedLabel?: string;
     /** True when this guided session is marked as the before/after reference; renders the `referenceLabel` tag. */
@@ -61,6 +65,8 @@
     statusLabel,
     classification,
     classificationLabel,
+    classificationHelp,
+    helpLabel,
     importedLabel,
     isReference = false,
     referenceLabel,
@@ -99,6 +105,7 @@
   <div class="result">
     {#if classification && classificationLabel}
       <StatusChip {classification} label={classificationLabel} />
+      {#if classificationHelp && helpLabel}<InfoTip text={classificationHelp} label={helpLabel} />{/if}
     {:else if statusLabel}
       <span class="status-tag caption">{statusLabel}</span>
     {/if}

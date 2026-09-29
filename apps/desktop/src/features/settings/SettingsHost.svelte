@@ -277,6 +277,8 @@
         return t('settings.accessNote.denied');
       case 'error':
         return t('settings.accessNote.error');
+      case 'capped_by_vendor':
+        return t('settings.accessNote.cappedByVendor');
       default:
         return undefined;
     }

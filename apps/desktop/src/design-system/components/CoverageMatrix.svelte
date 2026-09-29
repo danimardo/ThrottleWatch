@@ -23,6 +23,7 @@
   import type { AdvancedAccessState } from '../lib/access';
   import Button from './Button.svelte';
   import Banner from './Banner.svelte';
+  import InfoTip from './InfoTip.svelte';
 
   export type CoverageQuality = 'direct' | 'derived' | 'substitute';
 
@@ -70,6 +71,15 @@
     recheckDisabled?: boolean;
     copySummaryLabel?: string;
     onCopySummary?: () => void;
+    /**
+     * Plain-language explanations, already translated. Each one appears as an `InfoTip` only when
+     * given: one per magnitude (by row `id`), one per quality word, and one for the access sentence.
+     */
+    rowHelp?: Record<string, string>;
+    qualityHelp?: Partial<Record<CoverageQuality, string>>;
+    accessHelp?: string;
+    /** Accessible name of every `InfoTip` trigger, e.g. "More information". */
+    helpLabel?: string;
   }
 
   let {
@@ -91,7 +101,11 @@
     onRecheck,
     recheckDisabled = false,
     copySummaryLabel,
-    onCopySummary
+    onCopySummary,
+    rowHelp,
+    qualityHelp,
+    accessHelp,
+    helpLabel
   }: Props = $props();
 
   let accessTone = $derived<'info' | 'warning' | 'critical'>(
@@ -134,7 +148,9 @@
     <tbody>
       {#each rows as row, i (row.id)}
         <tr class:unavailable={!row.available} style:--tw-i={i}>
-          <th scope="row" class="body-strong">{row.label}</th>
+          <th scope="row" class="body-strong">
+            <span class="with-help">{row.label}{#if rowHelp?.[row.id] && helpLabel}<InfoTip text={rowHelp[row.id] ?? ''} label={helpLabel} />{/if}</span>
+          </th>
           <td data-label={columnLabels.available}>
             <span class="avail" class:ok={row.available}>
               <span class="glyph" aria-hidden="true">
@@ -149,7 +165,10 @@
           </td>
           <td data-label={columnLabels.quality}>
             {#if row.available && row.qualityLabel}
-              <span class="body quality" class:substitute={row.quality === 'substitute'} class:derived={row.quality === 'derived'}>{row.qualityLabel}</span>
+              <span class="with-help">
+                <span class="body quality" class:substitute={row.quality === 'substitute'} class:derived={row.quality === 'derived'}>{row.qualityLabel}</span>
+                {#if row.quality && qualityHelp?.[row.quality] && helpLabel}<InfoTip text={qualityHelp[row.quality] ?? ''} label={helpLabel} />{/if}
+              </span>
             {:else}
               <span class="body muted" aria-hidden="true">—</span>
             {/if}
@@ -174,10 +193,13 @@
         action={(accessState === 'installable' || accessState === 'upgradable') && onRequestAccess ? requestAction : accessState === 'error' && onAccessRetry ? retryAction : undefined}
       />
     {:else}
-      <span class="body access-line">{accessLabel}</span>
+      <span class="with-help">
+        <span class="body access-line">{accessLabel}</span>
+        {#if accessHelp && helpLabel}<InfoTip text={accessHelp} label={helpLabel} />{/if}
+      </span>
     {/if}
     <div class="actions">
-      {#if accessState === 'available' && onDisableAccess}
+      {#if (accessState === 'available' || accessState === 'capped_by_vendor') && onDisableAccess}
         {@render disableAction()}
       {/if}
       <Button variant="secondary" label={recheckLabel} disabled={recheckDisabled} onclick={onRecheck} />
@@ -189,6 +211,11 @@
 </div>
 
 <style>
+  .with-help {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
   .tw-coverage-matrix {
     display: flex;
     flex-direction: column;

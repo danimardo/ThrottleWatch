@@ -105,6 +105,7 @@ pub fn snapshot_dto(
                 summary.advanced_access,
                 detect_pawnio,
                 live.sidecar_low_level_access(),
+                live.cpu().map(|cpu| cpu.vendor.as_str()),
             ),
         },
         confidence_label: crate::i18n::text(
@@ -151,12 +152,16 @@ pub fn detect_pawnio() -> Option<PawnIoInstallation> {
 /// sidecar) says `denied`, which Rust's own installer/registry check has no way to tell on its
 /// own: a policy or antivirus blocking PawnIO looks identical to it as "a current install", but
 /// there is nothing to repair by retrying, so the interface must offer help instead (FR-090,
-/// T161).
+/// T161) — or unless `vendor` is one this build has no limitation-reason registry for at all
+/// (AMD today, `spec.md` §421): tier A is not attainable there regardless of how well advanced
+/// access works, so a current install reads as `capped_by_vendor`, not `error` (found
+/// 2026-09-28: "Reparar acceso avanzado" fixed nothing, forever, because nothing was broken).
 pub(super) fn resolve_advanced_access(
     enabled: bool,
     computed: AdvancedAccess,
     detect: impl FnOnce() -> Option<PawnIoInstallation>,
     sidecar_state: Option<&str>,
+    vendor: Option<&str>,
 ) -> AdvancedAccessDto {
     if !enabled {
         return AdvancedAccessDto::Denied;
@@ -169,6 +174,9 @@ pub(super) fn resolve_advanced_access(
         Some(PawnIoInstallation::Upgradable { .. }) => AdvancedAccessDto::Upgradable,
         Some(PawnIoInstallation::Current { .. }) if sidecar_state == Some("denied") => {
             AdvancedAccessDto::Denied
+        }
+        Some(PawnIoInstallation::Current { .. }) if vendor == Some("amd") => {
+            AdvancedAccessDto::CappedByVendor
         }
         Some(PawnIoInstallation::Current { .. }) => AdvancedAccessDto::Error,
     }
@@ -214,6 +222,7 @@ pub fn coverage_dto(
             summary.advanced_access,
             detect,
             live.sidecar_low_level_access(),
+            live.cpu().map(|cpu| cpu.vendor.as_str()),
         ),
         rows: coverage_rows(live, signals),
         conclusion_key: match summary.tier {
@@ -741,7 +750,8 @@ mod tests {
             ),
         ];
         for (installation, computed, expected) in cases {
-            let actual = resolve_advanced_access(true, computed, || installation.clone(), None);
+            let actual =
+                resolve_advanced_access(true, computed, || installation.clone(), None, None);
             assert_eq!(
                 format!("{actual:?}"),
                 format!("{expected:?}"),
@@ -757,6 +767,7 @@ mod tests {
             AdvancedAccess::Installable,
             || panic!("the probe must not run when advanced access is disabled"),
             None,
+            None,
         );
         assert!(matches!(actual, AdvancedAccessDto::Denied));
     }
@@ -767,6 +778,7 @@ mod tests {
             true,
             AdvancedAccess::NotNeeded,
             || panic!("tier A needs no probe"),
+            None,
             None,
         );
         assert!(matches!(actual, AdvancedAccessDto::NotNeeded));
@@ -784,6 +796,7 @@ mod tests {
             AdvancedAccess::Installable,
             || Some(PawnIoInstallation::Current { version: "2.2.0".to_owned() }),
             Some("denied"),
+            Some("intel"),
         );
         assert!(matches!(actual, AdvancedAccessDto::Denied));
     }
@@ -791,14 +804,43 @@ mod tests {
     #[test]
     fn a_current_install_the_sidecar_has_not_reported_yet_still_offers_repair() {
         // No handshake seen this run (`None`), or the sidecar said anything other than `denied`:
-        // today's behaviour (offer repair) must not regress.
+        // today's behaviour (offer repair) must not regress — on a vendor whose limitation
+        // reasons this build can actually read.
         let actual = resolve_advanced_access(
             true,
             AdvancedAccess::Installable,
             || Some(PawnIoInstallation::Current { version: "2.2.0".to_owned() }),
             None,
+            Some("intel"),
         );
         assert!(matches!(actual, AdvancedAccessDto::Error));
+    }
+
+    /// Found 2026-09-28 on a real AMD machine: "Reparar acceso avanzado" never fixed anything,
+    /// because nothing was broken — AMD has no limitation-reason registry yet (`spec.md` §421),
+    /// so tier A is never reachable there and a current, working install must not read as `error`.
+    #[test]
+    fn a_current_install_on_amd_is_capped_not_broken() {
+        let actual = resolve_advanced_access(
+            true,
+            AdvancedAccess::Installable,
+            || Some(PawnIoInstallation::Current { version: "2.2.0".to_owned() }),
+            None,
+            Some("amd"),
+        );
+        assert!(matches!(actual, AdvancedAccessDto::CappedByVendor));
+    }
+
+    #[test]
+    fn an_amd_machine_the_sidecar_reports_denied_still_offers_help_not_the_capped_note() {
+        let actual = resolve_advanced_access(
+            true,
+            AdvancedAccess::Installable,
+            || Some(PawnIoInstallation::Current { version: "2.2.0".to_owned() }),
+            Some("denied"),
+            Some("amd"),
+        );
+        assert!(matches!(actual, AdvancedAccessDto::Denied));
     }
 
     #[test]

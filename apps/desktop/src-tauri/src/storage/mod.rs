@@ -1752,7 +1752,7 @@ mod tests {
         values.insert("appearance.theme".to_owned(), serde_json::json!("dark"));
         storage.set_user_preferences(&values)?;
         assert_eq!(storage.user_preferences()?["appearance.theme"], serde_json::json!("dark"));
-        assert_eq!(values.len(), 20);
+        assert_eq!(values.len(), 21);
         Ok(())
     }
 

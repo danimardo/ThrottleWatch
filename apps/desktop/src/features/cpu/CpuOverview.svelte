@@ -8,25 +8,41 @@
     CoreTableRow
   } from '../../design-system/components/CpuAdvancedTable.svelte';
   import { invokeValidated } from '../../lib/bridge';
+  import { coreTemperatureView } from './model';
   import { getTranslator } from '../../lib/i18n/runtime';
   import {
     commandResponseSchemas,
+    liveSnapshotSchema,
     type CpuTopology
   } from '../../lib/bridge/schemas';
 
   const { t } = getTranslator();
 
   let topology = $state<CpuTopology['cores']>([]);
+  let generalTemperatureC = $state<number | null>(null);
   let selectedCoreId = $state<string | undefined>();
 
-  onMount(() => {
-    void invokeValidated(
+  async function loadTopology(): Promise<void> {
+    const result = await invokeValidated(
       'get_cpu_topology',
       undefined,
       commandResponseSchemas.get_cpu_topology
-    ).then((result) => {
-      if (result.ok) topology = result.value.cores;
-    });
+    );
+    if (result.ok) topology = result.value.cores;
+    const live = await invokeValidated(
+      'get_live_snapshot',
+      undefined,
+      liveSnapshotSchema
+    );
+    if (live.ok) generalTemperatureC = live.value.temperature_c;
+  }
+
+  // The readings used to be fetched once when the screen opened and then never again, so the
+  // figures were frozen at whatever the first sample said.
+  onMount(() => {
+    void loadTopology();
+    const timer = setInterval(() => void loadTopology(), 2000);
+    return () => clearInterval(timer);
   });
 
   function label(value: number | null, suffix: string): string {
@@ -40,8 +56,15 @@
       id: core.id,
       index: core.index,
       group: core.group === 'ungrouped' ? undefined : core.group,
-      tone: core.temperature_c === null ? 'unknown' : 'warm',
-      temperatureLabel: label(core.temperature_c, ` ${t('dashboard.celsius')}`),
+      tone:
+        core.temperature_c === null && generalTemperatureC === null
+          ? 'unknown'
+          : 'warm',
+      temperatureLabel: coreTemperatureView(
+        t,
+        core.temperature_c,
+        generalTemperatureC
+      ).label,
       clockLabel: label(core.clock_mhz, ` ${t('dashboard.mhz')}`),
       throttling: core.throttling === true,
       unavailable: core.temperature_c === null && core.clock_mhz === null
@@ -64,7 +87,7 @@
         index: core.index,
         groupLabel: core.group?.toUpperCase() ?? '',
         temperatureLabel: core.temperatureLabel ?? t('common.noValue'),
-        temperatureValue: source?.temperature_c ?? undefined,
+        temperatureValue: source?.temperature_c ?? generalTemperatureC ?? undefined,
         clockLabel: core.clockLabel ?? t('common.noValue'),
         clockValue: source?.clock_mhz ?? undefined,
         loadLabel: label(
@@ -81,6 +104,16 @@
   );
   let noReadings = $derived(
     cores.length === 0 || cores.every((core) => core.unavailable)
+  );
+  // Some processors (this Ryzen among them) report one temperature for the whole chip and none per
+  // core: say so, instead of a grid of dashes that reads as broken.
+  let onlyChipTemperature = $derived(
+    !noReadings &&
+      generalTemperatureC !== null &&
+      topology.every((core) => core.temperature_c === null)
+  );
+  let someCoresHaveNoReading = $derived(
+    !noReadings && cores.some((core) => core.unavailable)
   );
   const columnLabels: CoreTableColumnLabels = {
     index: t('cpu.core'),
@@ -112,12 +145,24 @@
           .replace('{clock}', core.clockLabel ?? t('common.noValue'))}
   {selectedCoreId}
   onSelectCore={(id) => (selectedCoreId = id)}
-  coverageTone={noReadings ? 'warning' : undefined}
-  coverageTitle={noReadings ? t('cpu.waiting') : undefined}
-  coverageDescription={noReadings ? t('cpu.waitingDescription') : undefined}
+  coverageTone={noReadings ? 'warning' : onlyChipTemperature ? 'info' : undefined}
+  coverageTitle={noReadings
+    ? t('cpu.waiting')
+    : onlyChipTemperature
+      ? t('cpu.chipTemperatureOnlyTitle')
+      : undefined}
+  coverageDescription={noReadings
+    ? t('cpu.waitingDescription')
+    : onlyChipTemperature
+      ? t('cpu.chipTemperatureOnlyDescription')
+      : undefined}
   tableRows={rows}
   tableColumnLabels={columnLabels}
   tableFilterLabel={t('cpu.filter')}
   tableFilterPlaceholder={t('cpu.filterPlaceholder')}
   tableEmptyFilterMessage={t('cpu.emptyFilter')}
+  topologyHelp={someCoresHaveNoReading ? t('help.hatched') : undefined}
+  temperatureHelp={onlyChipTemperature ? t('help.coreTemperature') : undefined}
+  throttlingHelp={t('help.throttling')}
+  helpLabel={t('help.more')}
 />

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import InfoTip from './InfoTip.svelte';
   /**
    * The per-core advanced table: every core as a row, filterable (by
    * core number or group) and sortable (click a header), and
@@ -57,9 +58,13 @@
     emptyFilterMessage: string;
     rowHeight?: number;
     maxHeight?: number;
+    /** Plain-language explanations of two columns, as `InfoTip`s in their headers (with `helpLabel`). */
+    temperatureHelp?: string;
+    throttlingHelp?: string;
+    helpLabel?: string;
   }
 
-  let { rows, columnLabels, filterLabel, filterPlaceholder, emptyFilterMessage, rowHeight = 36, maxHeight = 320 }: Props = $props();
+  let { rows, columnLabels, filterLabel, filterPlaceholder, emptyFilterMessage, rowHeight = 36, maxHeight = 320, temperatureHelp, throttlingHelp, helpLabel }: Props = $props();
 
   let filterText = $state('');
   let sortColumn: CoreTableSortColumn = $state('index');
@@ -125,10 +130,13 @@
     <div class="header-row">
       <button type="button" class="col col-index caption" onclick={() => toggleSort('index')}>{columnLabels.index} {sortIndicator('index')}</button>
       <span class="col col-group caption">{columnLabels.group}</span>
-      <button type="button" class="col col-num caption" onclick={() => toggleSort('temperature')}>{columnLabels.temperature} {sortIndicator('temperature')}</button>
+      <span class="col col-num head-with-help">
+        <button type="button" class="head-button caption" onclick={() => toggleSort('temperature')}>{columnLabels.temperature} {sortIndicator('temperature')}</button>
+        {#if temperatureHelp && helpLabel}<InfoTip text={temperatureHelp} label={helpLabel} />{/if}
+      </span>
       <button type="button" class="col col-num caption" onclick={() => toggleSort('clock')}>{columnLabels.clock} {sortIndicator('clock')}</button>
       <button type="button" class="col col-num caption" onclick={() => toggleSort('load')}>{columnLabels.load} {sortIndicator('load')}</button>
-      <span class="col col-throttle caption">{columnLabels.throttling}</span>
+      <span class="col col-throttle caption head-with-help">{columnLabels.throttling}{#if throttlingHelp && helpLabel}<InfoTip text={throttlingHelp} label={helpLabel} placement="left" />{/if}</span>
     </div>
 
     {#if sortedRows.length === 0}
@@ -162,6 +170,29 @@
 </div>
 
 <style>
+  .head-with-help {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .col.head-with-help {
+    overflow: visible;
+  }
+  .head-button {
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: var(--text-tertiary);
+    font: inherit;
+    text-align: left;
+  }
+  .head-button:hover {
+    color: var(--text-primary);
+  }
+  .head-button:focus-visible {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 1px;
+  }
   .tw-cpu-table {
     background-color: var(--glass-bg);
     background-image: var(--glass-sheen);

@@ -17,6 +17,7 @@
     BottomBar,
     Button,
     CloseBlockedDialog,
+    Dialog,
     EmptyState,
     FirstCloseDialog,
     NavigationItem,
@@ -41,6 +42,7 @@
     type OnboardingState
   } from '../lib/bridge/schemas';
   import { invokeValidated, listenValidated } from '../lib/bridge';
+  import { accessRequestAction } from '../lib/access-action';
   import { stopOperationFor } from '../lib/lifecycle/close';
   import { getTranslator } from '../lib/i18n/runtime';
   import {
@@ -117,6 +119,7 @@
     'guided'
   );
   let firstCloseOpen = $state(false);
+  let startupAccessPromptOpen = $state(false);
   let storageDegraded = $state(false);
   let detectionStarted = false;
   const compactDestinations = destinations.slice(0, 3);
@@ -227,6 +230,8 @@
       onboardingState = state;
       if (state.status === 'pending' && initialStepFor(state) === 4) {
         void startDetection();
+      } else if (state.status !== 'pending') {
+        void checkStartupAccessPrompt();
       }
     });
     void loadDetailedLoggingState();
@@ -459,6 +464,68 @@
     } else {
       detectionStatus = 'partial';
     }
+  }
+
+  /**
+   * FR-090-adjacent, added 2026-09-28 at the owner's request: onboarding's own detection slide
+   * (`startDetection` above) only ever runs once, during the first run. Someone who skipped
+   * installing advanced access then, or whose PawnIO stopped being current since, otherwise never
+   * hears about it again unless they go looking in Ajustes themselves — this asks once per launch
+   * instead, and remembers "Ahora no" so it does not nag (`access.startup_prompt_dismissed`).
+   */
+  async function checkStartupAccessPrompt(): Promise<void> {
+    const preferences = await invokeValidated(
+      'get_preferences',
+      undefined,
+      commandResponseSchemas.get_preferences
+    );
+    if (
+      preferences.ok &&
+      preferences.value.values['access.startup_prompt_dismissed'] === true
+    ) {
+      return;
+    }
+    const result = await invokeValidated(
+      'get_coverage',
+      undefined,
+      commandResponseSchemas.get_coverage
+    );
+    if (result.ok && result.value.advanced_access === 'installable') {
+      coverage = result.value;
+      startupAccessPromptOpen = true;
+    }
+  }
+
+  async function activateAdvancedAccessFromPrompt(): Promise<void> {
+    const action = coverage && accessRequestAction(coverage.advanced_access);
+    startupAccessPromptOpen = false;
+    if (!action) return;
+    await invokeValidated(
+      'request_low_level_access',
+      { request: { action } },
+      commandResponseSchemas.request_low_level_access
+    );
+  }
+
+  async function dismissStartupAccessPrompt(): Promise<void> {
+    startupAccessPromptOpen = false;
+    const preferences = await invokeValidated(
+      'get_preferences',
+      undefined,
+      commandResponseSchemas.get_preferences
+    );
+    if (!preferences.ok) return;
+    await invokeValidated(
+      'set_preference',
+      {
+        request: {
+          key: 'access.startup_prompt_dismissed',
+          value: true,
+          expected_schema_version: preferences.value.schema_version
+        }
+      },
+      commandResponseSchemas.set_preference
+    );
   }
 
   function persist(state: OnboardingState): void {
@@ -713,6 +780,26 @@
     onTray={() => void resolveFirstClose('tray')}
     onDismiss={() => void resolveFirstClose('dismiss')}
   />
+
+  <Dialog
+    bind:open={startupAccessPromptOpen}
+    title={t('settings.startupAccessPromptTitle')}
+    description={t('settings.startupAccessPromptDescription')}
+    onclose={() => void dismissStartupAccessPrompt()}
+  >
+    {#snippet actions()}
+      <Button
+        variant="secondary"
+        label={t('settings.startupAccessPromptDismiss')}
+        onclick={() => void dismissStartupAccessPrompt()}
+      />
+      <Button
+        variant="primary"
+        label={t('settings.startupAccessPromptActivate')}
+        onclick={() => void activateAdvancedAccessFromPrompt()}
+      />
+    {/snippet}
+  </Dialog>
 
   {#if win.tier === 'compact' && !onboardingActive}
     <BottomBar

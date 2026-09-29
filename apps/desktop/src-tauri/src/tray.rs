@@ -284,21 +284,35 @@ pub fn refresh(app: &AppHandle, live: Option<&LiveState>, force: bool) {
     if previous.is_none_or(|(before, _, _)| before != state) {
         crate::log_debug!("TRAY_STATE_CHANGED", "tray icon state changed", state = state.key());
     }
-    // The menu labels, tooltip and icon are cosmetic and re-applied on the next change; a failure
-    // here says nothing about what the application is doing, so it is not logged (XVII).
-    let _ = ui.status.set_text(format!("{}: {state_text}", label("native.tray.status")));
-    let _ = ui.open.set_text(label("native.tray.open"));
-    let _ =
-        ui.pause.set_text(label(if paused { "native.tray.resume" } else { "native.tray.pause" }));
-    let _ = ui.quit.set_text(label("native.tray.quit"));
-    let _ = ui.icon.set_tooltip(Some(format!("{} — {state_text}", label("native.tray.tooltip"))));
+    let status_text = format!("{}: {state_text}", label("native.tray.status"));
+    let open_text = label("native.tray.open");
+    let pause_text = label(if paused { "native.tray.resume" } else { "native.tray.pause" });
+    let quit_text = label("native.tray.quit");
+    let tooltip = format!("{} — {state_text}", label("native.tray.tooltip"));
     let bytes = tray_icon_bytes(state, tray_variant());
-    if let Ok(icon) = Image::from_bytes(bytes) {
-        let _ = ui.icon.set_icon(Some(icon));
-    }
+    let (status, open, pause, quit, icon) =
+        (ui.status.clone(), ui.open.clone(), ui.pause.clone(), ui.quit.clone(), ui.icon.clone());
     if let Ok(mut applied) = ui.applied.lock() {
         *applied = Some(Applied { state, paused, locale });
     }
+    // Posted to the main thread, never waited for (found 2026-09-28): on Windows every one of
+    // these setters blocks until the main thread runs it, and this function is called from the
+    // collector's own thread. A synchronous command on the main thread (`restart_collector`, via
+    // "Reparar/Desactivar acceso avanzado") joins that very thread — so a tray update in flight
+    // during a restart deadlocked the whole window: the main thread waiting for the collector
+    // thread, the collector thread waiting for the main thread (T188). The labels, tooltip and
+    // icon are cosmetic and re-applied on the next change; a failure here says nothing about
+    // what the application is doing, so it is not logged (XVII).
+    let _ = app.run_on_main_thread(move || {
+        let _ = status.set_text(status_text);
+        let _ = open.set_text(open_text);
+        let _ = pause.set_text(pause_text);
+        let _ = quit.set_text(quit_text);
+        let _ = icon.set_tooltip(Some(tooltip));
+        if let Ok(image) = Image::from_bytes(bytes) {
+            let _ = icon.set_icon(Some(image));
+        }
+    });
 }
 
 #[cfg(test)]

@@ -48,6 +48,7 @@
     "batch4_morePrimitives": [
       "components/Select.svelte (custom accessible listbox dropdown)",
       "components/Tooltip.svelte (keyboard + hover accessible tooltip)",
+      "components/InfoTip.svelte (the small \"?\" that explains a figure in plain words; wraps Tooltip)",
       "components/ProgressBar.svelte (determinate/indeterminate linear track; StatusHero now built on this)",
       "components/Banner.svelte (persistent in-page notice, info/warning/critical)",
       "components/EmptyState.svelte (centered no-content placeholder)"
@@ -2752,7 +2753,7 @@
       ],
       "notes": "Internal — used by StatusChip and StatusHero. Not meant to be called directly by app screens."
     },
-    "lib/access.ts": "AdvancedAccessState = 'not_needed' | 'available' | 'installable' | 'upgradable' | 'denied' | 'error' — UI-side translation of the IPC low_level_access state (see data-model.md)."
+    "lib/access.ts": "AdvancedAccessState = 'not_needed' | 'available' | 'installable' | 'upgradable' | 'denied' | 'error' | 'capped_by_vendor' — UI-side translation of the IPC low_level_access state (see data-model.md). 'capped_by_vendor' (2026-09-28): installed and working, but this processor's vendor has no limitation-reason registry yet, so level A is unreachable — a fact, not a fault; renders like 'available' (status line, optional disable action), never a retry banner."
   },
   "brandAssets": {
     "appIcon": {
